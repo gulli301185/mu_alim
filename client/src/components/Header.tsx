@@ -6,7 +6,7 @@ import { NAV, SITE } from '../data/landing';
 function navClass(isActive: boolean) {
   return isActive ? 'nav-active nav-link' : 'nav-link';
 }
-
+// nnj
 function NavItem({ href, label, onClick }: { href: string; label: string; onClick?: () => void }) {
   if (href.startsWith('/#')) {
     return <a href={href} className="nav-link py-1.5 xl:py-0" onClick={onClick}>{label}</a>;
