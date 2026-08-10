@@ -1,0 +1,207 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", Georgia, serif;
+
+  /* Logo colors: navy + gold */
+  --color-navy: #1a367e;
+  --color-navy-dark: #122654;
+  --color-navy-light: #2a4a9e;
+  --color-gold: #f19e1f;
+  --color-gold-dark: #c88000;
+  --color-gold-light: #f5b84a;
+  --color-page: #f5f7fa;
+  --color-muted: #64748b;
+}
+
+html { scroll-behavior: smooth; }
+body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
+.font-display { font-family: var(--font-display); }
+.wrap { @apply mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8; }
+
+/* Header */
+.header { @apply sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm; }
+.nav-link { @apply text-sm text-gray-600 hover:text-gold transition-colors whitespace-nowrap; }
+.nav-active { @apply text-navy font-semibold; }
+
+/* Hero — mosque photo */
+.hero-mosque {
+  position: relative;
+  min-height: 460px;
+  background: url('/mosque-hero.jpg') center/cover no-repeat;
+}
+.hero-mosque::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(26,54,126,0.82) 0%, rgba(26,54,126,0.45) 60%, rgba(26,54,126,0.2) 100%);
+}
+.hero-inner { position: relative; z-index: 1; @apply py-16 lg:py-20; }
+.hero-title {
+  font-family: var(--font-display);
+  @apply text-3xl sm:text-4xl lg:text-[2.5rem] font-bold text-white leading-tight uppercase;
+}
+.hero-sub { @apply text-white/85 text-base sm:text-lg max-w-xl leading-relaxed mt-4; }
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-xl font-semibold text-sm px-7 py-3.5 transition-all shadow-md;
+  background: var(--color-navy); color: white;
+}
+.btn-primary:hover { background: var(--color-navy-dark); }
+
+.btn-outline {
+  @apply inline-flex items-center justify-center rounded-xl border-2 font-semibold text-sm px-7 py-3.5 transition-all;
+  border-color: white; color: white; background: rgba(255,255,255,0.1);
+}
+.btn-outline:hover { background: rgba(255,255,255,0.2); }
+
+.btn-gold {
+  @apply inline-flex items-center justify-center rounded-xl font-bold text-sm px-6 py-3 transition-all shadow-md;
+  background: var(--color-gold); color: var(--color-navy-dark);
+}
+.btn-gold:hover { background: var(--color-gold-dark); color: white; }
+
+/* Stats bar */
+.stats-bar {
+  @apply bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-gray-100 p-5 sm:p-6;
+  margin-top: -48px;
+  position: relative;
+  z-index: 10;
+}
+
+/* Cards */
+.ui-card { @apply bg-white rounded-2xl border border-gray-100 shadow-sm; }
+
+.quick-card {
+  @apply bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center gap-2.5 p-5 text-center cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5;
+}
+.quick-icon {
+  @apply flex h-12 w-12 items-center justify-center rounded-xl text-xl;
+  background: linear-gradient(135deg, rgba(26,54,126,0.08), rgba(241,158,31,0.12));
+}
+
+.section-title {
+  font-family: var(--font-display);
+  @apply text-xl font-bold text-navy uppercase tracking-wide;
+}
+.section-link { @apply text-sm font-semibold text-gold hover:text-gold-dark transition-colors; }
+
+/* Video section */
+.video-main { @apply relative rounded-2xl overflow-hidden bg-navy aspect-video; }
+.video-main img { @apply w-full h-full object-cover object-top; }
+.video-play {
+  @apply absolute inset-0 flex items-center justify-center;
+  background: rgba(26,54,126,0.35);
+}
+.play-circle {
+  @apply flex h-16 w-16 items-center justify-center rounded-full shadow-xl;
+  background: var(--color-gold);
+}
+
+.video-side-item {
+  @apply flex gap-3 p-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors;
+}
+.video-side-thumb { @apply w-24 h-16 rounded-lg object-cover object-top shrink-0; }
+
+/* Prayer */
+.prayer-row { @apply flex justify-between items-center py-2 px-3 rounded-lg text-sm; }
+.prayer-active { background: rgba(26,54,126,0.07); border: 1px solid rgba(26,54,126,0.12); }
+
+.countdown-box {
+  @apply rounded-2xl p-5 text-center text-white mt-4;
+  background: linear-gradient(135deg, var(--color-navy), var(--color-navy-dark));
+}
+.countdown-num { font-family: var(--font-display); @apply text-4xl font-bold; color: var(--color-gold); }
+
+/* Bottom grid */
+.ayah-arabic {
+  direction: rtl;
+  font-family: 'Traditional Arabic', serif;
+  @apply text-2xl text-right leading-loose text-navy mb-3;
+}
+.hadith-text { @apply text-sm text-muted leading-relaxed italic; }
+
+.event-date {
+  @apply flex flex-col items-center justify-center w-14 h-14 rounded-xl text-white shrink-0;
+  background: linear-gradient(135deg, var(--color-navy), var(--color-navy-light));
+}
+.event-row { @apply flex gap-4 py-3 border-b border-gray-100 last:border-0; }
+
+.social-btn {
+  @apply flex h-10 w-10 items-center justify-center rounded-xl text-white text-xs font-bold transition-transform hover:scale-105;
+}
+
+.input-field {
+  @apply w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20;
+}
+
+.select-field {
+  @apply w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none appearance-none cursor-pointer focus:border-navy;
+}
+
+.contact-bg {
+  background: linear-gradient(135deg, var(--color-navy) 0%, var(--color-navy-dark) 100%);
+}
+.footer-bg {
+  background: linear-gradient(180deg, var(--color-navy-dark) 0%, #0a1228 100%);
+}
+
+.theme-btn {
+  @apply flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-navy;
+}
+
+.paid-row { @apply flex items-center justify-between py-3 border-b border-gray-100 last:border-0; }
+
+.stat-icon {
+  @apply flex h-10 w-10 items-center justify-center rounded-xl shrink-0;
+  background: rgba(241,158,31,0.15);
+  color: var(--color-gold-dark);
+}
+
+/* Teacher page */
+.teacher-hero {
+  background: linear-gradient(135deg, #e8ecf4 0%, #f5f7fa 50%, #1a1a1a 50%, #0d0d0d 100%);
+  @apply py-10 lg:py-16;
+}
+.teacher-hero-grid {
+  @apply grid lg:grid-cols-2 gap-0 items-stretch min-h-[420px];
+}
+.teacher-photo-wrap {
+  @apply flex items-end justify-center lg:justify-start relative z-10;
+}
+.teacher-photo {
+  @apply max-h-[480px] w-auto object-contain object-bottom;
+}
+.teacher-quote-panel {
+  @apply flex flex-col justify-center px-6 sm:px-10 lg:px-14 py-10 relative;
+  background: linear-gradient(135deg, #2a2a2a, #0a0a0a);
+}
+.teacher-quote-mark {
+  font-family: var(--font-display);
+  @apply text-6xl leading-none mb-2;
+  color: var(--color-gold);
+  opacity: 0.6;
+}
+.teacher-quote-main {
+  @apply text-xl sm:text-2xl lg:text-3xl font-bold uppercase leading-snug tracking-wide;
+  color: var(--color-gold);
+}
+.teacher-quote-sub {
+  @apply text-sm sm:text-base font-semibold uppercase mt-4 tracking-wide;
+  color: rgba(241,158,31,0.75);
+}
+.teacher-signature {
+  font-family: var(--font-display);
+  @apply text-2xl italic mt-8 self-end;
+  color: var(--color-gold);
+  border-bottom: 2px solid var(--color-gold);
+  padding-bottom: 4px;
+}
+.teacher-topic-icon {
+  @apply flex h-10 w-10 items-center justify-center rounded-xl shrink-0;
+  background: rgba(26,54,126,0.08);
+  color: var(--color-navy);
+}
