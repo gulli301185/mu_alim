@@ -66,7 +66,8 @@ export function TeacherPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="section-title">Акыркы баяндар</h2>
             <a href={SITE.youtubeFree} target="_blank" rel="noopener noreferrer" className="section-link flex items-center gap-1">
-              <Youtube className="h-4 w-4" /> YouTube канал
+              <Youtube className="h-4 w-4" /> YouTube канал 
+              {/* checked */}
             </a>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
