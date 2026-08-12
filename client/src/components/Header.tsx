@@ -1,74 +1,246 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, type RefObject } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Search, Moon, Sun, Globe, Menu, X } from 'lucide-react';
-import { NAV, SITE } from '../data/landing';
+import { Moon, Sun, Globe, Menu, X, ChevronDown, User } from 'lucide-react';
+import { NAV_PRIMARY, NAV_MENU, LANG_OPTIONS, type LangCode } from '../data/landing';
+import { AuthModal } from './AuthModal';
 
 function navClass(isActive: boolean) {
   return isActive ? 'nav-active nav-link' : 'nav-link';
 }
-// nnj
-function NavItem({ href, label, onClick }: { href: string; label: string; onClick?: () => void }) {
+
+function HeaderNavLink({
+  href,
+  label,
+  onClick,
+  isHashActive,
+}: {
+  href: string;
+  label: string;
+  onClick?: () => void;
+  isHashActive?: (href: string) => boolean;
+}) {
   if (href.startsWith('/#')) {
-    return <a href={href} className="nav-link py-1.5 xl:py-0" onClick={onClick}>{label}</a>;
+    return (
+      <a
+        href={href}
+        className={navClass(isHashActive?.(href) ?? false)}
+        onClick={onClick}
+      >
+        {label}
+      </a>
+    );
   }
   return (
-    <NavLink to={href} className={({ isActive }) => `${navClass(isActive)} py-1.5 xl:py-0`} onClick={onClick}>
+    <NavLink to={href} className={({ isActive }) => navClass(isActive)} onClick={onClick}>
       {label}
     </NavLink>
   );
 }
 
+function MenuDropdown({
+  open,
+  onToggle,
+  onClose,
+  menuRef,
+  isHashActive,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  menuRef: RefObject<HTMLDivElement | null>;
+  isHashActive: (href: string) => boolean;
+}) {
+  return (
+    <div className="header-menu-wrap" ref={menuRef}>
+      <button
+        type="button"
+        className={`header-menu-btn${open ? ' header-menu-btn-open' : ''}`}
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={onToggle}
+      >
+        Меню
+        <ChevronDown className="h-4 w-4 header-menu-chevron" />
+      </button>
+      {open && (
+        <div className="header-dropdown">
+          {NAV_MENU.map((item) =>
+            item.href.startsWith('/#') ? (
+              <a
+                key={item.label}
+                href={item.href}
+                className={`header-dropdown-link${isHashActive(item.href) ? ' header-dropdown-link-active' : ''}`}
+                onClick={onClose}
+              >
+                {item.label}
+              </a>
+            ) : (
+              <NavLink
+                key={item.label}
+                to={item.href}
+                className={({ isActive }) =>
+                  `header-dropdown-link${isActive ? ' header-dropdown-link-active' : ''}`
+                }
+                onClick={onClose}
+              >
+                {item.label}
+              </NavLink>
+            ),
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Header({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
-  const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [lang, setLang] = useState<LangCode>(() => {
+    const saved = localStorage.getItem('lang');
+    return saved === 'ru' || saved === 'en' || saved === 'kg' ? saved : 'kg';
+  });
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const menuRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
 
   const isHashActive = (href: string) => href.startsWith('/#') && pathname === '/';
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    setMobileOpen(false);
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    localStorage.setItem('lang', lang);
+    document.documentElement.lang = lang === 'kg' ? 'ky' : lang;
+  }, [lang]);
+
+  const closeAll = () => {
+    setMobileOpen(false);
+    setMenuOpen(false);
+  };
+
+  const openAuth = (tab: 'login' | 'register' = 'login') => {
+    setAuthTab(tab);
+    setAuthOpen(true);
+    closeAll();
+  };
+
+  const renderMenuLinks = (onClick?: () => void) =>
+    NAV_MENU.map((item) => (
+      <HeaderNavLink
+        key={item.label}
+        href={item.href}
+        label={item.label}
+        onClick={onClick}
+        isHashActive={isHashActive}
+      />
+    ));
+
   return (
     <header className="header">
-      <div className="wrap flex items-center justify-between h-[68px] gap-4">
-        <Link to="/" className="flex items-center gap-3 no-underline shrink-0">
-          <img src="/logo-mualim.png" alt="Logo" className="h-11 w-11 object-contain" />
-          <div>
-            <p className="text-sm font-extrabold text-navy leading-tight tracking-wide">{SITE.name}</p>
-            <p className="text-[10px] text-muted font-medium">{SITE.tagline}</p>
-          </div>
+      <div className="wrap header-inner">
+        <Link to="/" className="header-logo no-underline shrink-0">
+          <img
+            src="/logo-mualim.png"
+            alt="MUALIM"
+            className="h-11 w-11 object-cover rounded-full bg-white p-0.5 shadow-sm"
+          />
+          <span className="header-brand-name">MUALIM</span>
         </Link>
 
-        <nav className="hidden xl:flex items-center gap-5">
-          {NAV.map((l) => (
-            l.href.startsWith('/#') ? (
-              <a key={l.label} href={l.href} className={navClass(isHashActive(l.href))}>{l.label}</a>
-            ) : (
-              <NavLink key={l.label} to={l.href} className={({ isActive }) => navClass(isActive)}>
-                {l.label}
-              </NavLink>
-            )
+        <nav className="header-nav hidden lg:flex">
+          {NAV_PRIMARY.map((item) => (
+            <HeaderNavLink
+              key={item.label}
+              href={item.href}
+              label={item.label}
+              isHashActive={isHashActive}
+            />
           ))}
+          <MenuDropdown
+            open={menuOpen}
+            onToggle={() => setMenuOpen(!menuOpen)}
+            onClose={() => setMenuOpen(false)}
+            menuRef={menuRef}
+            isHashActive={isHashActive}
+          />
         </nav>
 
-        <div className="flex items-center gap-2">
-          <button className="p-2 text-navy hover:text-gold" aria-label="Издөө"><Search className="h-4 w-4" /></button>
-          <button onClick={onToggle} className="theme-btn" aria-label="Тема">
+        <div className="header-actions">
+          <button type="button" onClick={onToggle} className="theme-btn hidden sm:flex" aria-label="Тема">
             {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{dark ? 'Light' : 'Dark'}</span>
+            <span className="hidden md:inline">{dark ? 'Жарык' : 'Караңгы'}</span>
           </button>
-          <button className="hidden sm:flex items-center gap-1 text-sm font-medium text-navy">
-            <Globe className="h-4 w-4" /> KG
+
+          <div className="header-lang-wrap hidden sm:inline-flex">
+            <Globe className="h-4 w-4 header-lang-icon" aria-hidden />
+            <select
+              className="header-lang-select"
+              value={lang}
+              aria-label="Тил тандоо"
+              onChange={(e) => setLang(e.target.value as LangCode)}
+            >
+              {LANG_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button type="button" className="header-login-btn" onClick={() => openAuth('login')}>
+            <User className="h-4 w-4" />
+            Login
           </button>
-          <button className="xl:hidden p-2" onClick={() => setOpen(!open)}>
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+
+          <button
+            type="button"
+            className="header-mobile-toggle lg:hidden"
+            aria-label="Меню"
+            onClick={() => setMobileOpen(!mobileOpen)}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
 
-      {open && (
-        <nav className="xl:hidden wrap pb-4 flex flex-col gap-2 border-t pt-3">
-          {NAV.map((l) => (
-            <NavItem key={l.label} href={l.href} label={l.label} onClick={() => setOpen(false)} />
-          ))}
+      {mobileOpen && (
+        <nav className="header-mobile-nav lg:hidden wrap">
+          <div className="header-mobile-group">
+            {NAV_PRIMARY.map((item) => (
+              <HeaderNavLink
+                key={item.label}
+                href={item.href}
+                label={item.label}
+                onClick={closeAll}
+                isHashActive={isHashActive}
+              />
+            ))}
+          </div>
+          <p className="header-mobile-label">Меню</p>
+          <div className="header-mobile-group">{renderMenuLinks(closeAll)}</div>
+          <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuth('login')}>
+            <User className="h-4 w-4" />
+            Login
+          </button>
         </nav>
       )}
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab={authTab} />
     </header>
   );
 }

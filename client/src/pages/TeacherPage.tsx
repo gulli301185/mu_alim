@@ -1,117 +1,131 @@
 import { Link } from 'react-router-dom';
-import { Play, GraduationCap, BookOpen, Youtube } from 'lucide-react';
-import { TEACHER, FREE_VIDEOS, PAID_COURSES, SITE } from '../data/landing';
+import {
+  GraduationCap,
+  MapPin,
+  ArrowLeft,
+  Briefcase,
+  Languages,
+  User,
+  Info,
+} from 'lucide-react';
+import { TEACHER } from '../data/landing';
 
 export function TeacherPage() {
   return (
     <>
-      {/* Hero quote section */}
       <section className="teacher-hero">
         <div className="wrap teacher-hero-grid">
           <div className="teacher-photo-wrap">
-            <img src="/ustaz.png" alt={TEACHER.name} className="teacher-photo" />
+            <img src="/ustaz.png?v=4" alt={TEACHER.name} className="teacher-photo" />
           </div>
           <div className="teacher-quote-panel">
             <span className="teacher-quote-mark">"</span>
             <p className="teacher-quote-main">{TEACHER.quote}</p>
-            <p className="teacher-quote-sub">{TEACHER.quoteSub}</p>
+            {TEACHER.quoteSub ? (
+              <p className="teacher-quote-sub">{TEACHER.quoteSub}</p>
+            ) : null}
             <p className="teacher-signature">{TEACHER.shortName}</p>
           </div>
         </div>
       </section>
 
-      {/* Bio */}
-      <section className="py-12 bg-white">
-        <div className="wrap max-w-4xl">
-          <p className="text-xs font-bold uppercase tracking-widest mb-2 text-gold">Устаз жөнүндө</p>
-          <h1 className="section-title mb-2">{TEACHER.name}</h1>
-          <p className="text-sm font-medium text-navy mb-1">{TEACHER.role}</p>
-          <p className="text-sm text-muted mb-6">{TEACHER.institute}</p>
-          <p className="text-muted leading-relaxed">{TEACHER.bio}</p>
-
-          <div className="grid sm:grid-cols-3 gap-4 mt-8">
-            {TEACHER.stats.map((s) => (
-              <div key={s.label} className="ui-card p-5 text-center">
-                <p className="text-2xl font-bold text-navy">{s.value}</p>
-                <p className="text-xs text-muted mt-1">{s.label}</p>
-              </div>
-            ))}
+      <section className="teacher-profile-page">
+        <div className="wrap teacher-profile-wrap">
+          <div className="teacher-profile-intro-block">
+            <p className="teacher-profile-label">Устаз жөнүндө</p>
+            <h1 className="teacher-profile-name">{TEACHER.name}</h1>
+            <p className="teacher-profile-role">{TEACHER.role}</p>
+            <p className="teacher-profile-institute">{TEACHER.institute}</p>
           </div>
-        </div>
-      </section>
 
-      {/* Achievements */}
-      <section className="py-10 bg-page">
-        <div className="wrap max-w-4xl">
-          <h2 className="section-title mb-6">Илим багыты</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {TEACHER.topics.map((t) => (
-              <div key={t.title} className="ui-card p-5 flex gap-4 items-start">
-                <div className="teacher-topic-icon">
-                  {t.icon === 'book' ? <BookOpen className="h-5 w-5" /> : <GraduationCap className="h-5 w-5" />}
-                </div>
-                <div>
-                  <p className="font-semibold text-navy text-sm">{t.title}</p>
-                  <p className="text-xs text-muted mt-1 leading-relaxed">{t.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+          <div className="teacher-profile-body">
+            <article className="teacher-profile-card teacher-profile-bio-card">
+              <h2 className="teacher-profile-card-title">
+                <User className="h-5 w-5" />
+                Жеке сапаттар
+              </h2>
+              <p className="teacher-profile-bio">{TEACHER.personalQualities}</p>
+            </article>
 
-      {/* Videos */}
-      <section className="py-10 bg-white">
-        <div className="wrap">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="section-title">Акыркы баяндар</h2>
-            <a href={SITE.youtubeFree} target="_blank" rel="noopener noreferrer" className="section-link flex items-center gap-1">
-              <Youtube className="h-4 w-4" /> YouTube канал 
-              {/* checked */}
-            </a>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {FREE_VIDEOS.map((v) => (
-              <a key={v.id} href={v.url} target="_blank" rel="noopener noreferrer" className="ui-card overflow-hidden no-underline group">
-                <div className="relative aspect-video">
-                  <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-navy/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="play-circle scale-75">
-                      <Play className="h-5 w-5 text-navy ml-0.5" fill="currentColor" />
+            <article className="teacher-profile-card">
+              <h2 className="teacher-profile-card-title">
+                <GraduationCap className="h-5 w-5" />
+                Билим алуу
+              </h2>
+              <ol className="teacher-education-list">
+                {TEACHER.education.map((item) => (
+                  <li key={`${item.period}-${item.place}`} className="teacher-education-item">
+                    <span className="teacher-education-period">{item.period}</span>
+                    <div className="teacher-education-content">
+                      <p className="teacher-education-place">{item.place}</p>
+                      <p className="teacher-education-city">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        {item.city}
+                      </p>
+                      <p className="teacher-education-focus">{item.focus}</p>
                     </div>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <p className="text-sm font-medium text-navy line-clamp-2">{v.title}</p>
-                  <p className="text-xs text-muted mt-1">{v.date}</p>
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
+                  </li>
+                ))}
+              </ol>
+            </article>
 
-      {/* Courses */}
-      <section className="py-10 bg-page">
-        <div className="wrap max-w-4xl">
-          <h2 className="section-title mb-6">Акылуу курстар</h2>
-          <div className="space-y-3">
-            {PAID_COURSES.map((c) => (
-              <div key={c.title} className="ui-card p-5 flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-semibold text-navy">{c.title}</p>
-                  <p className="text-xs text-muted mt-1">{c.lessons} сабак · ★ {c.rating}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="font-bold text-gold">{c.price}</p>
-                  <button className="btn-gold text-xs px-4 py-2 mt-2">Катталуу</button>
-                </div>
-              </div>
-            ))}
+            <article className="teacher-profile-card">
+              <h2 className="teacher-profile-card-title">
+                <Briefcase className="h-5 w-5" />
+                Иш тажрыйбасы
+              </h2>
+              <ol className="teacher-education-list">
+                {TEACHER.workExperience.map((item) => (
+                  <li key={`${item.period}-${item.role}`} className="teacher-education-item">
+                    <span className="teacher-education-period">{item.period}</span>
+                    <div className="teacher-education-content">
+                      <p className="teacher-education-place">{item.role}</p>
+                      <p className="teacher-education-city">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        {item.place}, {item.city}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </article>
+
+            <div className="teacher-profile-two-col">
+              <article className="teacher-profile-card">
+                <h2 className="teacher-profile-card-title">
+                  <Languages className="h-5 w-5" />
+                  Тилдер
+                </h2>
+                <ul className="teacher-language-list">
+                  {TEACHER.languages.map((lang) => (
+                    <li key={lang.name} className="teacher-language-item">
+                      <span className="teacher-language-name">{lang.name}</span>
+                      <span className="teacher-language-level">{lang.level}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+
+              <article className="teacher-profile-card">
+                <h2 className="teacher-profile-card-title">
+                  <Info className="h-5 w-5" />
+                  Кошумча маалымат
+                </h2>
+                <ul className="teacher-extra-list">
+                  {TEACHER.additionalInfo.map((info) => (
+                    <li key={info} className="teacher-extra-item">
+                      {info}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </div>
           </div>
-          <div className="mt-8 text-center">
-            <Link to="/" className="btn-primary">Башкы бетке кайтуу</Link>
-          </div>
+
+          <Link to="/" className="teacher-profile-back">
+            <ArrowLeft className="h-4 w-4" />
+            Башкы бетке кайтуу
+          </Link>
         </div>
       </section>
     </>
