@@ -1,53 +1,63 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight, Eye, FileText, Play, Search } from 'lucide-react';
-import { AYAH, FREE_VIDEOS, HADITH } from '../data/landing';
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { QaTelegramCard } from '../components/QaTelegramCard';
 import {
+  FALLBACK_QUESTIONS,
   filterQuestions,
-  formatQuestionDate,
-  formatViews,
-  QUESTION_ARTICLES,
   QUESTIONS_PER_PAGE,
   QUESTION_SORT_OPTIONS,
   sortQuestions,
+  type QuestionArticle,
   type QuestionSort,
 } from '../data/questions';
-
-function ArticleTypeBadge({ type }: { type: 'text' | 'video' }) {
-  if (type === 'video') {
-    return (
-      <span className="qa-article-badge qa-article-badge-video">
-        <Play className="h-3.5 w-3.5" aria-hidden />
-        Видео макала
-      </span>
-    );
-  }
-  return (
-    <span className="qa-article-badge">
-      <FileText className="h-3.5 w-3.5" aria-hidden />
-      Тексттик макала
-    </span>
-  );
-}
+import { fetchQaList } from '../lib/qa-api';
 
 export function QuestionsPage() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<QuestionSort>('default');
   const [page, setPage] = useState(1);
+  const [items, setItems] = useState<QuestionArticle[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [useFallback, setUseFallback] = useState(false);
 
-  const filtered = useMemo(() => {
-    const sorted = sortQuestions(filterQuestions(QUESTION_ARTICLES, query), sort);
-    return sorted;
-  }, [query, sort]);
+  useEffect(() => {
+    let cancelled = false;
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / QUESTIONS_PER_PAGE));
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await fetchQaList({
+          page,
+          limit: QUESTIONS_PER_PAGE,
+          search: query,
+          sort,
+        });
+        if (cancelled) return;
+        setItems(data.items);
+        setTotalPages(data.totalPages);
+        setUseFallback(false);
+      } catch {
+        if (cancelled) return;
+        const filtered = sortQuestions(filterQuestions(FALLBACK_QUESTIONS, query), sort);
+        setItems(
+          filtered.slice((page - 1) * QUESTIONS_PER_PAGE, page * QUESTIONS_PER_PAGE),
+        );
+        setTotalPages(Math.max(1, Math.ceil(filtered.length / QUESTIONS_PER_PAGE)));
+        setUseFallback(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [page, query, sort]);
+
   const currentPage = Math.min(page, totalPages);
-  const pageItems = filtered.slice(
-    (currentPage - 1) * QUESTIONS_PER_PAGE,
-    currentPage * QUESTIONS_PER_PAGE,
-  );
-
-  const newMaterials = FREE_VIDEOS.slice(0, 3);
 
   return (
     <section className="qa-page">
@@ -57,7 +67,7 @@ export function QuestionsPage() {
             <p className="qa-page-kicker">Жаңы бөлüm · 2025-жылдан тартып толукталат</p>
             <h1 className="qa-page-title">Суроо-жооп</h1>
             <p className="qa-page-subtitle">
-              Динiy суроолорго жооптор, макалалар жана видеолор — Mualim Academy
+              Динiy суроолорго жооптор — Mualim Academy
             </p>
           </div>
         </header>
@@ -77,127 +87,91 @@ export function QuestionsPage() {
             />
           </label>
 
-          <label className="qa-sort">
-            <span className="qa-sort-label">Сорттоо</span>
-            <select
-              className="qa-sort-select"
-              value={sort}
-              onChange={(e) => {
-                setSort(e.target.value as QuestionSort);
-                setPage(1);
-              }}
-            >
-              {QUESTION_SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="qa-sort-row" role="group" aria-label="Сорттоо">
+            {QUESTION_SORT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`qa-sort-btn${sort === option.value ? ' qa-sort-btn-active' : ''}`}
+                onClick={() => {
+                  setSort(option.value);
+                  setPage(1);
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="qa-layout">
-          <div className="qa-main">
+        {useFallback ? (
+          <p className="qa-fallback-note">API иштебей жатат — статикалык маалымат көрсөтүлүүдө.</p>
+        ) : null}
+
+        <div className="qa-main">
+          {loading ? (
+            <div className="qa-empty ui-card">
+              <p>Жүктөлүүдө...</p>
+            </div>
+          ) : (
             <ul className="qa-articles">
-              {pageItems.map((article) => (
+              {items.map((article, index) => (
                 <li key={article.id}>
-                  <Link to={`/questions/${article.id}`} className="qa-article-card ui-card">
-                    <ArticleTypeBadge type={article.type} />
-                    <h2 className="qa-article-title">{article.title}</h2>
-                    <p className="qa-article-excerpt">{article.excerpt}</p>
-                    <p className="qa-article-views">
-                      <Eye className="h-4 w-4" aria-hidden />
-                      <span>Көрүүлөр: {formatViews(article.views)}</span>
-                    </p>
+                  <Link to={`/questions/${article.id}`} className="qa-tg-card-link">
+                    <QaTelegramCard
+                      article={{
+                        ...article,
+                        number:
+                          sort === 'default'
+                            ? (page - 1) * QUESTIONS_PER_PAGE + index + 1
+                            : article.number,
+                      }}
+                      compact
+                    />
                   </Link>
                 </li>
               ))}
             </ul>
+          )}
 
-            {pageItems.length === 0 && (
-              <div className="qa-empty ui-card">
-                <p>Эч нерсе табылган жок. Башка сөз менен издеп көрүңүз.</p>
-              </div>
-            )}
+          {!loading && items.length === 0 && (
+            <div className="qa-empty ui-card">
+              <p>Эч нерсе табылган жок. Башка сөз менен издеп көрүңүз.</p>
+            </div>
+          )}
 
-            {totalPages > 1 && (
-              <nav className="qa-pagination" aria-label="Беттер">
+          {!loading && totalPages > 1 && (
+            <nav className="qa-pagination" aria-label="Беттер">
+              <button
+                type="button"
+                className="qa-page-btn"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Мурдагы бет"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
                 <button
+                  key={n}
                   type="button"
-                  className="qa-page-btn"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  aria-label="Мурдагы бет"
+                  className={`qa-page-num${n === currentPage ? ' qa-page-num-active' : ''}`}
+                  onClick={() => setPage(n)}
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  {n}
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={`qa-page-num${n === currentPage ? ' qa-page-num-active' : ''}`}
-                    onClick={() => setPage(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="qa-page-btn"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  aria-label="Кийинки бет"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </nav>
-            )}
-          </div>
-
-          <aside className="qa-sidebar">
-            <div className="qa-sidebar-card qa-sidebar-ayah ui-card">
-              <h2 className="qa-sidebar-title">Күндүн аяты</h2>
-              <p className="qa-sidebar-text">{AYAH.translation}</p>
-              <p className="qa-sidebar-source">— {AYAH.source}</p>
-              <Link to="/#ayah" className="qa-sidebar-link">
-                Толук окуу
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-
-            <div className="qa-sidebar-card qa-sidebar-hadith ui-card">
-              <h2 className="qa-sidebar-title">Күндүн хадиси</h2>
-              <p className="qa-sidebar-text">{HADITH.text}</p>
-              <p className="qa-sidebar-source">— {HADITH.source}</p>
-              <Link to="/#hadith" className="qa-sidebar-link">
-                Толук окуу
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-
-            <div className="qa-sidebar-card ui-card">
-              <h2 className="qa-sidebar-title">Жаңы материалдар</h2>
-              <ul className="qa-new-list">
-                {newMaterials.map((video) => (
-                  <li key={video.id + video.date}>
-                    <a
-                      href={video.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="qa-new-item"
-                    >
-                      <span className="qa-new-type">
-                        <Play className="h-3 w-3" aria-hidden />
-                        Видео
-                      </span>
-                      <span className="qa-new-title">{video.title}</span>
-                      <span className="qa-new-date">{formatQuestionDate(video.date)}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </aside>
+              ))}
+              <button
+                type="button"
+                className="qa-page-btn"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Кийинки бет"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </nav>
+          )}
         </div>
       </div>
     </section>

@@ -3,14 +3,29 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   CheckCircle2,
+  Download,
   Lock,
   PlayCircle,
 } from 'lucide-react';
 import { buildCourseLessons, getCourseById, isLessonUnlocked } from '../data/courseLessons';
+import { SITE } from '../data/landing';
 import {
+  downloadCourseCertificate,
+  generateCertificateNumber,
+  loadCertificateName,
+  saveCertificateName,
+  SITE_LOGO_URL,
+} from '../lib/certificatePdf';
+import {
+  calcTestScorePercent,
+  CERTIFICATE_THRESHOLD,
+  ensureCertificateMeta,
+  getAverageScore,
+  isCertificateEligible,
   isCoursePaid,
   loadCourseProgress,
   markLessonComplete,
+  PASS_THRESHOLD,
   type CourseProgress,
 } from '../lib/courseAccess';
 import { CoursePaymentBlock } from './CoursesPage';
@@ -44,7 +59,9 @@ export function CourseLearnPage() {
   const [videoReady, setVideoReady] = useState(false);
   const [answers, setAnswers] = useState<number[]>([]);
   const [testSubmitted, setTestSubmitted] = useState(false);
+  const [lastTestScore, setLastTestScore] = useState<number | null>(null);
   const [reviewTab, setReviewTab] = useState<ReviewTab>('video');
+  const [certificateName, setCertificateName] = useState(() => loadCertificateName());
 
   useEffect(() => {
     if (!courseId || !course) {
@@ -124,14 +141,44 @@ export function CourseLearnPage() {
 
     setTestSubmitted(true);
     const correct = activeLesson.tests.filter((t, i) => answers[i] === t.correctIndex).length;
-    const passed = correct / activeLesson.tests.length >= 0.8;
+    const scorePercent = calcTestScorePercent(correct, activeLesson.tests.length);
+    const passed = scorePercent / 100 >= PASS_THRESHOLD;
+
+    setLastTestScore(scorePercent);
 
     if (passed) {
-      const next = markLessonComplete(courseId, activeLesson.id);
+      const next = markLessonComplete(courseId, activeLesson.id, scorePercent);
       setProgress(next);
       setPhase('review');
       setReviewTab('video');
     }
+  };
+
+  const handleCertificateDownload = async () => {
+    if (!courseId || !course) return;
+
+    const trimmedName = certificateName.trim();
+    if (!trimmedName) return;
+
+    saveCertificateName(trimmedName);
+
+    const lessonIds = lessons.map((lesson) => lesson.id);
+    const average = getAverageScore(progress, lessonIds) ?? 0;
+    const certificateNumber =
+      progress.certificateNumber ?? generateCertificateNumber(courseId);
+
+    if (!progress.certificateNumber) {
+      const next = ensureCertificateMeta(courseId, certificateNumber);
+      setProgress(next);
+    }
+
+    await downloadCourseCertificate({
+      studentName: trimmedName,
+      courseTitle: course.title,
+      scorePercent: average,
+      issuedAt: new Date(),
+      certificateNumber,
+    });
   };
 
   const handlePaid = () => {
@@ -139,15 +186,17 @@ export function CourseLearnPage() {
     setProgress(loadCourseProgress(courseId!));
   };
 
+  const lessonIds = useMemo(() => lessons.map((lesson) => lesson.id), [lessons]);
+  const averageScore = getAverageScore(progress, lessonIds);
+  const certificateReady = isCertificateEligible(progress, lessons.length, lessonIds);
+  const allLessonsDone = progress.completedLessonIds.length >= lessons.length;
+
   if (!course || !courseId || !activeLesson) {
     return null;
   }
 
-  const testPassed =
-    testSubmitted &&
-    activeLesson.tests.filter((t, i) => answers[i] === t.correctIndex).length /
-      activeLesson.tests.length >=
-      0.8;
+  const testPassed = testSubmitted && (lastTestScore ?? 0) / 100 >= PASS_THRESHOLD;
+  const testScoreHigh = testSubmitted && (lastTestScore ?? 0) / 100 >= CERTIFICATE_THRESHOLD;
 
   return (
     <section className="course-learn-page">
@@ -330,9 +379,17 @@ export function CourseLearnPage() {
                     )}
 
                     {testPassed ? (
-                      <p className="course-learn-test-pass">
-                        <CheckCircle2 className="h-4 w-4 inline" /> Тест ийгиликтүү! Кийинки видео ачылды.
-                      </p>
+                      <div className="course-learn-test-pass-wrap">
+                        <p className="course-learn-test-pass">
+                          <CheckCircle2 className="h-4 w-4 inline" /> Тест ийгиликтүү! ({lastTestScore}
+                          %) Кийинки видео ачылды.
+                        </p>
+                        {testScoreHigh && !allLessonsDone && (
+                          <p className="course-learn-test-cert-hint">
+                            90% жана жогору! Курс аяктаганда сертификат ала аласыз.
+                          </p>
+                        )}
+                      </div>
                     ) : (
                       <button
                         type="button"
@@ -425,7 +482,47 @@ export function CourseLearnPage() {
                       );
                       if (!next) {
                         return (
-                          <p className="course-learn-done-all">Бардык видеолор аякталды!</p>
+                          <div className="course-learn-done">
+                            <img
+                              src={SITE_LOGO_URL}
+                              alt={SITE.name}
+                              className="course-learn-done-logo"
+                            />
+                            <p className="course-learn-done-all">Бардык видеолор аякталды!</p>
+                            {certificateReady ? (
+                              <>
+                                <p className="course-learn-done-title">Сертификатка укук ачылды!</p>
+                                <p className="course-learn-done-text">
+                                  Орточо көрсөткүч: {averageScore}% (минимум{' '}
+                                  {CERTIFICATE_THRESHOLD * 100}%)
+                                </p>
+                                <label className="course-learn-cert-name-field">
+                                  <span className="course-learn-cert-name-label">Атыңыз</span>
+                                  <input
+                                    type="text"
+                                    className="course-learn-cert-name-input"
+                                    value={certificateName}
+                                    onChange={(e) => setCertificateName(e.target.value)}
+                                    placeholder="Сертификатка жазылуу"
+                                  />
+                                </label>
+                                <button
+                                  type="button"
+                                  className="btn-gold course-learn-cert-btn"
+                                  onClick={handleCertificateDownload}
+                                  disabled={!certificateName.trim()}
+                                >
+                                  <Download className="h-4 w-4" aria-hidden />
+                                  PDF сертификатты жүктөө
+                                </button>
+                              </>
+                            ) : (
+                              <p className="course-learn-done-text">
+                                Сертификат үчүн бардык тесттерде орточо {CERTIFICATE_THRESHOLD * 100}%
+                                же жогору керек. Азыркы орточо: {averageScore ?? 0}%
+                              </p>
+                            )}
+                          </div>
                         );
                       }
                       return (

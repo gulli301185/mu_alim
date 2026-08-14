@@ -151,94 +151,112 @@ export function Header({ dark, onToggle }: { dark: boolean; onToggle: () => void
     ));
 
   return (
-    <header className="header">
-      <div className="wrap header-inner">
-        <Link to="/" className="header-logo no-underline shrink-0">
-          <img
-            src="/logo-mualim.png"
-            alt="MUALIM"
-            className="h-11 w-11 object-cover rounded-full bg-white p-0.5 shadow-sm"
-          />
-          <span className="header-brand-name">MUALIM</span>
-        </Link>
-
-        <nav className="header-nav hidden lg:flex">
-          {NAV_PRIMARY.map((item) => (
-            <HeaderNavLink
-              key={item.label}
-              href={item.href}
-              label={item.label}
-              isHashActive={isHashActive}
+    <header className="header-wave">
+      <div className="header-body">
+        <div className="header-dots" aria-hidden />
+        <div className="wrap header-inner">
+          <Link to="/" className="header-logo no-underline shrink-0">
+            <img
+              src="/logo-mualim.png"
+              alt="MUALIM"
+              className="header-logo-img"
             />
-          ))}
-          <MenuDropdown
-            open={menuOpen}
-            onToggle={() => setMenuOpen(!menuOpen)}
-            onClose={() => setMenuOpen(false)}
-            menuRef={menuRef}
-            isHashActive={isHashActive}
-          />
-        </nav>
+            <span className="header-brand-name">MUALIM</span>
+          </Link>
 
-        <div className="header-actions">
-          <button type="button" onClick={onToggle} className="theme-btn hidden sm:flex" aria-label="Тема">
-            {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-            <span className="hidden md:inline">{dark ? 'Жарык' : 'Караңгы'}</span>
-          </button>
-
-          <div className="header-lang-wrap hidden sm:inline-flex">
-            <Globe className="h-4 w-4 header-lang-icon" aria-hidden />
-            <select
-              className="header-lang-select"
-              value={lang}
-              aria-label="Тил тандоо"
-              onChange={(e) => setLang(e.target.value as LangCode)}
-            >
-              {LANG_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button type="button" className="header-login-btn" onClick={() => openAuth('login')}>
-            <User className="h-4 w-4" />
-            Login
-          </button>
-
-          <button
-            type="button"
-            className="header-mobile-toggle lg:hidden"
-            aria-label="Меню"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-        </div>
-      </div>
-
-      {mobileOpen && (
-        <nav className="header-mobile-nav lg:hidden wrap">
-          <div className="header-mobile-group">
+          <nav className="header-nav hidden lg:flex">
             {NAV_PRIMARY.map((item) => (
               <HeaderNavLink
                 key={item.label}
                 href={item.href}
                 label={item.label}
-                onClick={closeAll}
                 isHashActive={isHashActive}
               />
             ))}
+            <MenuDropdown
+              open={menuOpen}
+              onToggle={() => setMenuOpen(!menuOpen)}
+              onClose={() => setMenuOpen(false)}
+              menuRef={menuRef}
+              isHashActive={isHashActive}
+            />
+          </nav>
+
+          <div className="header-actions">
+            <button type="button" onClick={onToggle} className="theme-btn hidden sm:flex" aria-label="Тема">
+              {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              <span className="hidden md:inline">{dark ? 'Жарык' : 'Караңгы'}</span>
+            </button>
+
+            <div className="header-lang-wrap hidden sm:inline-flex">
+              <Globe className="h-4 w-4 header-lang-icon" aria-hidden />
+              <select
+                className="header-lang-select"
+                value={lang}
+                aria-label="Тил тандоо"
+                onChange={(e) => setLang(e.target.value as LangCode)}
+              >
+                {LANG_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button type="button" className="header-login-btn" onClick={() => openAuth('login')}>
+              <User className="h-4 w-4" />
+              Login
+            </button>
+
+            <button
+              type="button"
+              className="header-mobile-toggle lg:hidden"
+              aria-label="Меню"
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
-          <p className="header-mobile-label">Меню</p>
-          <div className="header-mobile-group">{renderMenuLinks(closeAll)}</div>
-          <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuth('login')}>
-            <User className="h-4 w-4" />
-            Login
-          </button>
-        </nav>
-      )}
+        </div>
+
+        {mobileOpen && (
+          <nav className="header-mobile-nav lg:hidden wrap">
+            <div className="header-mobile-group">
+              {NAV_PRIMARY.map((item) => (
+                <HeaderNavLink
+                  key={item.label}
+                  href={item.href}
+                  label={item.label}
+                  onClick={closeAll}
+                  isHashActive={isHashActive}
+                />
+              ))}
+            </div>
+            <p className="header-mobile-label">Меню</p>
+            <div className="header-mobile-group">{renderMenuLinks(closeAll)}</div>
+            <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuth('login')}>
+              <User className="h-4 w-4" />
+              Login
+            </button>
+          </nav>
+        )}
+
+        <div className="header-wave-edge" aria-hidden>
+          <svg className="header-wave-svg" viewBox="0 0 1440 120" preserveAspectRatio="none">
+            <path
+              d="M0,80 L0,120 L1440,120 L1440,20 C1200,60 960,0 720,40 C480,80 240,20 0,80 Z"
+              className="header-wave-path-back"
+            />
+          </svg>
+          <svg className="header-wave-svg header-wave-svg-front" viewBox="0 0 1440 100" preserveAspectRatio="none">
+            <path
+              d="M0,70 L0,100 L1440,100 L1440,0 C1080,50 720,10 360,55 C180,75 60,65 0,70 Z"
+              className="header-wave-path-front"
+            />
+          </svg>
+        </div>
+      </div>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab={authTab} />
     </header>

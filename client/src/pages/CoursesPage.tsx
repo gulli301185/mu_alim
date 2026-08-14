@@ -137,7 +137,7 @@ export function CoursePaymentBlock({
 
       <button
         type="button"
-        className="btn-gold courses-payment-btn w-full"
+        className="btn-primary courses-payment-btn w-full"
         onClick={handlePay}
         disabled={!termsAccepted || paymentStatus === 'processing'}
       >

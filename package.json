@@ -6,10 +6,19 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:seed:qa": "tsx server/src/seed-qa.ts",
+    "db:renumber:qa": "tsx server/src/seed-qa.ts",
+    "db:import:qa": "node scripts/parse-telegram-qa.mjs",
+    "dev:server": "tsx watch server/src/index.ts",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "npm run dev:server & npm run dev:client",
+    "build:client": "npm run build --prefix client",
+    "build:server": "npm run build --prefix server"
   },
   "devDependencies": {
-    "prisma": "^6.14.0"
+    "prisma": "^6.14.0",
+    "tsx": "^4.19.3"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0"

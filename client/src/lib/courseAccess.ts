@@ -1,8 +1,14 @@
 export const PAID_COURSES_KEY = 'mualim-paid-courses';
 export const COURSE_PROGRESS_KEY = 'mualim-course-progress';
 
+export const PASS_THRESHOLD = 0.8;
+export const CERTIFICATE_THRESHOLD = 0.9;
+
 export type CourseProgress = {
   completedLessonIds: string[];
+  lessonScores?: Record<string, number>;
+  certificateNumber?: string;
+  certificateIssuedAt?: string;
 };
 
 export type AllCourseProgress = Record<string, CourseProgress>;
@@ -50,11 +56,70 @@ export function saveCourseProgress(courseId: string, progress: CourseProgress) {
   localStorage.setItem(COURSE_PROGRESS_KEY, JSON.stringify(all));
 }
 
-export function markLessonComplete(courseId: string, lessonId: string) {
+export function calcTestScorePercent(correct: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((correct / total) * 100);
+}
+
+export function getAverageScore(progress: CourseProgress, lessonIds: string[]): number | null {
+  const scores = lessonIds
+    .map((id) => progress.lessonScores?.[id])
+    .filter((score): score is number => typeof score === 'number');
+  if (!scores.length) return null;
+  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+}
+
+export function isCourseFullyComplete(progress: CourseProgress, totalLessons: number): boolean {
+  return progress.completedLessonIds.length >= totalLessons;
+}
+
+export function isCertificateEligible(
+  progress: CourseProgress,
+  totalLessons: number,
+  lessonIds: string[],
+): boolean {
+  if (!isCourseFullyComplete(progress, totalLessons)) return false;
+  const average = getAverageScore(progress, lessonIds);
+  return average !== null && average >= CERTIFICATE_THRESHOLD * 100;
+}
+
+export function markLessonComplete(
+  courseId: string,
+  lessonId: string,
+  scorePercent?: number,
+): CourseProgress {
   const progress = loadCourseProgress(courseId);
-  if (progress.completedLessonIds.includes(lessonId)) return progress;
-  const next = {
-    completedLessonIds: [...progress.completedLessonIds, lessonId],
+  const lessonScores = { ...(progress.lessonScores ?? {}) };
+
+  if (scorePercent !== undefined) {
+    const previous = lessonScores[lessonId] ?? 0;
+    lessonScores[lessonId] = Math.max(previous, scorePercent);
+  }
+
+  const completedLessonIds = progress.completedLessonIds.includes(lessonId)
+    ? progress.completedLessonIds
+    : [...progress.completedLessonIds, lessonId];
+
+  const next: CourseProgress = {
+    ...progress,
+    completedLessonIds,
+    lessonScores,
+  };
+  saveCourseProgress(courseId, next);
+  return next;
+}
+
+export function ensureCertificateMeta(
+  courseId: string,
+  certificateNumber: string,
+): CourseProgress {
+  const progress = loadCourseProgress(courseId);
+  if (progress.certificateNumber) return progress;
+
+  const next: CourseProgress = {
+    ...progress,
+    certificateNumber,
+    certificateIssuedAt: new Date().toISOString(),
   };
   saveCourseProgress(courseId, next);
   return next;

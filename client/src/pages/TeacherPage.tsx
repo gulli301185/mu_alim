@@ -5,8 +5,8 @@ import {
   ArrowLeft,
   Briefcase,
   Languages,
-  User,
-  Info,
+  Calendar,
+  Users,
 } from 'lucide-react';
 import { TEACHER } from '../data/landing';
 
@@ -31,72 +31,52 @@ export function TeacherPage() {
 
       <section className="teacher-profile-page">
         <div className="wrap teacher-profile-wrap">
-          <div className="teacher-profile-intro-block">
-            <p className="teacher-profile-label">Устаз жөнүндө</p>
-            <h1 className="teacher-profile-name">{TEACHER.name}</h1>
-            <p className="teacher-profile-role">{TEACHER.role}</p>
-            <p className="teacher-profile-institute">{TEACHER.institute}</p>
-          </div>
+          <div className="teacher-profile-layout">
+            <div className="teacher-profile-col-main">
+              <div className="teacher-profile-intro-block">
+                <p className="teacher-profile-label">Устаз жөнүндө</p>
+                <h1 className="teacher-profile-name">{TEACHER.name}</h1>
+                <p className="teacher-profile-role">{TEACHER.role}</p>
+                <p className="teacher-profile-institute">{TEACHER.institute}</p>
+                <div className="teacher-profile-meta">
+                  <span className="teacher-profile-meta-item">
+                    <Calendar className="h-4 w-4 shrink-0" aria-hidden />
+                    {TEACHER.birthYear}-жылы төрөлгөн
+                  </span>
+                  <span className="teacher-profile-meta-item">
+                    <Users className="h-4 w-4 shrink-0" aria-hidden />
+                    {TEACHER.family}
+                  </span>
+                </div>
+              </div>
 
-          <div className="teacher-profile-body">
-            <article className="teacher-profile-card teacher-profile-bio-card">
-              <h2 className="teacher-profile-card-title">
-                <User className="h-5 w-5" />
-                Жеке сапаттар
-              </h2>
-              <p className="teacher-profile-bio">{TEACHER.personalQualities}</p>
-            </article>
+              <article className="teacher-profile-card teacher-profile-card-accent teacher-profile-card-grow">
+                <h2 className="teacher-profile-card-title">
+                  <Briefcase className="h-5 w-5" />
+                  Иш тажрыйбасы
+                </h2>
+                <ol className="teacher-education-list">
+                  {TEACHER.workExperience.map((item) => (
+                    <li key={`${item.period}-${item.role}`} className="teacher-education-item">
+                      <span className="teacher-education-period">{item.period}</span>
+                      <div className="teacher-education-content">
+                        <p className="teacher-education-place">{item.role}</p>
+                        <p className="teacher-education-city">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                          {item.place}, {item.city}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </article>
 
-            <article className="teacher-profile-card">
-              <h2 className="teacher-profile-card-title">
-                <GraduationCap className="h-5 w-5" />
-                Билим алуу
-              </h2>
-              <ol className="teacher-education-list">
-                {TEACHER.education.map((item) => (
-                  <li key={`${item.period}-${item.place}`} className="teacher-education-item">
-                    <span className="teacher-education-period">{item.period}</span>
-                    <div className="teacher-education-content">
-                      <p className="teacher-education-place">{item.place}</p>
-                      <p className="teacher-education-city">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        {item.city}
-                      </p>
-                      <p className="teacher-education-focus">{item.focus}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </article>
-
-            <article className="teacher-profile-card">
-              <h2 className="teacher-profile-card-title">
-                <Briefcase className="h-5 w-5" />
-                Иш тажрыйбасы
-              </h2>
-              <ol className="teacher-education-list">
-                {TEACHER.workExperience.map((item) => (
-                  <li key={`${item.period}-${item.role}`} className="teacher-education-item">
-                    <span className="teacher-education-period">{item.period}</span>
-                    <div className="teacher-education-content">
-                      <p className="teacher-education-place">{item.role}</p>
-                      <p className="teacher-education-city">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        {item.place}, {item.city}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </article>
-
-            <div className="teacher-profile-two-col">
-              <article className="teacher-profile-card">
+              <article className="teacher-profile-card teacher-profile-card-accent teacher-profile-card-bottom">
                 <h2 className="teacher-profile-card-title">
                   <Languages className="h-5 w-5" />
                   Тилдер
                 </h2>
-                <ul className="teacher-language-list">
+                <ul className="teacher-language-grid teacher-language-grid-stack">
                   {TEACHER.languages.map((lang) => (
                     <li key={lang.name} className="teacher-language-item">
                       <span className="teacher-language-name">{lang.name}</span>
@@ -105,19 +85,29 @@ export function TeacherPage() {
                   ))}
                 </ul>
               </article>
+            </div>
 
-              <article className="teacher-profile-card">
+            <div className="teacher-profile-col-education">
+              <article className="teacher-profile-card teacher-profile-card-accent teacher-profile-card-stretch">
                 <h2 className="teacher-profile-card-title">
-                  <Info className="h-5 w-5" />
-                  Кошумча маалымат
+                  <GraduationCap className="h-5 w-5" />
+                  Билим алуу
                 </h2>
-                <ul className="teacher-extra-list">
-                  {TEACHER.additionalInfo.map((info) => (
-                    <li key={info} className="teacher-extra-item">
-                      {info}
+                <ol className="teacher-education-list">
+                  {TEACHER.education.map((item) => (
+                    <li key={`${item.period}-${item.place}`} className="teacher-education-item">
+                      <span className="teacher-education-period">{item.period}</span>
+                      <div className="teacher-education-content">
+                        <p className="teacher-education-place">{item.place}</p>
+                        <p className="teacher-education-city">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                          {item.city}
+                        </p>
+                        <p className="teacher-education-focus">{item.focus}</p>
+                      </div>
                     </li>
                   ))}
-                </ul>
+                </ol>
               </article>
             </div>
           </div>
