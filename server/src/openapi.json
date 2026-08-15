@@ -1,0 +1,220 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Mu Alim API",
+    "version": "1.0.0",
+    "description": "MUALIM — Node.js API (PostgreSQL). Swagger VS Code'до азыр иштейт."
+  },
+  "servers": [
+    { "url": "http://localhost:3001", "description": "Local dev" }
+  ],
+  "tags": [
+    { "name": "Health", "description": "Текшерүү" },
+    { "name": "Auth", "description": "Кирүү" },
+    { "name": "QA", "description": "Суроо-жооп" }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "API иштеп жатабы",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "ok": { "type": "boolean", "example": true } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Кирүү (JWT токен)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "admin@mualim.academy" },
+                  "password": { "type": "string", "minLength": 6, "example": "admin123456" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ийгилик",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "email": { "type": "string" },
+                        "firstName": { "type": "string" },
+                        "lastName": { "type": "string" },
+                        "role": { "type": "string", "enum": ["user", "admin"] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Кирүү ийгиликсиз" }
+        }
+      }
+    },
+    "/api/qa": {
+      "get": {
+        "tags": ["QA"],
+        "summary": "Суроо-жооп тизмesi",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["default", "newest", "oldest", "popular"], "default": "default" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Суроо-жооп тизмesi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "slug": { "type": "string" },
+                          "number": { "type": "integer" },
+                          "title": { "type": "string" },
+                          "question": { "type": "string" },
+                          "answer": { "type": "string" },
+                          "excerpt": { "type": "string" },
+                          "tags": { "type": "array", "items": { "type": "string" } },
+                          "views": { "type": "integer" },
+                          "publishedAt": { "type": "string", "format": "date-time" },
+                          "type": { "type": "string", "enum": ["text", "video"] },
+                          "source": { "type": "string", "example": "telegram" }
+                        }
+                      }
+                    },
+                    "total": { "type": "integer", "example": 4 },
+                    "page": { "type": "integer", "example": 1 },
+                    "totalPages": { "type": "integer", "example": 1 }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "description": "Server катасы" }
+        }
+      },
+      "post": {
+        "tags": ["QA"],
+        "summary": "Жаңы суроо (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["question", "answer"],
+                "properties": {
+                  "question": { "type": "string" },
+                  "answer": { "type": "string" },
+                  "number": { "type": "integer" },
+                  "tags": { "type": "array", "items": { "type": "string" } },
+                  "type": { "type": "string", "enum": ["text", "video"] },
+                  "isPublished": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Түзүлдү" }, "401": { "description": "Auth кerek" }, "403": { "description": "Admin кerek" } }
+      }
+    },
+    "/api/qa/{slug}": {
+      "get": {
+        "tags": ["QA"],
+        "summary": "Бир суроо slug боюнча",
+        "parameters": [
+          { "name": "slug", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Суроо" }, "404": { "description": "Табылган жок" } }
+      }
+    },
+    "/api/qa/{id}": {
+      "put": {
+        "tags": ["QA"],
+        "summary": "Жаңыртуу (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": { "type": "string" },
+                  "answer": { "type": "string" },
+                  "number": { "type": "integer" },
+                  "tags": { "type": "array", "items": { "type": "string" } },
+                  "type": { "type": "string", "enum": ["text", "video"] },
+                  "isPublished": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Жаңырды" }, "404": { "description": "Табылган жок" } }
+      },
+      "delete": {
+        "tags": ["QA"],
+        "summary": "Өчүрүү (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "204": { "description": "Өчүрүлдү" }, "404": { "description": "Табылган жок" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Login аркылуу алган token"
+      }
+    }
+  }
+}

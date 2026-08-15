@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { Footer } from './Footer';
+import { useAuth } from '../context/AuthContext';
 
 function getInitialDark(): boolean {
   const saved = localStorage.getItem('theme');
@@ -12,6 +13,9 @@ function getInitialDark(): boolean {
 
 export function Layout() {
   const [dark, setDark] = useState(getInitialDark);
+  const { isAdmin } = useAuth();
+  const { pathname } = useLocation();
+  const adminQaMode = isAdmin && pathname.startsWith('/questions');
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -20,9 +24,9 @@ export function Layout() {
 
   return (
     <div className={dark ? 'dark' : ''}>
-      <Header dark={dark} onToggle={() => setDark(!dark)} />
+      <Header dark={dark} onToggle={() => setDark(!dark)} adminSimple={adminQaMode} />
       <Outlet />
-      <Footer />
+      {!adminQaMode ? <Footer /> : null}
     </div>
   );
 }

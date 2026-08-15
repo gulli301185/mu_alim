@@ -32,9 +32,9 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
 
 .header-body {
   position: relative;
-  background: linear-gradient(180deg, var(--color-navy) 0%, var(--color-navy-dark) 100%);
+  background: linear-gradient(180deg, #3a5fae 0%, var(--color-navy-light) 45%, var(--color-navy) 100%);
   overflow: visible;
-  box-shadow: 0 4px 24px rgba(18, 38, 84, 0.18);
+  box-shadow: 0 4px 20px rgba(42, 74, 158, 0.2);
 }
 
 .header-dots {
@@ -43,7 +43,7 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
   right: 0;
   width: 220px;
   height: 280px;
-  opacity: 0.22;
+  opacity: 0.3;
   background-image: radial-gradient(circle, var(--color-gold) 1.5px, transparent 1.5px);
   background-size: 14px 14px;
   mask-image: linear-gradient(135deg, transparent 20%, black 60%);
@@ -91,11 +91,11 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
 }
 
 .header-wave-path-back {
-  fill: var(--color-navy-light);
+  fill: #4a6fc4;
 }
 
 .header-wave-path-front {
-  fill: var(--color-navy);
+  fill: var(--color-navy-light);
 }
 
 .header-logo {
@@ -357,8 +357,185 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
 .auth-modal-switch-btn:hover {
   color: var(--color-sky-dark);
 }
+.auth-modal-error {
+  @apply text-sm rounded-lg px-3 py-2 mb-3;
+  color: #b42318;
+  background: rgba(180, 35, 24, 0.08);
+  border: 1px solid rgba(180, 35, 24, 0.18);
+}
 
-/* Hero — mosque photo */
+.header-user-wrap {
+  @apply relative z-[5];
+}
+.header-user-btn {
+  @apply inline-flex items-center gap-2 text-sm font-semibold px-2.5 py-1.5 rounded-lg transition-colors max-w-[220px];
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+.header-user-btn:hover,
+.header-user-btn-open {
+  color: var(--color-gold-light);
+  border-color: rgba(241, 158, 31, 0.45);
+  background: rgba(241, 158, 31, 0.12);
+}
+.header-user-avatar {
+  @apply inline-flex items-center justify-center rounded-full shrink-0 font-bold text-xs;
+  width: 30px;
+  height: 30px;
+  background: var(--color-gold);
+  color: var(--color-navy-dark);
+}
+.header-user-name {
+  @apply truncate;
+}
+.header-user-admin {
+  @apply items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full;
+  color: var(--color-gold-light);
+  background: rgba(241, 158, 31, 0.16);
+}
+.header-user-chevron {
+  transition: transform 0.2s;
+}
+.header-user-btn-open .header-user-chevron {
+  transform: rotate(180deg);
+}
+.header-user-dropdown {
+  @apply absolute right-0 top-full mt-2 min-w-[14rem] py-2 rounded-xl shadow-xl;
+  z-index: 200;
+  border: 1px solid rgba(241, 158, 31, 0.18);
+  background: var(--color-navy-dark);
+}
+.header-user-dropdown-head {
+  @apply px-4 py-3 border-b;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.header-user-dropdown-name {
+  @apply text-sm font-bold m-0;
+  color: #fff;
+}
+.header-user-dropdown-email {
+  @apply text-xs m-0 mt-1;
+  color: rgba(255, 255, 255, 0.65);
+}
+.header-user-dropdown-role {
+  @apply inline-flex text-xs font-semibold mt-2 px-2 py-0.5 rounded-full;
+  color: var(--color-gold-light);
+  background: rgba(241, 158, 31, 0.14);
+}
+.header-user-dropdown-link {
+  @apply flex items-center gap-2 w-full px-4 py-2.5 text-sm no-underline transition-colors text-left bg-transparent border-0 cursor-pointer;
+  color: rgba(255, 255, 255, 0.82);
+}
+.header-user-dropdown-link:hover {
+  color: var(--color-gold-light);
+  background: rgba(255, 255, 255, 0.06);
+}
+.header-mobile-user {
+  @apply flex flex-col gap-2 mt-2;
+}
+
+.header-admin-label {
+  @apply justify-self-center text-base font-semibold m-0;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.profile-page {
+  @apply py-8 sm:py-10;
+}
+.profile-page-wrap {
+  @apply flex flex-col gap-6;
+}
+.profile-page-header {
+  @apply flex flex-wrap items-start justify-between gap-4;
+}
+.profile-page-kicker {
+  @apply text-xs font-bold uppercase tracking-widest m-0;
+  color: var(--color-gold-dark);
+}
+.profile-page-title {
+  @apply text-2xl sm:text-3xl font-bold m-0 mt-1;
+  color: var(--color-navy);
+}
+.profile-page-subtitle {
+  @apply text-sm m-0 mt-1;
+  color: var(--color-muted);
+}
+.profile-role-badge {
+  @apply inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-full;
+  color: var(--color-navy);
+  background: rgba(241, 158, 31, 0.18);
+  border: 1px solid rgba(241, 158, 31, 0.35);
+}
+.profile-grid {
+  @apply grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)];
+}
+.profile-summary,
+.profile-form,
+.profile-card {
+  @apply p-5 sm:p-6;
+}
+.profile-avatar {
+  @apply flex items-center justify-center rounded-full font-bold text-xl mx-auto;
+  width: 72px;
+  height: 72px;
+  background: linear-gradient(135deg, var(--color-gold-light), var(--color-gold));
+  color: var(--color-navy-dark);
+}
+.profile-summary-name {
+  @apply text-lg font-bold text-center m-0 mt-4;
+  color: var(--color-navy);
+}
+.profile-summary-email,
+.profile-summary-phone,
+.profile-summary-role {
+  @apply text-sm text-center m-0 mt-1;
+  color: var(--color-muted);
+}
+.profile-logout-btn,
+.profile-link-btn {
+  @apply block w-full text-center mt-4 px-4 py-2.5 rounded-lg text-sm font-semibold no-underline transition-colors;
+}
+.profile-logout-btn {
+  color: #fff;
+  background: var(--color-navy);
+}
+.profile-logout-btn:hover {
+  background: var(--color-navy-light);
+}
+.profile-link-btn {
+  color: var(--color-navy);
+  border: 1px solid rgba(26, 54, 126, 0.15);
+  background: #fff;
+}
+.profile-form-title {
+  @apply text-xl font-bold m-0 mb-4;
+  color: var(--color-navy);
+}
+.profile-form-subtitle {
+  @apply text-base font-semibold m-0 mb-3;
+  color: var(--color-navy);
+}
+.profile-form-grid {
+  @apply grid gap-4 sm:grid-cols-2;
+}
+.profile-form-full {
+  @apply sm:col-span-2;
+}
+.profile-password-block {
+  @apply mt-6 pt-6 border-t flex flex-col gap-4;
+  border-color: rgba(26, 54, 126, 0.1);
+}
+.profile-save-btn {
+  @apply mt-6 px-6 py-3 font-bold;
+}
+.profile-success {
+  @apply text-sm rounded-lg px-3 py-2 mb-3 m-0;
+  color: #067647;
+  background: rgba(6, 118, 71, 0.08);
+  border: 1px solid rgba(6, 118, 71, 0.18);
+}
+
 .hero-mosque {
   position: relative;
   min-height: 460px;
@@ -2145,16 +2322,16 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
 
 /* Header — dark mode (match footer tones) */
 .dark .header-body {
-  background: linear-gradient(180deg, var(--color-navy) 0%, var(--color-navy-dark) 100%);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, #3a5fae 0%, var(--color-navy-light) 45%, var(--color-navy) 100%);
+  box-shadow: 0 4px 20px rgba(42, 74, 158, 0.28);
 }
 
 .dark .header-wave-path-back {
-  fill: var(--color-navy-light);
+  fill: #4a6fc4;
 }
 
 .dark .header-wave-path-front {
-  fill: var(--color-navy);
+  fill: var(--color-navy-light);
 }
 
 .dark .nav-link {
@@ -2432,6 +2609,34 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
 
 .dark .auth-modal-switch-btn:hover {
   color: #fff;
+}
+
+.dark .auth-modal-error {
+  color: #ffb4ab;
+  background: rgba(255, 180, 171, 0.08);
+  border-color: rgba(255, 180, 171, 0.18);
+}
+
+.dark .header-user-dropdown {
+  background: #0a1628;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .profile-page-title,
+.dark .profile-summary-name,
+.dark .profile-form-title,
+.dark .profile-form-subtitle {
+  color: var(--dm-text);
+}
+
+.dark .profile-link-btn {
+  color: var(--dm-text);
+  background: var(--dm-card);
+  border-color: var(--dm-card-border);
+}
+
+.dark .profile-password-block {
+  border-color: var(--dm-card-border);
 }
 
 /* Teacher page */
@@ -4132,3 +4337,178 @@ a.course-learn-review-tab {
 .dark .qa-article-detail-body {
   color: var(--dm-text);
 }
+
+/* QA admin — minimal UI */
+.qa-page-admin {
+  background: var(--color-page);
+}
+
+.qa-admin-header {
+  @apply flex flex-wrap items-center justify-between gap-4;
+}
+
+.qa-admin-title {
+  @apply text-3xl sm:text-4xl font-bold m-0;
+  color: var(--color-navy);
+}
+
+.qa-admin-btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-semibold no-underline transition-colors cursor-pointer border-0;
+}
+
+.qa-admin-btn-add {
+  @apply px-5;
+}
+
+.qa-admin-btn-muted {
+  color: var(--color-navy);
+  background: #fff;
+  border: 1px solid #dde3ee;
+}
+
+.qa-admin-btn-muted:hover {
+  border-color: var(--color-navy-light);
+}
+
+.qa-admin-btn-danger {
+  color: #fff;
+  background: #c0392b;
+}
+
+.qa-admin-btn-danger:hover {
+  background: #a93226;
+}
+
+.qa-admin-search {
+  @apply relative flex items-center;
+}
+
+.qa-admin-search-input {
+  @apply w-full rounded-xl border py-4 pl-12 pr-4 text-lg outline-none;
+  border-color: #dde3ee;
+  background: #fff;
+  color: var(--color-navy);
+}
+
+.qa-admin-list {
+  @apply flex flex-col gap-3 list-none m-0 p-0;
+}
+
+.qa-admin-row {
+  @apply flex flex-col gap-4 p-4 sm:p-5;
+}
+
+.qa-admin-row-main {
+  @apply flex items-start gap-3;
+}
+
+.qa-admin-row-num {
+  @apply shrink-0 inline-flex items-center justify-center rounded-lg font-bold text-base;
+  min-width: 42px;
+  height: 42px;
+  background: rgba(241, 158, 31, 0.16);
+  color: var(--color-navy);
+}
+
+.qa-admin-row-text {
+  @apply m-0 text-lg leading-relaxed;
+  color: var(--color-navy);
+}
+
+.qa-admin-row-actions {
+  @apply flex flex-wrap gap-2;
+}
+
+.qa-admin-form {
+  @apply flex flex-col gap-4 p-5;
+}
+
+.qa-admin-field {
+  @apply flex flex-col gap-2;
+}
+
+.qa-admin-field-num {
+  max-width: 180px;
+}
+
+.qa-admin-label {
+  @apply text-base font-semibold;
+  color: var(--color-navy);
+}
+
+.qa-admin-textarea,
+.qa-admin-input {
+  @apply w-full rounded-xl border px-4 py-3 text-lg outline-none;
+  border-color: #dde3ee;
+  background: #fff;
+  color: var(--color-navy);
+}
+
+.qa-admin-textarea:focus,
+.qa-admin-input:focus {
+  border-color: var(--color-navy-light);
+}
+
+.qa-admin-form-actions {
+  @apply flex flex-wrap gap-3;
+}
+
+.qa-admin-page-label {
+  @apply inline-flex items-center px-3 text-base font-semibold;
+  color: var(--color-navy);
+}
+
+.qa-admin-back {
+  @apply inline-flex items-center gap-2 mb-4 text-lg font-semibold bg-transparent border-0 cursor-pointer p-0;
+  color: var(--color-navy);
+}
+
+.qa-admin-view {
+  @apply p-5 sm:p-6;
+}
+
+.qa-admin-view-label {
+  @apply text-sm font-bold uppercase tracking-wide m-0 mb-2;
+  color: var(--color-gold-dark);
+}
+
+.qa-admin-view-question {
+  @apply text-2xl font-bold m-0 mb-5 leading-snug;
+  color: var(--color-navy);
+}
+
+.qa-admin-view-answer {
+  @apply text-lg m-0 leading-relaxed whitespace-pre-wrap;
+  color: var(--color-navy);
+}
+
+.qa-admin-article-actions {
+  @apply flex flex-wrap gap-3 mt-4;
+}
+
+.dark .qa-page-admin {
+  background: var(--dm-bg);
+}
+
+.dark .qa-admin-title,
+.dark .qa-admin-row-text,
+.dark .qa-admin-label,
+.dark .qa-admin-view-question,
+.dark .qa-admin-view-answer,
+.dark .qa-admin-back,
+.dark .qa-admin-page-label {
+  color: var(--dm-text);
+}
+
+.dark .qa-admin-search-input,
+.dark .qa-admin-textarea,
+.dark .qa-admin-input,
+.dark .qa-admin-btn-muted,
+.dark .qa-admin-row,
+.dark .qa-admin-form,
+.dark .qa-admin-view {
+  background: var(--dm-card);
+  border-color: var(--dm-card-border);
+  color: var(--dm-text);
+}
+

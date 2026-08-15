@@ -1,45 +1,79 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { QaTelegramCard } from '../components/QaTelegramCard';
-import { getFallbackQuestionById, type QuestionArticle } from '../data/questions';
-import { fetchQaBySlug } from '../lib/qa-api';
+import { QaAdminForm } from '../components/QaAdminForm';
+import { useAuth } from '../context/AuthContext';
+import {
+  deleteQaArticle,
+  fetchQaBySlug,
+  updateQaArticle,
+  type QuestionArticle,
+} from '../lib/qa-api';
 
 export function QuestionArticlePage() {
   const { articleId } = useParams<{ articleId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isAdmin, token } = useAuth();
   const [article, setArticle] = useState<QuestionArticle | undefined>();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(searchParams.get('edit') === '1');
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!articleId) {
       setLoading(false);
+      setError('Суроо табылган жок.');
       return;
     }
 
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await fetchQaBySlug(articleId!);
-        if (!cancelled) setArticle(data);
-      } catch {
-        if (!cancelled) setArticle(getFallbackQuestionById(articleId!));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchQaBySlug(articleId);
+      setArticle(data);
+    } catch {
+      setArticle(undefined);
+      setError('Макала базадан табылган жок.');
+    } finally {
+      setLoading(false);
     }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
   }, [articleId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    setEditing(searchParams.get('edit') === '1');
+  }, [searchParams]);
+
+  const handleUpdate = async (values: { question: string; answer: string; number?: number }) => {
+    if (!token || !article?.recordId) throw new Error('Admin кирүү кerek');
+    const updated = await updateQaArticle(token, article.recordId, values);
+    setArticle(updated);
+    setEditing(false);
+    if (updated.slug && updated.slug !== articleId) {
+      navigate(`/questions/${updated.slug}`, { replace: true });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!token || !article?.recordId) return;
+    const ok = window.confirm('Бул суроону өчүрөсүзбү?');
+    if (!ok) return;
+    try {
+      await deleteQaArticle(token, article.recordId);
+      navigate('/questions');
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Өчүрүү ийгиликсиз');
+    }
+  };
 
   if (loading) {
     return (
-      <section className="qa-page">
+      <section className="qa-page qa-page-admin">
         <div className="wrap qa-page-wrap">
           <div className="qa-empty ui-card">
             <p>Жүктөлүүдө...</p>
@@ -49,14 +83,14 @@ export function QuestionArticlePage() {
     );
   }
 
-  if (!article) {
+  if (error || !article) {
     return (
-      <section className="qa-page">
+      <section className="qa-page qa-page-admin">
         <div className="wrap qa-page-wrap">
           <div className="qa-empty ui-card">
-            <p>Макала табылган жок.</p>
-            <Link to="/questions" className="btn-primary qa-back-btn">
-              Суроо-жоопко кайтуу
+            <p>{error ?? 'Макала табылган жок.'}</p>
+            <Link to="/questions" className="btn-gold qa-admin-btn">
+              Артка
             </Link>
           </div>
         </div>
@@ -64,34 +98,59 @@ export function QuestionArticlePage() {
     );
   }
 
-  const isTelegram = article.source === 'telegram' || (article.question && article.answer);
+  if (isAdmin) {
+    return (
+      <section className="qa-page qa-page-admin">
+        <div className="wrap qa-article-page-wrap">
+          <button type="button" className="qa-admin-back" onClick={() => navigate('/questions')}>
+            <ArrowLeft className="h-5 w-5" />
+            Артка
+          </button>
+
+          {!editing ? (
+            <>
+              <div className="qa-admin-view ui-card">
+                <p className="qa-admin-view-label">Суроо №{article.number ?? '—'}</p>
+                <h1 className="qa-admin-view-question">{article.question ?? article.title}</h1>
+                <p className="qa-admin-view-label">Жооп</p>
+                <p className="qa-admin-view-answer">{article.answer}</p>
+              </div>
+
+              <div className="qa-admin-article-actions">
+                <button type="button" className="qa-admin-btn qa-admin-btn-muted" onClick={() => setEditing(true)}>
+                  Өзгөртүү
+                </button>
+                <button type="button" className="qa-admin-btn qa-admin-btn-danger" onClick={() => void handleDelete()}>
+                  Өчүрүү
+                </button>
+              </div>
+            </>
+          ) : (
+            <QaAdminForm
+              initial={{
+                question: article.question ?? article.title,
+                answer: article.answer ?? '',
+                number: article.number ?? undefined,
+              }}
+              submitLabel="Сактоо"
+              onCancel={() => setEditing(false)}
+              onSubmit={handleUpdate}
+            />
+          )}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="qa-page">
       <div className="wrap qa-article-page-wrap">
-        <button
-          type="button"
-          className="course-learn-back"
-          onClick={() => navigate('/questions')}
-        >
+        <button type="button" className="course-learn-back" onClick={() => navigate('/questions')}>
           <ArrowLeft className="h-4 w-4" />
           Суроо-жоопко кайтуу
         </button>
 
-        {isTelegram ? (
-          <QaTelegramCard article={article} />
-        ) : (
-          <article className="qa-article-detail ui-card">
-            <h1 className="qa-article-detail-title">{article.title}</h1>
-            <div className="qa-article-detail-body">
-              <p>{article.excerpt}</p>
-              <p>
-                Толук макала жакында жарыяланат. Ушул убакта сурооңуз болсо,{' '}
-                <a href="mailto:info@mualim.academy">info@mualim.academy</a> дарегине жазыңыз.
-              </p>
-            </div>
-          </article>
-        )}
+        <QaTelegramCard article={article} />
       </div>
     </section>
   );

@@ -4,8 +4,8 @@ import {
   formatQuestionNumber,
   formatQuestionTime,
   formatViews,
-  type QuestionArticle,
-} from '../data/questions';
+} from '../lib/qa-format';
+import type { QuestionArticle } from '../lib/qa-api';
 
 type QaTelegramCardProps = {
   article: QuestionArticle;

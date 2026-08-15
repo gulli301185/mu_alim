@@ -5,6 +5,7 @@
   "scripts": {
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:setup": "prisma generate && prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed:qa": "tsx server/src/seed-qa.ts",

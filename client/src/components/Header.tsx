@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, type RefObject } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Moon, Sun, Globe, Menu, X, ChevronDown, User } from 'lucide-react';
+import { Moon, Sun, Globe, Menu, X, ChevronDown, User, LogOut, Shield } from 'lucide-react';
 import { NAV_PRIMARY, NAV_MENU, LANG_OPTIONS, type LangCode } from '../data/landing';
 import { AuthModal } from './AuthModal';
+import { useAuth } from '../context/AuthContext';
+import { getUserDisplayName } from '../lib/auth-api';
 
 function navClass(isActive: boolean) {
   return isActive ? 'nav-active nav-link' : 'nav-link';
@@ -93,7 +95,80 @@ function MenuDropdown({
   );
 }
 
-export function Header({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
+function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
+  const { user, isAdmin, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, [open]);
+
+  if (!user) return null;
+
+  const closeAll = () => {
+    setOpen(false);
+    onCloseMobile?.();
+  };
+
+  return (
+    <div className="header-user-wrap" ref={menuRef}>
+      <button
+        type="button"
+        className={`header-user-btn${open ? ' header-user-btn-open' : ''}`}
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="header-user-avatar">{user.firstName.charAt(0).toUpperCase()}</span>
+        <span className="header-user-name hidden md:inline">{getUserDisplayName(user)}</span>
+        {isAdmin ? (
+          <span className="header-user-admin hidden lg:inline-flex">
+            <Shield className="h-3.5 w-3.5" />
+            Admin
+          </span>
+        ) : null}
+        <ChevronDown className="h-4 w-4 header-user-chevron" />
+      </button>
+
+      {open && (
+        <div className="header-user-dropdown">
+          <div className="header-user-dropdown-head">
+            <p className="header-user-dropdown-name">{getUserDisplayName(user)}</p>
+            <p className="header-user-dropdown-email">{user.email}</p>
+            {isAdmin ? <span className="header-user-dropdown-role">Администратор</span> : null}
+          </div>
+          <Link to="/profile" className="header-user-dropdown-link" onClick={closeAll}>
+            <User className="h-4 w-4" />
+            Профиль
+          </Link>
+          <button type="button" className="header-user-dropdown-link" onClick={() => { logout(); closeAll(); }}>
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Header({
+  dark,
+  onToggle,
+  adminSimple = false,
+}: {
+  dark: boolean;
+  onToggle: () => void;
+  adminSimple?: boolean;
+}) {
+  const { user, loading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lang, setLang] = useState<LangCode>(() => {
@@ -155,72 +230,81 @@ export function Header({ dark, onToggle }: { dark: boolean; onToggle: () => void
       <div className="header-body">
         <div className="header-dots" aria-hidden />
         <div className="wrap header-inner">
-          <Link to="/" className="header-logo no-underline shrink-0">
-            <img
-              src="/logo-mualim.png"
-              alt="MUALIM"
-              className="header-logo-img"
-            />
+          <Link to="/questions" className="header-logo no-underline shrink-0">
+            <img src="/logo-mualim.png" alt="MUALIM" className="header-logo-img" />
             <span className="header-brand-name">MUALIM</span>
           </Link>
 
-          <nav className="header-nav hidden lg:flex">
-            {NAV_PRIMARY.map((item) => (
-              <HeaderNavLink
-                key={item.label}
-                href={item.href}
-                label={item.label}
+          {!adminSimple ? (
+            <nav className="header-nav hidden lg:flex">
+              {NAV_PRIMARY.map((item) => (
+                <HeaderNavLink
+                  key={item.label}
+                  href={item.href}
+                  label={item.label}
+                  isHashActive={isHashActive}
+                />
+              ))}
+              <MenuDropdown
+                open={menuOpen}
+                onToggle={() => setMenuOpen(!menuOpen)}
+                onClose={() => setMenuOpen(false)}
+                menuRef={menuRef}
                 isHashActive={isHashActive}
               />
-            ))}
-            <MenuDropdown
-              open={menuOpen}
-              onToggle={() => setMenuOpen(!menuOpen)}
-              onClose={() => setMenuOpen(false)}
-              menuRef={menuRef}
-              isHashActive={isHashActive}
-            />
-          </nav>
+            </nav>
+          ) : (
+            <p className="header-admin-label hidden sm:block">Суроо-жооп бөлümү</p>
+          )}
 
           <div className="header-actions">
-            <button type="button" onClick={onToggle} className="theme-btn hidden sm:flex" aria-label="Тема">
-              {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-              <span className="hidden md:inline">{dark ? 'Жарык' : 'Караңгы'}</span>
-            </button>
+            {!adminSimple ? (
+              <>
+                <button type="button" onClick={onToggle} className="theme-btn hidden sm:flex" aria-label="Тема">
+                  {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                  <span className="hidden md:inline">{dark ? 'Жарык' : 'Караңгы'}</span>
+                </button>
 
-            <div className="header-lang-wrap hidden sm:inline-flex">
-              <Globe className="h-4 w-4 header-lang-icon" aria-hidden />
-              <select
-                className="header-lang-select"
-                value={lang}
-                aria-label="Тил тандоо"
-                onChange={(e) => setLang(e.target.value as LangCode)}
-              >
-                {LANG_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <div className="header-lang-wrap hidden sm:inline-flex">
+                  <Globe className="h-4 w-4 header-lang-icon" aria-hidden />
+                  <select
+                    className="header-lang-select"
+                    value={lang}
+                    aria-label="Тил тандоо"
+                    onChange={(e) => setLang(e.target.value as LangCode)}
+                  >
+                    {LANG_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : null}
 
-            <button type="button" className="header-login-btn" onClick={() => openAuth('login')}>
-              <User className="h-4 w-4" />
-              Login
-            </button>
+            {!loading && user ? (
+              <UserMenu />
+            ) : (
+              <button type="button" className="header-login-btn" onClick={() => openAuth('login')}>
+                <User className="h-4 w-4" />
+                Login
+              </button>
+            )}
 
             <button
               type="button"
               className="header-mobile-toggle lg:hidden"
               aria-label="Меню"
-              onClick={() => setMobileOpen(!mobileOpen)}
+              onClick={() => !adminSimple && setMobileOpen(!mobileOpen)}
+              style={adminSimple ? { visibility: 'hidden' } : undefined}
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
 
-        {mobileOpen && (
+        {mobileOpen && !adminSimple && (
           <nav className="header-mobile-nav lg:hidden wrap">
             <div className="header-mobile-group">
               {NAV_PRIMARY.map((item) => (
@@ -235,10 +319,20 @@ export function Header({ dark, onToggle }: { dark: boolean; onToggle: () => void
             </div>
             <p className="header-mobile-label">Меню</p>
             <div className="header-mobile-group">{renderMenuLinks(closeAll)}</div>
-            <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuth('login')}>
-              <User className="h-4 w-4" />
-              Login
-            </button>
+            {!loading && user ? (
+              <div className="header-mobile-user">
+                <UserMenu onCloseMobile={closeAll} />
+                <Link to="/profile" className="header-login-btn header-login-btn-mobile" onClick={closeAll}>
+                  <User className="h-4 w-4" />
+                  Профиль
+                </Link>
+              </div>
+            ) : (
+              <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuth('login')}>
+                <User className="h-4 w-4" />
+                Login
+              </button>
+            )}
           </nav>
         )}
 

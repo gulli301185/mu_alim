@@ -2,6 +2,8 @@ export type QuestionSort = 'default' | 'newest' | 'oldest' | 'popular';
 
 export type QuestionArticle = {
   id: string;
+  recordId?: string;
+  slug?: string;
   title: string;
   excerpt: string;
   views: number;
@@ -23,6 +25,15 @@ export type QaListResponse = {
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
+async function parseApiError(res: Response, fallback: string) {
+  try {
+    const data = (await res.json()) as { error?: string };
+    return data.error ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function fetchQaList(params: {
   page?: number;
   limit?: number;
@@ -36,13 +47,13 @@ export async function fetchQaList(params: {
   if (params.sort) query.set('sort', params.sort);
 
   const res = await fetch(`${API_BASE}/api/qa?${query}`);
-  if (!res.ok) throw new Error('API error');
+  if (!res.ok) throw new Error(await parseApiError(res, 'API error'));
   return res.json();
 }
 
 export async function fetchQaBySlug(slug: string): Promise<QuestionArticle> {
   const res = await fetch(`${API_BASE}/api/qa/${slug}`);
-  if (!res.ok) throw new Error('Not found');
+  if (!res.ok) throw new Error(await parseApiError(res, 'Not found'));
   return res.json();
 }
 
@@ -65,8 +76,8 @@ export async function createQaArticle(token: string, data: AdminQaInput) {
     },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Create failed');
-  return res.json();
+  if (!res.ok) throw new Error(await parseApiError(res, 'Түзүү ийгиликсиз'));
+  return res.json() as Promise<QuestionArticle>;
 }
 
 export async function updateQaArticle(token: string, id: string, data: Partial<AdminQaInput>) {
@@ -78,8 +89,8 @@ export async function updateQaArticle(token: string, id: string, data: Partial<A
     },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Update failed');
-  return res.json();
+  if (!res.ok) throw new Error(await parseApiError(res, 'Жаңыртуу ийгиликсиз'));
+  return res.json() as Promise<QuestionArticle>;
 }
 
 export async function deleteQaArticle(token: string, id: string) {
@@ -87,18 +98,5 @@ export async function deleteQaArticle(token: string, id: string) {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Delete failed');
-}
-
-export async function adminLogin(email: string, password: string) {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) throw new Error('Login failed');
-  return res.json() as Promise<{
-    token: string;
-    user: { id: string; email: string; role: string; firstName: string; lastName: string };
-  }>;
+  if (!res.ok) throw new Error(await parseApiError(res, 'Өчүрүү ийгиликсиз'));
 }

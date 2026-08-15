@@ -1,63 +1,221 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
 import { QaTelegramCard } from '../components/QaTelegramCard';
+import { QaAdminForm } from '../components/QaAdminForm';
+import { useAuth } from '../context/AuthContext';
+import { QUESTIONS_PER_PAGE, QUESTION_SORT_OPTIONS } from '../lib/qa-format';
 import {
-  FALLBACK_QUESTIONS,
-  filterQuestions,
-  QUESTIONS_PER_PAGE,
-  QUESTION_SORT_OPTIONS,
-  sortQuestions,
+  createQaArticle,
+  deleteQaArticle,
+  fetchQaList,
   type QuestionArticle,
   type QuestionSort,
-} from '../data/questions';
-import { fetchQaList } from '../lib/qa-api';
+} from '../lib/qa-api';
+
+function QaAdminList({
+  items,
+  loading,
+  error,
+  onReload,
+  onDelete,
+}: {
+  items: QuestionArticle[];
+  loading: boolean;
+  error: string | null;
+  onReload: () => void;
+  onDelete: (article: QuestionArticle) => void;
+}) {
+  if (error) {
+    return (
+      <div className="qa-empty ui-card">
+        <p>{error}</p>
+        <button type="button" className="btn-gold qa-admin-btn" onClick={onReload}>
+          Кайра жүктөө
+        </button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="qa-empty ui-card">
+        <p>Жүктөлүүдө...</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="qa-empty ui-card">
+        <p>Эч нерсе жок.</p>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="qa-admin-list">
+      {items.map((article) => (
+        <li key={article.recordId ?? article.slug ?? article.id} className="qa-admin-row ui-card">
+          <div className="qa-admin-row-main">
+            <span className="qa-admin-row-num">{article.number ?? '—'}</span>
+            <p className="qa-admin-row-text">{article.question ?? article.title}</p>
+          </div>
+          <div className="qa-admin-row-actions">
+            <Link to={`/questions/${article.slug ?? article.id}`} className="qa-admin-btn qa-admin-btn-muted">
+              Көрүү
+            </Link>
+            <Link
+              to={`/questions/${article.slug ?? article.id}?edit=1`}
+              className="qa-admin-btn qa-admin-btn-muted"
+            >
+              Өзгөртүү
+            </Link>
+            <button
+              type="button"
+              className="qa-admin-btn qa-admin-btn-danger"
+              onClick={() => onDelete(article)}
+            >
+              Өчүрүү
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function QuestionsPage() {
+  const { isAdmin, token } = useAuth();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<QuestionSort>('default');
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<QuestionArticle[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [useFallback, setUseFallback] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchQaList({
+        page,
+        limit: QUESTIONS_PER_PAGE,
+        search: query,
+        sort: isAdmin ? 'default' : sort,
+      });
+      setItems(data.items);
+      setTotalPages(data.totalPages);
+    } catch {
+      setItems([]);
+      setTotalPages(1);
+      setError('Маалымат базасынан жүктөө ийгиликсиз.');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, query, sort, isAdmin]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await fetchQaList({
-          page,
-          limit: QUESTIONS_PER_PAGE,
-          search: query,
-          sort,
-        });
-        if (cancelled) return;
-        setItems(data.items);
-        setTotalPages(data.totalPages);
-        setUseFallback(false);
-      } catch {
-        if (cancelled) return;
-        const filtered = sortQuestions(filterQuestions(FALLBACK_QUESTIONS, query), sort);
-        setItems(
-          filtered.slice((page - 1) * QUESTIONS_PER_PAGE, page * QUESTIONS_PER_PAGE),
-        );
-        setTotalPages(Math.max(1, Math.ceil(filtered.length / QUESTIONS_PER_PAGE)));
-        setUseFallback(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
     void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [page, query, sort]);
+  }, [load]);
+
+  const handleCreate = async (values: { question: string; answer: string; number?: number }) => {
+    if (!token) throw new Error('Admin кирүү кerek');
+    await createQaArticle(token, values);
+    setShowCreate(false);
+    setPage(1);
+    await load();
+  };
+
+  const handleDelete = async (article: QuestionArticle) => {
+    if (!token || !article.recordId) return;
+    const ok = window.confirm('Бул суроону өчүрөсүзбү?');
+    if (!ok) return;
+    try {
+      await deleteQaArticle(token, article.recordId);
+      await load();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Өчүрүү ийгиликсиз');
+    }
+  };
 
   const currentPage = Math.min(page, totalPages);
+
+  if (isAdmin) {
+    return (
+      <section className="qa-page qa-page-admin">
+        <div className="wrap qa-page-wrap">
+          <header className="qa-admin-header">
+            <h1 className="qa-admin-title">Суроо-жооп</h1>
+            <button
+              type="button"
+              className="btn-gold qa-admin-btn qa-admin-btn-add"
+              onClick={() => setShowCreate((v) => !v)}
+            >
+              <Plus className="h-5 w-5" />
+              {showCreate ? 'Жабуу' : 'Жаңы суроо'}
+            </button>
+          </header>
+
+          {showCreate ? (
+            <QaAdminForm
+              submitLabel="Сактоо"
+              onCancel={() => setShowCreate(false)}
+              onSubmit={handleCreate}
+            />
+          ) : null}
+
+          <label className="qa-admin-search">
+            <Search className="h-5 w-5" aria-hidden />
+            <input
+              type="search"
+              className="qa-admin-search-input"
+              placeholder="Издөө..."
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+          </label>
+
+          <QaAdminList
+            items={items}
+            loading={loading}
+            error={error}
+            onReload={() => void load()}
+            onDelete={(article) => void handleDelete(article)}
+          />
+
+          {!loading && !error && totalPages > 1 ? (
+            <nav className="qa-pagination" aria-label="Беттер">
+              <button
+                type="button"
+                className="qa-page-btn"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="qa-admin-page-label">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                className="qa-page-btn"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </nav>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="qa-page">
@@ -66,9 +224,7 @@ export function QuestionsPage() {
           <div>
             <p className="qa-page-kicker">Жаңы бөлüm · 2025-жылдан тартып толукталат</p>
             <h1 className="qa-page-title">Суроо-жооп</h1>
-            <p className="qa-page-subtitle">
-              Динiy суроолорго жооптор — Mualim Academy
-            </p>
+            <p className="qa-page-subtitle">Динiy суроолорго жооптор — Mualim Academy</p>
           </div>
         </header>
 
@@ -104,8 +260,13 @@ export function QuestionsPage() {
           </div>
         </div>
 
-        {useFallback ? (
-          <p className="qa-fallback-note">API иштебей жатат — статикалык маалымат көрсөтүлүүдө.</p>
+        {error ? (
+          <div className="qa-empty ui-card">
+            <p>{error}</p>
+            <button type="button" className="btn-primary qa-back-btn" onClick={() => void load()}>
+              Кайра аракет кылуу
+            </button>
+          </div>
         ) : null}
 
         <div className="qa-main">
@@ -115,39 +276,29 @@ export function QuestionsPage() {
             </div>
           ) : (
             <ul className="qa-articles">
-              {items.map((article, index) => (
-                <li key={article.id}>
-                  <Link to={`/questions/${article.id}`} className="qa-tg-card-link">
-                    <QaTelegramCard
-                      article={{
-                        ...article,
-                        number:
-                          sort === 'default'
-                            ? (page - 1) * QUESTIONS_PER_PAGE + index + 1
-                            : article.number,
-                      }}
-                      compact
-                    />
+              {items.map((article) => (
+                <li key={article.slug ?? article.id}>
+                  <Link to={`/questions/${article.slug ?? article.id}`} className="qa-tg-card-link">
+                    <QaTelegramCard article={article} compact />
                   </Link>
                 </li>
               ))}
             </ul>
           )}
 
-          {!loading && items.length === 0 && (
+          {!loading && !error && items.length === 0 && (
             <div className="qa-empty ui-card">
-              <p>Эч нерсе табылган жок. Башка сөз менен издеп көрүңүз.</p>
+              <p>Эч нерсе табылган жок.</p>
             </div>
           )}
 
-          {!loading && totalPages > 1 && (
+          {!loading && !error && totalPages > 1 && (
             <nav className="qa-pagination" aria-label="Беттер">
               <button
                 type="button"
                 className="qa-page-btn"
                 disabled={currentPage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                aria-label="Мурдагы бет"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -166,7 +317,6 @@ export function QuestionsPage() {
                 className="qa-page-btn"
                 disabled={currentPage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                aria-label="Кийинки бет"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
