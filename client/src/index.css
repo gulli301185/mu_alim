@@ -1715,39 +1715,33 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
   }
 }
 
-.teacher-language-grid {
-  @apply grid gap-2.5 list-none m-0 p-0;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 480px) {
-  .teacher-language-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.teacher-language-grid-stack {
-  grid-template-columns: 1fr;
-}
-
 .teacher-language-list {
-  @apply flex flex-col gap-2 list-none m-0 p-0;
+  @apply flex flex-col gap-2.5 list-none m-0 p-0;
 }
 
-.teacher-language-item {
-  @apply flex items-center justify-between gap-3 px-4 py-3 rounded-xl;
-  background: color-mix(in srgb, var(--color-sky-light) 22%, #fff);
-  border: 1px solid #e8eef5;
+.teacher-language-list-item {
+  @apply flex items-baseline flex-wrap gap-x-1.5 text-sm pl-4 relative;
+}
+
+.teacher-language-list-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-gold);
 }
 
 .teacher-language-name {
-  @apply text-sm font-semibold;
+  @apply font-semibold;
   color: var(--color-navy);
 }
 
 .teacher-language-level {
-  @apply text-xs font-medium px-2.5 py-1 rounded-full;
-  background: var(--color-navy);
-  color: var(--color-gold);
+  @apply text-sm font-normal;
+  color: var(--color-muted, #64748b);
 }
 
 .teacher-extra-list {
@@ -2480,9 +2474,8 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
   color: var(--dm-text-muted) !important;
 }
 
-.dark .teacher-language-item {
-  background: var(--dm-card-2);
-  border-color: var(--dm-card-border);
+.dark .teacher-language-level {
+  color: var(--dm-text-muted) !important;
 }
 
 .dark .teacher-diploma-item {

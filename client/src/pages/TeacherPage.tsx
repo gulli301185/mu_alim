@@ -76,11 +76,11 @@ export function TeacherPage() {
                   <Languages className="h-5 w-5" />
                   Тилдер
                 </h2>
-                <ul className="teacher-language-grid teacher-language-grid-stack">
+                <ul className="teacher-language-list">
                   {TEACHER.languages.map((lang) => (
-                    <li key={lang.name} className="teacher-language-item">
+                    <li key={lang.name} className="teacher-language-list-item">
                       <span className="teacher-language-name">{lang.name}</span>
-                      <span className="teacher-language-level">{lang.level}</span>
+                      <span className="teacher-language-level">— {lang.level}</span>
                     </li>
                   ))}
                 </ul>
