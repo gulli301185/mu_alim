@@ -31,7 +31,7 @@ export function QaAdminForm({ initial, submitLabel, onSubmit, onCancel }: QaAdmi
         number: number.trim() ? Number(number) : undefined,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ката кetti');
+      setError(err instanceof Error ? err.message : 'Ката кетти');
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { QaTelegramCard } from '../components/QaTelegramCard';
 import { QaAdminForm } from '../components/QaAdminForm';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   deleteQaArticle,
   fetchQaBySlug,
+  recordQaView,
   updateQaArticle,
   type QuestionArticle,
 } from '../lib/qa-api';
@@ -14,8 +15,9 @@ import {
 export function QuestionArticlePage() {
   const { articleId } = useParams<{ articleId: string }>();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const { isAdmin, token } = useAuth();
+  const { isAdmin, token, loading: authLoading } = useAuth();
   const [article, setArticle] = useState<QuestionArticle | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,13 +35,20 @@ export function QuestionArticlePage() {
     try {
       const data = await fetchQaBySlug(articleId);
       setArticle(data);
+
+      if (!authLoading && !isAdmin) {
+        const viewResult = await recordQaView(articleId);
+        if (viewResult) {
+          setArticle((prev) => (prev ? { ...prev, views: viewResult.views } : prev));
+        }
+      }
     } catch {
       setArticle(undefined);
       setError('Макала базадан табылган жок.');
     } finally {
       setLoading(false);
     }
-  }, [articleId]);
+  }, [articleId, authLoading, isAdmin]);
 
   useEffect(() => {
     void load();
@@ -50,7 +59,7 @@ export function QuestionArticlePage() {
   }, [searchParams]);
 
   const handleUpdate = async (values: { question: string; answer: string; number?: number }) => {
-    if (!token || !article?.recordId) throw new Error('Admin кирүү кerek');
+    if (!token || !article?.recordId) throw new Error('Админ кирүү керек');
     const updated = await updateQaArticle(token, article.recordId, values);
     setArticle(updated);
     setEditing(false);
@@ -69,6 +78,15 @@ export function QuestionArticlePage() {
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Өчүрүү ийгиликсиз');
     }
+  };
+
+  const listReturnSearch =
+    (location.state as { returnSearch?: string } | null)?.returnSearch ??
+    searchParams.get('return') ??
+    '';
+
+  const backToQuestions = () => {
+    navigate(listReturnSearch ? `/questions?${listReturnSearch}` : '/questions');
   };
 
   if (loading) {
@@ -102,7 +120,7 @@ export function QuestionArticlePage() {
     return (
       <section className="qa-page qa-page-admin">
         <div className="wrap qa-article-page-wrap">
-          <button type="button" className="qa-admin-back" onClick={() => navigate('/questions')}>
+          <button type="button" className="qa-admin-back" onClick={backToQuestions}>
             <ArrowLeft className="h-5 w-5" />
             Артка
           </button>
@@ -145,7 +163,7 @@ export function QuestionArticlePage() {
   return (
     <section className="qa-page">
       <div className="wrap qa-article-page-wrap">
-        <button type="button" className="course-learn-back" onClick={() => navigate('/questions')}>
+        <button type="button" className="course-learn-back" onClick={backToQuestions}>
           <ArrowLeft className="h-4 w-4" />
           Суроо-жоопко кайтуу
         </button>

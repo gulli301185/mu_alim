@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -7,8 +8,14 @@ import {
   Lock,
   PlayCircle,
 } from 'lucide-react';
-import { buildCourseLessons, getCourseById, isLessonUnlocked } from '../data/courseLessons';
+import {
+  getCourseById,
+  isLessonUnlocked,
+  mapLessonsToCourseLessons,
+  type CourseLesson,
+} from '../data/courseLessons';
 import { SITE } from '../data/landing';
+import { getLessonsByCourse } from '../lib/lesson-api';
 import {
   downloadCourseCertificate,
   generateCertificateNumber,
@@ -28,14 +35,14 @@ import {
   PASS_THRESHOLD,
   type CourseProgress,
 } from '../lib/courseAccess';
-import { CoursePaymentBlock } from './CoursesPage';
+import { CourseYoutubePlayer } from '../components/CourseYoutubeLink';
 
 type LessonPhase = 'video' | 'test' | 'review';
 type ReviewTab = 'video' | 'test';
 
 function canAccessLesson(
   paid: boolean,
-  lessons: ReturnType<typeof buildCourseLessons>,
+  lessons: CourseLesson[],
   lessonId: string,
   completedLessonIds: string[],
 ) {
@@ -48,7 +55,29 @@ export function CourseLearnPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const course = courseId ? getCourseById(courseId) : undefined;
-  const lessons = useMemo(() => (courseId ? buildCourseLessons(courseId) : []), [courseId]);
+
+  const {
+    data: apiLessons,
+    isLoading: lessonsLoading,
+    isError: lessonsIsError,
+    error: lessonsQueryError,
+  } = useQuery({
+    queryKey: ['course-lessons', courseId],
+    queryFn: () => getLessonsByCourse(courseId!),
+    enabled: Boolean(courseId && course),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const lessons = useMemo(
+    () => (apiLessons && course ? mapLessonsToCourseLessons(apiLessons, course.title) : []),
+    [apiLessons, course?.title],
+  );
+
+  const lessonIdsKey = useMemo(() => lessons.map((lesson) => lesson.id).join(','), [lessons]);
 
   const [paid, setPaid] = useState(() => (courseId ? isCoursePaid(courseId) : false));
   const [progress, setProgress] = useState<CourseProgress>(() =>
@@ -56,7 +85,7 @@ export function CourseLearnPage() {
   );
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [phase, setPhase] = useState<LessonPhase>('video');
-  const [videoReady, setVideoReady] = useState(false);
+  const [videoWatched, setVideoWatched] = useState(false);
   const [answers, setAnswers] = useState<number[]>([]);
   const [testSubmitted, setTestSubmitted] = useState(false);
   const [lastTestScore, setLastTestScore] = useState<number | null>(null);
@@ -68,8 +97,21 @@ export function CourseLearnPage() {
       navigate('/courses', { replace: true });
       return;
     }
-    setPaid(isCoursePaid(courseId));
-    setProgress(loadCourseProgress(courseId));
+    if (!isCoursePaid(courseId)) {
+      navigate(`/courses/${courseId}`, { replace: true });
+      return;
+    }
+    setPaid(true);
+    setProgress((prev) => {
+      const loaded = loadCourseProgress(courseId);
+      if (
+        prev.completedLessonIds.length === loaded.completedLessonIds.length &&
+        prev.completedLessonIds.every((id, index) => id === loaded.completedLessonIds[index])
+      ) {
+        return prev;
+      }
+      return loaded;
+    });
   }, [courseId, course, navigate]);
 
   useEffect(() => {
@@ -88,12 +130,12 @@ export function CourseLearnPage() {
       if (prev && canAccessLesson(paid, lessons, prev, progress.completedLessonIds)) return prev;
       return firstOpen.id;
     });
-  }, [lessons, progress.completedLessonIds, paid]);
+  }, [lessonIdsKey, lessons, progress.completedLessonIds, paid]);
 
   useEffect(() => {
     setAnswers([]);
     setTestSubmitted(false);
-    setVideoReady(false);
+    setVideoWatched(false);
 
     if (!activeLessonId || !lessons.length) return;
 
@@ -113,14 +155,11 @@ export function CourseLearnPage() {
 
     setPhase('video');
     setReviewTab('video');
-  }, [activeLessonId, lessons, progress.completedLessonIds, paid]);
+  }, [activeLessonId, lessonIdsKey, lessons, progress.completedLessonIds, paid]);
 
-  useEffect(() => {
-    if (phase !== 'video' || !activeLessonId || !paid) return;
-    setVideoReady(false);
-    const timer = window.setTimeout(() => setVideoReady(true), 5000);
-    return () => window.clearTimeout(timer);
-  }, [activeLessonId, phase, paid]);
+  const handleWatchComplete = useCallback(() => {
+    setVideoWatched(true);
+  }, []);
 
   const activeLesson = lessons.find((l) => l.id === activeLessonId);
   const completedCount = progress.completedLessonIds.length;
@@ -129,7 +168,7 @@ export function CourseLearnPage() {
     : false;
 
   const handleVideoComplete = () => {
-    if (!videoReady || !activeAccessible) return;
+    if (!videoWatched || !activeAccessible) return;
     setPhase('test');
     setAnswers(activeLesson?.tests.map(() => -1) ?? []);
     setTestSubmitted(false);
@@ -181,18 +220,68 @@ export function CourseLearnPage() {
     });
   };
 
-  const handlePaid = () => {
-    setPaid(true);
-    setProgress(loadCourseProgress(courseId!));
-  };
 
   const lessonIds = useMemo(() => lessons.map((lesson) => lesson.id), [lessons]);
   const averageScore = getAverageScore(progress, lessonIds);
   const certificateReady = isCertificateEligible(progress, lessons.length, lessonIds);
   const allLessonsDone = progress.completedLessonIds.length >= lessons.length;
 
-  if (!course || !courseId || !activeLesson) {
+  const lessonCount = lessons.length || course?.lessons || 0;
+
+  if (!course || !courseId) {
     return null;
+  }
+
+  if (lessonsLoading) {
+    return (
+      <section className="course-learn-page">
+        <div className="wrap course-learn-inner">
+          <p className="course-learn-stats">Сабактар жүктөлүүдө...</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (lessonsIsError) {
+    const message =
+      lessonsQueryError instanceof Error && lessonsQueryError.message === 'Курс табылган жок'
+        ? 'Бул курс базада табылган жок. Админге кайрылыңыз.'
+        : 'Сабактар жүктөлбөдү. Кийинчерээк кайра аракет кылыңыз.';
+    return (
+      <section className="course-learn-page">
+        <div className="wrap course-learn-inner">
+          <Link to={`/courses/${courseId}`} className="course-learn-back">
+            <ArrowLeft className="h-4 w-4" />
+            Курска кайтуу
+          </Link>
+          <p className="course-learn-stats">{message}</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (!lessons.length) {
+    return (
+      <section className="course-learn-page">
+        <div className="wrap course-learn-inner">
+          <Link to={`/courses/${courseId}`} className="course-learn-back">
+            <ArrowLeft className="h-4 w-4" />
+            Курска кайтуу
+          </Link>
+          <p className="course-learn-stats">Бул курс үчүн жарыяланган сабактар табылган жок.</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (!activeLesson) {
+    return (
+      <section className="course-learn-page">
+        <div className="wrap course-learn-inner">
+          <p className="course-learn-stats">Сабактар жүктөлүүдө...</p>
+        </div>
+      </section>
+    );
   }
 
   const testPassed = testSubmitted && (lastTestScore ?? 0) / 100 >= PASS_THRESHOLD;
@@ -210,8 +299,8 @@ export function CourseLearnPage() {
             <p className="course-learn-label">Менин курсум</p>
             <h1 className="course-learn-title">{course.title}</h1>
             <p className="course-learn-stats">
-              {course.lessons} видео-сабак · {completedCount} аякталды ·{' '}
-              {course.lessons - completedCount} калды
+              {lessonCount} видео-сабак · {completedCount} аякталды ·{' '}
+              {lessonCount - completedCount} калды
             </p>
           </div>
         </div>
@@ -219,7 +308,7 @@ export function CourseLearnPage() {
         <div className="course-learn-grid">
           <aside className="course-learn-sidebar ui-card">
             <h2 className="course-learn-sidebar-title">
-              Видеолор ({course.lessons})
+              Видеолор ({lessonCount})
             </h2>
             <ul className="course-learn-lessons">
               {lessons.map((lesson) => {
@@ -247,6 +336,14 @@ export function CourseLearnPage() {
                       disabled={!unlocked}
                       onClick={() => {
                         if (!unlocked) return;
+                        if (
+                          !completed &&
+                          activeLessonId &&
+                          activeLessonId !== lesson.id &&
+                          !progress.completedLessonIds.includes(activeLessonId)
+                        ) {
+                          return;
+                        }
                         setActiveLessonId(lesson.id);
                       }}
                     >
@@ -276,27 +373,11 @@ export function CourseLearnPage() {
           </aside>
 
           <article className="course-learn-main ui-card">
-            {!paid ? (
-              <div className="courses-payment-block course-learn-payment">
-                <p className="courses-payment-panel-label">Курсду активдештирүү</p>
-                <h2 className="courses-payment-course-name">{course.title}</h2>
-                <p className="courses-payment-course-desc">
-                  Төлөгөндөн кийин 1-видеодон баштап, тест тапшырганда кийинкилер ачылат.
-                </p>
-                <CoursePaymentBlock
-                  courseId={courseId}
-                  courseTitle={course.title}
-                  coursePrice={course.price}
-                  lessonCount={course.lessons}
-                  onPaid={handlePaid}
-                />
-              </div>
-            ) : (
-              <>
+            <>
                 <div className="course-learn-main-head">
                   <h2 className="course-learn-main-title">{activeLesson.title}</h2>
                   <span className="course-learn-main-step">
-                    {activeLesson.order} / {course.lessons}
+                    {activeLesson.order} / {lessonCount}
                   </span>
                 </div>
 
@@ -307,25 +388,23 @@ export function CourseLearnPage() {
                   </div>
                 ) : phase === 'video' ? (
                   <div className="course-learn-video-block">
-                    <div className="course-learn-embed">
-                      <iframe
-                        key={activeLesson.id}
-                        src={`https://www.youtube.com/embed/${activeLesson.videoId}?rel=0`}
-                        title={activeLesson.title}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
+                    <CourseYoutubePlayer
+                      key={activeLesson.id}
+                      videoId={activeLesson.videoId}
+                      title={activeLesson.title}
+                      onWatchComplete={handleWatchComplete}
+                      requireFullWatch
+                    />
                     <p className="course-learn-video-hint">
-                      Видеону толук көрүп бүткөндөн кийин тест ачылат.
+                      Токтотуп коё аласыз, бирок видеону аягына чейин көрүшүңүз керек. Андан кийин тест ачылат.
                     </p>
                     <button
                       type="button"
                       className="btn-primary course-learn-video-btn"
-                      disabled={!videoReady}
+                      disabled={!videoWatched}
                       onClick={handleVideoComplete}
                     >
-                      {videoReady ? 'Көрүү аяктады — тестке өтүү' : 'Видео көрүлүүдө...'}
+                      {videoWatched ? 'Көрүү аяктады — тестке өтүү' : 'Видеону аягына чейин көрүңүз...'}
                     </button>
                   </div>
                 ) : phase === 'test' ? (
@@ -371,6 +450,7 @@ export function CourseLearnPage() {
                             setPhase('video');
                             setTestSubmitted(false);
                             setAnswers([]);
+                            setVideoWatched(false);
                           }}
                         >
                           Кайра баштоо
@@ -431,22 +511,19 @@ export function CourseLearnPage() {
 
                     {reviewTab === 'video' ? (
                       <div className="course-learn-video-block">
-                        <div className="course-learn-embed">
-                          <iframe
-                            key={`review-${activeLesson.id}`}
-                            src={`https://www.youtube.com/embed/${activeLesson.videoId}?rel=0`}
-                            title={activeLesson.title}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          />
-                        </div>
+                        <CourseYoutubePlayer
+                          key={`review-${activeLesson.id}`}
+                          videoId={activeLesson.videoId}
+                          title={activeLesson.title}
+                          requireFullWatch={false}
+                        />
                         <p className="course-learn-video-hint">
-                          Видеону каалаган убакта кайra көрүңүз.
+                          Видеону каалаган убакта кайра көрүңүз.
                         </p>
                       </div>
                     ) : (
                       <div className="course-learn-test course-learn-test-review">
-                        <h3 className="course-learn-test-title">Тест — кайra көрүү</h3>
+                        <h3 className="course-learn-test-title">Тест — кайра көрүү</h3>
                         <div className="course-learn-test-scroll">
                           {activeLesson.tests.map((test) => (
                             <div key={test.question} className="course-learn-test-q course-learn-test-q-review">
@@ -513,7 +590,7 @@ export function CourseLearnPage() {
                                   disabled={!certificateName.trim()}
                                 >
                                   <Download className="h-4 w-4" aria-hidden />
-                                  PDF сертификатты жүктөө
+                                  ПДФ сертификатты жүктөө
                                 </button>
                               </>
                             ) : (
@@ -538,7 +615,6 @@ export function CourseLearnPage() {
                   </div>
                 )}
               </>
-            )}
           </article>
         </div>
       </div>

@@ -30,6 +30,6 @@ export function formatQuestionTime(iso: string) {
   return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-export function formatViews(count: number) {
-  return count.toLocaleString('ru-RU');
+export function formatViews(count?: number | null) {
+  return (count ?? 0).toLocaleString('ru-RU');
 }

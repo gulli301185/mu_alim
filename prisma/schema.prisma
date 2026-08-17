@@ -91,8 +91,23 @@ model User {
   reviews        Review[]
   certificates   Certificate[]
   qaArticles     QaArticle[]
+  passwordResets PasswordResetToken[]
 
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  token     String    @unique @db.VarChar(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model UserProfile {
@@ -489,6 +504,8 @@ model QaArticle {
   excerpt        String?       @db.VarChar(500)
   tags           String[]      @default([])
   type           QaArticleType @default(text)
+  telegramViews  Int           @default(0) @map("telegram_views")
+  siteViews      Int           @default(0) @map("site_views")
   views          Int           @default(0)
   isPublished    Boolean       @default(true) @map("is_published")
   publishedAt    DateTime      @map("published_at") @db.Timestamptz

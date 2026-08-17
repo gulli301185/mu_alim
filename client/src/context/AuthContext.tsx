@@ -2,122 +2,212 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  adminLoginRequest,
   fetchMe,
+  forgotPasswordRequest,
   loadStoredAuth,
-  loginRequest,
+  loginUserRequest,
   registerRequest,
+  resetPasswordRequest,
   saveStoredAuth,
   updateProfileRequest,
-  type AuthSession,
   type AuthUser,
   type LoginInput,
   type RegisterInput,
   type UpdateProfileInput,
 } from '../lib/auth-api';
+import { authKeys } from '../lib/auth-keys';
 
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
   isAdmin: boolean;
-  login: (input: LoginInput) => Promise<void>;
+  loginUser: (input: LoginInput) => Promise<void>;
+  loginAdmin: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
   updateProfile: (input: UpdateProfileInput) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ message: string; resetUrl?: string }>;
+  resetPassword: (input: {
+    token: string;
+    password: string;
+    confirmPassword: string;
+  }) => Promise<{ message: string }>;
+  isLoggingIn: boolean;
+  isRegistering: boolean;
+  isLoggingOut: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<AuthSession | null>(() => loadStoredAuth());
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [token, setToken] = useState<string | null>(() => loadStoredAuth()?.token ?? null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const meQuery = useQuery({
+    queryKey: authKeys.me(),
+    queryFn: async () => {
+      if (!token) return null;
+      const user = await fetchMe(token);
+      saveStoredAuth({ token, user });
+      return user;
+    },
+    enabled: Boolean(token),
+  });
 
-    async function bootstrap() {
-      const stored = loadStoredAuth();
-      if (!stored?.token) {
-        if (!cancelled) {
-          setSession(null);
-          setLoading(false);
-        }
-        return;
-      }
+  const applySession = useCallback(
+    (nextToken: string, user: AuthUser) => {
+      saveStoredAuth({ token: nextToken, user });
+      setToken(nextToken);
+      queryClient.setQueryData(authKeys.me(), user);
+    },
+    [queryClient],
+  );
 
-      try {
-        const user = await fetchMe(stored.token);
-        if (cancelled) return;
-        const next = { token: stored.token, user };
-        setSession(next);
-        saveStoredAuth(next);
-      } catch {
-        if (cancelled) return;
-        saveStoredAuth(null);
-        setSession(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
+  const clearSession = useCallback(() => {
+    saveStoredAuth(null);
+    setToken(null);
+    queryClient.removeQueries({ queryKey: authKeys.all });
+  }, [queryClient]);
 
-    void bootstrap();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const loginUserMutation = useMutation({
+    mutationFn: (input: LoginInput) =>
+      loginUserRequest({
+        email: input.email.trim().toLowerCase(),
+        password: input.password,
+      }),
+    onSuccess: (session) => applySession(session.token, session.user),
+  });
 
-  const persist = useCallback((next: AuthSession | null) => {
-    setSession(next);
-    saveStoredAuth(next);
-  }, []);
+  const loginAdminMutation = useMutation({
+    mutationFn: (input: LoginInput) =>
+      adminLoginRequest({
+        email: input.email.trim().toLowerCase(),
+        password: input.password,
+      }),
+    onSuccess: (session) => applySession(session.token, session.user),
+  });
 
-  const login = useCallback(async (input: LoginInput) => {
-    const next = await loginRequest({
-      email: input.email.trim().toLowerCase(),
-      password: input.password,
-    });
-    persist(next);
-  }, [persist]);
+  const registerMutation = useMutation({
+    mutationFn: (input: RegisterInput) =>
+      registerRequest({
+        ...input,
+        email: input.email.trim().toLowerCase(),
+      }),
+    onSuccess: (session) => applySession(session.token, session.user),
+  });
 
-  const register = useCallback(async (input: RegisterInput) => {
-    const next = await registerRequest({
-      ...input,
-      email: input.email.trim().toLowerCase(),
-    });
-    persist(next);
-  }, [persist]);
+  const updateProfileMutation = useMutation({
+    mutationFn: (input: UpdateProfileInput) => {
+      if (!token) throw new Error('Кирүү талап кылынат');
+      return updateProfileRequest(token, input);
+    },
+    onSuccess: (user) => {
+      if (!token) return;
+      saveStoredAuth({ token, user });
+      queryClient.setQueryData(authKeys.me(), user);
+    },
+  });
+
+  const forgotPasswordMutation = useMutation({
+    mutationFn: (email: string) => forgotPasswordRequest(email.trim().toLowerCase()),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: resetPasswordRequest,
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => undefined,
+    onSuccess: () => clearSession(),
+  });
+
+  const loginUser = useCallback(
+    async (input: LoginInput) => {
+      await loginUserMutation.mutateAsync(input);
+    },
+    [loginUserMutation],
+  );
+
+  const loginAdmin = useCallback(
+    async (input: LoginInput) => {
+      await loginAdminMutation.mutateAsync(input);
+    },
+    [loginAdminMutation],
+  );
+
+  const register = useCallback(
+    async (input: RegisterInput) => {
+      await registerMutation.mutateAsync(input);
+    },
+    [registerMutation],
+  );
 
   const logout = useCallback(() => {
-    persist(null);
-  }, [persist]);
+    logoutMutation.mutate();
+  }, [logoutMutation]);
 
   const updateProfile = useCallback(
     async (input: UpdateProfileInput) => {
-      if (!session?.token) throw new Error('Кирүү талап кылынат');
-      const user = await updateProfileRequest(session.token, input);
-      persist({ token: session.token, user });
+      await updateProfileMutation.mutateAsync(input);
     },
-    [persist, session?.token],
+    [updateProfileMutation],
   );
+
+  const forgotPassword = useCallback(
+    async (email: string) => forgotPasswordMutation.mutateAsync(email),
+    [forgotPasswordMutation],
+  );
+
+  const resetPassword = useCallback(
+    async (input: { token: string; password: string; confirmPassword: string }) =>
+      resetPasswordMutation.mutateAsync(input),
+    [resetPasswordMutation],
+  );
+
+  const user = meQuery.data ?? (token ? loadStoredAuth()?.user ?? null : null);
+  const loading = Boolean(token) && meQuery.isPending;
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: session?.user ?? null,
-      token: session?.token ?? null,
+      user,
+      token,
       loading,
-      isAdmin: session?.user?.role === 'admin',
-      login,
+      isAdmin: user?.role === 'admin',
+      loginUser,
+      loginAdmin,
       register,
       logout,
       updateProfile,
+      forgotPassword,
+      resetPassword,
+      isLoggingIn: loginUserMutation.isPending || loginAdminMutation.isPending,
+      isRegistering: registerMutation.isPending,
+      isLoggingOut: logoutMutation.isPending,
     }),
-    [session, loading, login, register, logout, updateProfile],
+    [
+      user,
+      token,
+      loading,
+      loginUser,
+      loginAdmin,
+      register,
+      logout,
+      updateProfile,
+      forgotPassword,
+      resetPassword,
+      loginUserMutation.isPending,
+      loginAdminMutation.isPending,
+      registerMutation.isPending,
+      logoutMutation.isPending,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

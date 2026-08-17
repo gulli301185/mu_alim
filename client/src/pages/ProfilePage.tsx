@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Mail, Lock, User, Phone, Shield } from 'lucide-react';
+import { Mail, User, Phone, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getUserDisplayName } from '../lib/auth-api';
+import { PasswordField } from '../components/PasswordField';
 
 export function ProfilePage() {
   const { user, loading, isAdmin, updateProfile, logout } = useAuth();
@@ -85,7 +86,7 @@ export function ProfilePage() {
           {isAdmin ? (
             <span className="profile-role-badge">
               <Shield className="h-4 w-4" />
-              Admin
+              Админ
             </span>
           ) : null}
         </header>
@@ -101,7 +102,7 @@ export function ProfilePage() {
               Чыгуу (Logout)
             </button>
             <Link to="/questions" className="profile-link-btn">
-              Суроо-жооп бөлümүнө
+              Суроо-жооп бөлүмүнө
             </Link>
           </aside>
 
@@ -143,7 +144,7 @@ export function ProfilePage() {
               </label>
 
               <label className="auth-modal-field profile-form-full">
-                <span className="auth-modal-label">Email</span>
+                <span className="auth-modal-label">Электрондук почта</span>
                 <span className="auth-modal-input-group">
                   <span className="auth-modal-input-icon-box" aria-hidden>
                     <Mail className="h-4 w-4" />
@@ -178,53 +179,29 @@ export function ProfilePage() {
 
             <div className="profile-password-block">
               <h3 className="profile-form-subtitle">Сыр сөздү өзгөртүү (милдеттүү эмес)</h3>
-              <label className="auth-modal-field">
-                <span className="auth-modal-label">Учурдагы сыр сөз</span>
-                <span className="auth-modal-input-group">
-                  <span className="auth-modal-input-icon-box" aria-hidden>
-                    <Lock className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="password"
-                    className="auth-modal-input"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    autoComplete="current-password"
-                  />
-                </span>
-              </label>
-              <label className="auth-modal-field">
-                <span className="auth-modal-label">Жаңы сыр сөз</span>
-                <span className="auth-modal-input-group">
-                  <span className="auth-modal-input-icon-box" aria-hidden>
-                    <Lock className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="password"
-                    className="auth-modal-input"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    minLength={6}
-                    autoComplete="new-password"
-                  />
-                </span>
-              </label>
-              <label className="auth-modal-field">
-                <span className="auth-modal-label">Жаңы сыр сөздү кайталаңыз</span>
-                <span className="auth-modal-input-group">
-                  <span className="auth-modal-input-icon-box" aria-hidden>
-                    <Lock className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="password"
-                    className="auth-modal-input"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    minLength={6}
-                    autoComplete="new-password"
-                  />
-                </span>
-              </label>
+              <PasswordField
+                label="Учурдагы сыр сөз"
+                name="currentPassword"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              <PasswordField
+                label="Жаңы сыр сөз"
+                name="newPassword"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={6}
+                autoComplete="new-password"
+              />
+              <PasswordField
+                label="Жаңы сыр сөздү кайталаңыз"
+                name="confirmPassword"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={6}
+                autoComplete="new-password"
+              />
             </div>
 
             <button type="submit" className="btn-gold profile-save-btn" disabled={saving}>

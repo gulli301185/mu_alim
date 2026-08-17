@@ -2,9 +2,9 @@ import { useState, useRef, useEffect, type RefObject } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Moon, Sun, Globe, Menu, X, ChevronDown, User, LogOut, Shield } from 'lucide-react';
 import { NAV_PRIMARY, NAV_MENU, LANG_OPTIONS, type LangCode } from '../data/landing';
-import { AuthModal } from './AuthModal';
+import { UserAuthModal } from './UserAuthModal';
 import { useAuth } from '../context/AuthContext';
-import { getUserDisplayName } from '../lib/auth-api';
+import { getUserDisplayName, type AuthUser } from '../lib/auth-api';
 
 function navClass(isActive: boolean) {
   return isActive ? 'nav-active nav-link' : 'nav-link';
@@ -95,6 +95,54 @@ function MenuDropdown({
   );
 }
 
+function AuthButtons({
+  loading,
+  user,
+  isLoggingOut,
+  onLogin,
+  onRegister,
+  onLogout,
+}: {
+  loading: boolean;
+  user: AuthUser | null;
+  isLoggingOut: boolean;
+  onLogin: () => void;
+  onRegister: () => void;
+  onLogout: () => void;
+}) {
+  if (loading) {
+    return <span className="header-auth-loading">...</span>;
+  }
+
+  if (user) {
+    return (
+      <>
+        <UserMenu />
+        <button
+          type="button"
+          className="header-logout-btn"
+          onClick={onLogout}
+          disabled={isLoggingOut}
+        >
+          <LogOut className="h-4 w-4" />
+          {isLoggingOut ? 'Чыгууда...' : 'Logout'}
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <button type="button" className="header-login-btn" onClick={onLogin}>
+        <User className="h-4 w-4" />
+        Кирүү
+      </button>
+      <button type="button" className="header-register-btn" onClick={onRegister}>
+        Катталуу
+      </button>
+    </>
+  );
+}
 function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const { user, isAdmin, logout } = useAuth();
   const [open, setOpen] = useState(false);
@@ -132,7 +180,7 @@ function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
         {isAdmin ? (
           <span className="header-user-admin hidden lg:inline-flex">
             <Shield className="h-3.5 w-3.5" />
-            Admin
+            Админ
           </span>
         ) : null}
         <ChevronDown className="h-4 w-4 header-user-chevron" />
@@ -151,7 +199,7 @@ function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
           </Link>
           <button type="button" className="header-user-dropdown-link" onClick={() => { logout(); closeAll(); }}>
             <LogOut className="h-4 w-4" />
-            Logout
+            Чыгуу
           </button>
         </div>
       )}
@@ -168,7 +216,7 @@ export function Header({
   onToggle: () => void;
   adminSimple?: boolean;
 }) {
-  const { user, loading } = useAuth();
+  const { user, loading, logout, isLoggingOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lang, setLang] = useState<LangCode>(() => {
@@ -231,8 +279,8 @@ export function Header({
         <div className="header-dots" aria-hidden />
         <div className="wrap header-inner">
           <Link to="/questions" className="header-logo no-underline shrink-0">
-            <img src="/logo-mualim.png" alt="MUALIM" className="header-logo-img" />
-            <span className="header-brand-name">MUALIM</span>
+            <img src="/logo-mualim.png" alt="МУАЛИМ" className="header-logo-img" />
+            <span className="header-brand-name">МУАЛИМ</span>
           </Link>
 
           {!adminSimple ? (
@@ -254,7 +302,7 @@ export function Header({
               />
             </nav>
           ) : (
-            <p className="header-admin-label hidden sm:block">Суроо-жооп бөлümү</p>
+            <p className="header-admin-label hidden sm:block">Суроо-жооп бөлүмү</p>
           )}
 
           <div className="header-actions">
@@ -283,14 +331,16 @@ export function Header({
               </>
             ) : null}
 
-            {!loading && user ? (
-              <UserMenu />
-            ) : (
-              <button type="button" className="header-login-btn" onClick={() => openAuth('login')}>
-                <User className="h-4 w-4" />
-                Login
-              </button>
-            )}
+            <div className="header-auth-actions">
+              <AuthButtons
+                loading={loading}
+                user={user}
+                isLoggingOut={isLoggingOut}
+                onLogin={() => openAuth('login')}
+                onRegister={() => openAuth('register')}
+                onLogout={logout}
+              />
+            </div>
 
             <button
               type="button"
@@ -326,12 +376,26 @@ export function Header({
                   <User className="h-4 w-4" />
                   Профиль
                 </Link>
+                <button
+                  type="button"
+                  className="header-logout-btn header-login-btn-mobile"
+                  onClick={() => { logout(); closeAll(); }}
+                  disabled={isLoggingOut}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoggingOut ? 'Чыгууда...' : 'Logout'}
+                </button>
               </div>
             ) : (
-              <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuth('login')}>
-                <User className="h-4 w-4" />
-                Login
-              </button>
+              <div className="header-mobile-auth">
+                <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuth('login')}>
+                  <User className="h-4 w-4" />
+                  Кирүү
+                </button>
+                <button type="button" className="header-register-btn header-login-btn-mobile" onClick={() => openAuth('register')}>
+                  Катталуу
+                </button>
+              </div>
             )}
           </nav>
         )}
@@ -352,7 +416,7 @@ export function Header({
         </div>
       </div>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab={authTab} />
+      <UserAuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab={authTab} />
     </header>
   );
 }

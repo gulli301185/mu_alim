@@ -6,7 +6,7 @@ export type QuestionArticle = {
   slug?: string;
   title: string;
   excerpt: string;
-  views: number;
+  views?: number | null;
   publishedAt: string;
   type: 'text' | 'video';
   number?: number | null;
@@ -44,9 +44,9 @@ export async function fetchQaList(params: {
   if (params.page) query.set('page', String(params.page));
   if (params.limit) query.set('limit', String(params.limit));
   if (params.search) query.set('search', params.search);
-  if (params.sort) query.set('sort', params.sort);
+  query.set('sort', params.sort ?? 'default');
 
-  const res = await fetch(`${API_BASE}/api/qa?${query}`);
+  const res = await fetch(`${API_BASE}/api/qa?${query.toString()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(await parseApiError(res, 'API error'));
   return res.json();
 }
@@ -55,6 +55,25 @@ export async function fetchQaBySlug(slug: string): Promise<QuestionArticle> {
   const res = await fetch(`${API_BASE}/api/qa/${slug}`);
   if (!res.ok) throw new Error(await parseApiError(res, 'Not found'));
   return res.json();
+}
+
+const viewDedupe = new Map<string, number>();
+const VIEW_DEDUPE_MS = 3000;
+
+function shouldRecordQaView(slug: string): boolean {
+  const now = Date.now();
+  const last = viewDedupe.get(slug);
+  if (last != null && now - last < VIEW_DEDUPE_MS) return false;
+  viewDedupe.set(slug, now);
+  return true;
+}
+
+export async function recordQaView(slug: string): Promise<{ views: number } | null> {
+  if (!shouldRecordQaView(slug)) return null;
+
+  const res = await fetch(`${API_BASE}/api/qa/${slug}/view`, { method: 'POST' });
+  if (!res.ok) return null;
+  return res.json() as Promise<{ views: number }>;
 }
 
 export type AdminQaInput = {

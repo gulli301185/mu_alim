@@ -23,6 +23,7 @@ builder.Services.AddDbContext<MuAlimDbContext>(options =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IQaService, QaService>();
+builder.Services.AddScoped<ILessonService, LessonService>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 
 var jwtSecret = builder.Configuration["Jwt:Secret"]

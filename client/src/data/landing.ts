@@ -1,7 +1,7 @@
 export const SITE = {
   name: "Ислам Булагы",
   tagline: "Куран жана Сүннөт ордосу",
-  subtitle: "Nur Academy · Mualim Academy",
+  subtitle: "Нур академиясы · Муалим академиясы",
   instagram: "https://www.instagram.com/mualim.academy/",
   youtubeFree: "https://www.youtube.com/@Muhammadalim_Halil",
   phone: "+996 500 864 404",
@@ -15,7 +15,7 @@ export const PAYMENT_TERMS = [
   "Курс материалдарын үчүнчү жактарга берүү, көчүрүү же таратууга тыюу салынат.",
   "Төлөм кайтарылбайт, эгер курс материалына кирүү ачылган болсо.",
   "Техникалык көйгөйлөр үчүн колдоо: " + SITE.phone,
-  "Mualim Academy платформасынын жалпы колдонуу шарттары колдонулат.",
+  "Муалим академиясы платформасынын жалпы колдонуу шарттары колдонулат.",
 ] as const;
 
 export const FOOTER_COLUMNS = [
@@ -32,7 +32,7 @@ export const FOOTER_COLUMNS = [
     title: "Маалымат",
     links: [
       { label: "Намаз убакыттары", href: "/#prayer" },
-      { label: "Cуроо-жооп", href: "/questions" },
+      { label: "Суроо-жооп", href: "/questions" },
       { label: "Биздин сабактар", href: "/#videos" },
       { label: "Байланыш", href: "/#contact" },
     ],
@@ -40,7 +40,7 @@ export const FOOTER_COLUMNS = [
   {
     title: "Колдоо",
     links: [
-      { label: "Жардам & FAQ", href: "/questions" },
+      { label: "Жардам жана суроолор", href: "/questions" },
       { label: "Шарттар", href: "/#contact" },
       { label: "Баалар", href: "/courses" },
       { label: "Катталуу", href: "/#contact" },
@@ -49,10 +49,10 @@ export const FOOTER_COLUMNS = [
 ] as const;
 
 export const FOOTER_SOCIAL = [
-  { name: "Telegram", color: "#0088cc", href: "https://t.me" },
-  { name: "WhatsApp", color: "#25D366", href: "https://wa.me" },
+  { name: "Телеграм", color: "#0088cc", href: "https://t.me" },
+  { name: "Ватсап", color: "#25D366", href: "https://wa.me" },
   {
-    name: "Instagram",
+    name: "Инстаграм",
     color: "#E4405F",
     href: "https://instagram.com/mualim.academy",
   },
@@ -91,7 +91,7 @@ export const QUICK_ACCESS = [
   { label: "Курстар", href: "/courses", emoji: "📖" },
   { label: "Дубалар", href: "/#ayah", emoji: "🤲" },
   { label: "Акыркы баян", href: "/#videos", emoji: "▶️" },
-  { label: "Cуроо-жооп", href: "/questions", emoji: "💬" },
+  { label: "Суроо-жооп", href: "/questions", emoji: "💬" },
   { label: "Устаз", href: "/ustaz", emoji: "👤" },
 ] as const;
 
@@ -139,6 +139,7 @@ export const FREE_VIDEOS = [
 ] as const;
 
 const YT_IDS = [
+  "mtKKIbWbRWc",
   "ZkpJ1ezB2TI",
   "jWh55FxqLhQ",
   "iBn8RH4GSko",
@@ -177,7 +178,7 @@ export const PAID_COURSES = [
   },
   {
     id: "fiqh",
-    title: "Фикh",
+    title: "Фикх",
     price: "3 800 сом",
     lessons: 12,
     rating: 4.9,
@@ -233,7 +234,7 @@ export const PAID_COURSES = [
   },
   {
     id: "kids",
-    title: "Балдар тарbiyasy",
+    title: "Балдар тарбиясы",
     price: "3 300 сом",
     lessons: 10,
     rating: 4.8,
@@ -249,29 +250,12 @@ export const PAID_COURSES = [
   },
   {
     id: "zakat",
-    title: "Зeket жана сadaка",
+    title: "Зекет жана садака",
     price: "2 900 сом",
     lessons: 8,
     rating: 4.8,
     intro: courseIntro(3, "09:15", "2025-07-07"),
   },
-] as const;
-
-export const PRAYER_TIMES = [
-  { name: "Фажр", time: "04:12", phase: "new" as const },
-  { name: "Күн чыгыш", time: "05:45", phase: "waxing" as const },
-  { name: "Бешим", time: "13:10", phase: "full" as const, active: true },
-  { name: "Аср", time: "17:25", phase: "waning" as const },
-  { name: "Шам", time: "20:15", phase: "crescent" as const },
-  { name: "Куптан", time: "21:45", phase: "night" as const },
-] as const;
-
-export const CITIES = [
-  "Бишкек",
-  "Ош",
-  "Жалал-Абад",
-  "Каракол",
-  "Талас",
 ] as const;
 
 export const HADITH = {
@@ -311,18 +295,18 @@ export const EVENTS = [
 
 export const TEACHER = {
   name: "Мухаммадалим Исаков",
-  shortName: "Muhammadalim",
+  shortName: "Мухаммадалим",
   birthYear: 1991,
-  family: "3 балanın атасы",
+  family: "3 баланың атасы",
   institute: "Кара-Балта ш., «Хазрети Осмон» ислам институту",
   role: "Директордун орун басары",
   quote: "БИЛИМ МЕНЕН КУРАЛДАН, АДЕП МЕНЕН ЖОЛ ТАП, ЭМГЕК МЕНЕН БИЙИКТЕ.",
   quoteSub: "",
   teaserBio:
-    "1991-жылы төрөлгөн. «Хазрети Осмон» ислам институтунун директордун орун басары. YouTube каналында бекер баяндар жана Mualim Academy платформasında онлайн курстарды жүргүзөт.",
-  bio: "«Хазрети Осмон» ислам институтунун директордун орун басары. Араб, перс, түрк тилдеринде билим берет. Куран, фикh, тафсир жана тасаввуф темаларында сабак берет.",
+    "1991-жылы төрөлгөн. «Хазрети Осмон» ислам институтунун директордун орун басары. Ютуб каналында бекер баяндар жана Муалим академиясы платформасында онлайн курстарды жүргүзөт.",
+  bio: "«Хазрети Осмон» ислам институтунун директордун орун басары. Араб, перс, түрк тилдеринде билим берет. Куран, фикх, тафсир жана тасаввуф темаларында сабак берет.",
   fullBio:
-    "Мухаммадалим Исаков — 1991-жылы төрөлгөн. Кыргыз Республикасынын көптөгөн аалымдардын устаты шейх Абдысаттар дамланын колунда 2007-жылдан баштап ислам билимин алган. Кызыл-Кыя, Орто Азия, Түркия, Дубай жана Иорданияда окуган. «Хазрети Осмон» ислам институтунун директордун орун басары. YouTube каналында бекер баяндарды, Mualim Academy платформasında онлайн курстарды жүргүзөт.",
+    "Мухаммадалим Исаков — 1991-жылы төрөлгөн. Кыргыз Республикасынын көптөгөн аалымдардын устаты шейх Абдысаттар дамланын колунда 2007-жылдан баштап ислам билимин алган. Кызыл-Кыя, Орто Азия, Түркия, Дубай жана Иорданияда окуган. «Хазрети Осмон» ислам институтунун директордун орун басары. Ютуб каналында бекер баяндарды, Муалим академиясы платформасында онлайн курстарды жүргүзөт.",
   education: [
     {
       period: "2007",
@@ -397,10 +381,10 @@ export const TEACHER = {
   ] as const,
   languages: [
     { name: "Кыргызча", level: "Эне тили" },
-    { name: "Орусча", level: "Эрkin" },
-    { name: "Арабча", level: "Эрkin" },
-    { name: "Түркчө", level: "Эрkin" },
-    { name: "Персче", level: "Эрkin" },
+    { name: "Орусча", level: "Эркин" },
+    { name: "Арабча", level: "Эркин" },
+    { name: "Түркчө", level: "Эркин" },
+    { name: "Персче", level: "Эркин" },
   ] as const,
   stats: [
     { value: "1200+", label: "Баяндар" },
@@ -415,13 +399,13 @@ export const TEACHER = {
     },
     {
       icon: "book" as const,
-      title: "Фикh жана акыйда",
-      desc: "Ислам укугу жана негизги ишеним маселелери боюнча терең сабakтар.",
+      title: "Фикх жана акыйда",
+      desc: "Ислам укугу жана негизги ишеним маселелери боюнча терең сабактар.",
     },
     {
       icon: "grad" as const,
-      title: "Тasauф илими",
-      desc: "Жүрөктү tazaloo жана Аллаhка жakын болуу жолдору.",
+      title: "Тасауф илими",
+      desc: "Жүрөктү тазалоо жана Аллага жакын болуу жолдору.",
     },
     {
       icon: "grad" as const,
@@ -433,23 +417,23 @@ export const TEACHER = {
 
 export const SOCIAL = [
   {
-    name: "YouTube",
+    name: "Ютуб",
     color: "#FF0000",
     href: "https://youtube.com/@Muhammadalim_Halil",
   },
-  { name: "Telegram", color: "#0088cc", href: "https://t.me" },
+  { name: "Телеграм", color: "#0088cc", href: "https://t.me" },
   {
-    name: "Instagram",
+    name: "Инстаграм",
     color: "#E4405F",
     href: "https://instagram.com/mualim.academy",
   },
-  { name: "WhatsApp", color: "#25D366", href: "https://wa.me" },
+  { name: "Ватсап", color: "#25D366", href: "https://wa.me" },
 ] as const;
 
 export const FAQ = [
   {
     q: "Бекер сабактар кайдан алынат?",
-    a: "YouTube канал @Muhammadalim_Halil.",
+    a: "Ютуб канал @Muhammadalim_Halil.",
   },
   {
     q: "Акылуу курстарга кантип кирүү?",
@@ -457,6 +441,6 @@ export const FAQ = [
   },
   {
     q: "Сертификат кандай берилет?",
-    a: "Бардык сабактарды аяктап, тесттерден 80% топтогондон кийин PDF форматында.",
+    a: "Бардык сабактарды аяктап, тесттерден 80% топтогондон кийин ПДФ форматында.",
   },
 ] as const;

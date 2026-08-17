@@ -7,6 +7,8 @@ public class MuAlimDbContext(DbContextOptions<MuAlimDbContext> options) : DbCont
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<QaArticle> QaArticles => Set<QaArticle>();
+    public DbSet<Course> Courses => Set<Course>();
+    public DbSet<Lesson> Lessons => Set<Lesson>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +57,39 @@ public class MuAlimDbContext(DbContextOptions<MuAlimDbContext> options) : DbCont
                 .WithMany(u => u.QaArticles)
                 .HasForeignKey(e => e.CreatedById)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Course>(entity =>
+        {
+            entity.ToTable("courses");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Slug).HasColumnName("slug").HasMaxLength(280);
+            entity.Property(e => e.Title).HasColumnName("title").HasMaxLength(255);
+            entity.Property(e => e.IsPublished).HasColumnName("is_published");
+            entity.HasIndex(e => e.Slug).IsUnique();
+        });
+
+        modelBuilder.Entity<Lesson>(entity =>
+        {
+            entity.ToTable("lessons");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CourseId).HasColumnName("course_id");
+            entity.Property(e => e.Title).HasColumnName("title").HasMaxLength(255);
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.YoutubeUrl).HasColumnName("youtube_url").HasMaxLength(500);
+            entity.Property(e => e.YoutubeVideoId).HasColumnName("youtube_video_id").HasMaxLength(50);
+            entity.Property(e => e.DurationSeconds).HasColumnName("duration_seconds");
+            entity.Property(e => e.LessonOrder).HasColumnName("lesson_order");
+            entity.Property(e => e.IsPublished).HasColumnName("is_published");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(e => new { e.CourseId, e.LessonOrder }).IsUnique();
+            entity.HasOne(e => e.Course)
+                .WithMany(c => c.Lessons)
+                .HasForeignKey(e => e.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

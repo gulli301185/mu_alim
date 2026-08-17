@@ -39,7 +39,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   requireAuth(req, res, () => {
     if (req.user?.role !== 'admin') {
-      res.status(403).json({ error: 'Админ укугу кerek' });
+      res.status(403).json({ error: 'Админ укугу керек' });
       return;
     }
     next();

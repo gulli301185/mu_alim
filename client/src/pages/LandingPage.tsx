@@ -4,9 +4,17 @@ import {
   Play, Mic, Video, Users, Calendar, ChevronDown, MapPin, Star,
 } from 'lucide-react';
 import {
-  SITE, STATS, QUICK_ACCESS, FREE_VIDEOS, PAID_COURSES, PRAYER_TIMES, CITIES,
+  SITE, STATS, QUICK_ACCESS, FREE_VIDEOS, PAID_COURSES,
   HADITH, AYAH, EVENTS, TEACHER,
 } from '../data/landing';
+import {
+  fetchPrayerRegions,
+  fetchPrayerTimes,
+  loadSavedPrayerRegion,
+  savePrayerRegion,
+  type PrayerRegion,
+  type PrayerTimesResponse,
+} from '../lib/prayer-api';
 import { FaqAccordion } from '../components/FaqAccordion';
 
 const STAT_ICONS = [Mic, Video, Users, Calendar];
@@ -25,25 +33,31 @@ function formatPrayerDate(date: Date) {
   return `${date.getDate()}-${KY_MONTHS[date.getMonth()]}, ${date.getFullYear()}`;
 }
 
-function useCountdown(h: number, m: number) {
-  const [parts, setParts] = useState({ h: '01', m: '18', s: '55' });
+function useCountdownTo(targetIso: string | null) {
+  const [parts, setParts] = useState({ h: '00', m: '00', s: '00' });
+
   useEffect(() => {
+    if (!targetIso) return;
+
+    const target = new Date(targetIso).getTime();
     const tick = () => {
-      const now = new Date();
-      const target = new Date();
-      target.setHours(h, m, 0, 0);
-      if (target <= now) target.setDate(target.getDate() + 1);
-      const d = target.getTime() - now.getTime();
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setParts({ h: '00', m: '00', s: '00' });
+        return;
+      }
       setParts({
-        h: String(Math.floor(d / 3600000)).padStart(2, '0'),
-        m: String(Math.floor((d % 3600000) / 60000)).padStart(2, '0'),
-        s: String(Math.floor((d % 60000) / 1000)).padStart(2, '0'),
+        h: String(Math.floor(diff / 3600000)).padStart(2, '0'),
+        m: String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0'),
+        s: String(Math.floor((diff % 60000) / 1000)).padStart(2, '0'),
       });
     };
+
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [h, m]);
+  }, [targetIso]);
+
   return parts;
 }
 
@@ -135,11 +149,9 @@ function PaidCoursesSection() {
       </div>
       <div className="courses-scroll">
         {PAID_COURSES.map((c) => (
-          <a
+          <Link
             key={c.id}
-            href={c.intro.url}
-            target="_blank"
-            rel="noopener noreferrer"
+            to={`/courses/${c.id}`}
             className="course-card no-underline"
           >
             <div className="course-card-video">
@@ -149,15 +161,15 @@ function PaidCoursesSection() {
                   <Play className="h-5 w-5 text-navy ml-0.5" fill="currentColor" />
                 </div>
               </div>
-              <span className="video-free-badge">Бекер</span>
+              <span className="video-paid-badge">{c.price}</span>
               <span className="course-card-duration">{c.intro.duration}</span>
             </div>
             <div className="course-card-body">
               <p className="course-card-title">{c.title}</p>
-              <p className="course-card-intro">{c.intro.title} · Бекер</p>
+              <p className="course-card-intro">{c.intro.title}</p>
               <CourseMeta lessons={c.lessons} rating={c.rating} price={c.price} />
             </div>
-          </a>
+          </Link>
         ))}
       </div>
     </div>
@@ -254,12 +266,71 @@ function VideoPanel({
 }
 
 export function LandingPage() {
-  const [city, setCity] = useState<string>(CITIES[0]);
-  const countdown = useCountdown(13, 10);
-  const today = new Date();
+  const [regions, setRegions] = useState<PrayerRegion[]>([]);
+  const [regionId, setRegionId] = useState('');
+  const [prayerData, setPrayerData] = useState<PrayerTimesResponse | null>(null);
+  const [prayerLoading, setPrayerLoading] = useState(true);
+  const [prayerError, setPrayerError] = useState<string | null>(null);
+  const countdown = useCountdownTo(prayerData?.nextPrayer?.at ?? null);
+  const today = prayerData?.date ? new Date(`${prayerData.date}T12:00:00+06:00`) : new Date();
 
   const featured = FREE_VIDEOS[0];
   const sideVideos = FREE_VIDEOS.slice(1, 5);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRegions() {
+      try {
+        const data = await fetchPrayerRegions();
+        if (cancelled) return;
+
+        setRegions(data.items);
+        const saved = loadSavedPrayerRegion();
+        const initial =
+          saved && data.items.some((item) => item.id === saved)
+            ? saved
+            : data.defaultRegionId;
+        setRegionId(initial);
+      } catch {
+        if (!cancelled) setPrayerError('Аймактарды жүктөө ийгиликсиз');
+      }
+    }
+
+    void loadRegions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!regionId) return;
+
+    let cancelled = false;
+    setPrayerLoading(true);
+    setPrayerError(null);
+
+    async function loadTimes() {
+      try {
+        const data = await fetchPrayerTimes(regionId);
+        if (cancelled) return;
+        setPrayerData(data);
+        savePrayerRegion(regionId);
+      } catch {
+        if (!cancelled) {
+          setPrayerData(null);
+          setPrayerError('Намаз убакыттарын жүктөө ийгиликсиз');
+        }
+      } finally {
+        if (!cancelled) setPrayerLoading(false);
+      }
+    }
+
+    void loadTimes();
+    return () => {
+      cancelled = true;
+    };
+  }, [regionId]);
 
   return (
     <>
@@ -269,7 +340,7 @@ export function LandingPage() {
             Билим аркылуу<br />жакшы жашоого кадам
           </h1>
           <p className="hero-sub">
-            Куран жана Сүннөттүн негизинде ишенимдүү материалдар. Бекер YouTube баяндар жана акылуу онлайн курстар.
+            Куран жана Сүннөттүн негизинде ишенимдүү материалдар. Бекер Ютуб баяндар жана акылуу онлайн курстар.
           </p>
           <div className="flex flex-wrap gap-3 mt-8">
             <a href="#videos" className="btn-gold">БАЯНДАРДЫ КӨРҮҮ</a>
@@ -277,7 +348,6 @@ export function LandingPage() {
           </div>
         </div>
       </section>
-      // jfdvk
 
       <div className="wrap">
         <div className="stats-bar grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -320,11 +390,16 @@ export function LandingPage() {
                   <MapPin className="h-4 w-4 text-gold shrink-0" />
                   <select
                     className="prayer-city-input"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    aria-label="Шаар"
+                    value={regionId}
+                    onChange={(e) => setRegionId(e.target.value)}
+                    aria-label="Аймак"
+                    disabled={regions.length === 0}
                   >
-                    {CITIES.map((c) => <option key={c}>{c}</option>)}
+                    {regions.map((region) => (
+                      <option key={region.id} value={region.id}>
+                        {region.name}
+                      </option>
+                    ))}
                   </select>
                   <ChevronDown className="h-4 w-4 text-sky-dark shrink-0 pointer-events-none" />
                 </div>
@@ -332,15 +407,26 @@ export function LandingPage() {
               </div>
               <div className="prayer-split">
                 <div className="prayer-list">
-                  {PRAYER_TIMES.map((p) => (
-                    <div key={p.name} className="prayer-row">
-                      <div className="prayer-row-left">
-                        <PrayerIcon />
-                        <span className="prayer-name">{p.name}</span>
+                  {prayerLoading ? (
+                    <p className="prayer-status">Жүктөлүүдө...</p>
+                  ) : prayerError ? (
+                    <p className="prayer-status prayer-status-error">{prayerError}</p>
+                  ) : (
+                    prayerData?.times.map((p) => (
+                      <div
+                        key={p.key}
+                        className={`prayer-row${
+                          prayerData.activePrayer?.key === p.key ? ' prayer-row-active' : ''
+                        }`}
+                      >
+                        <div className="prayer-row-left">
+                          <PrayerIcon />
+                          <span className="prayer-name">{p.name}</span>
+                        </div>
+                        <span className="prayer-time">{p.time}</span>
                       </div>
-                      <span className="prayer-time">{p.time}</span>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
 
                 <div className="countdown-box">
@@ -350,7 +436,11 @@ export function LandingPage() {
                     className="countdown-mosque"
                     aria-hidden="true"
                   />
-                  <p className="countdown-label">Кийинки намазга чейин</p>
+                  <p className="countdown-label">
+                    {prayerData?.nextPrayer
+                      ? `Кийинки: ${prayerData.nextPrayer.name}`
+                      : 'Кийинки намазга чейин'}
+                  </p>
                   <div className="countdown-timer">
                     <div className="countdown-segment">
                       <span className="countdown-num">{countdown.h}</span>

@@ -6,14 +6,17 @@ import {
   formatViews,
 } from '../lib/qa-format';
 import type { QuestionArticle } from '../lib/qa-api';
+import { highlightText } from '../lib/search-highlight';
 
 type QaTelegramCardProps = {
   article: QuestionArticle;
-  /** Тизmede кыскача көрсөтүү */
+  /** Тизмеде кыскача көрсөтүү */
   compact?: boolean;
+  /** Издөө сөздөрүн текстте белгилөө */
+  searchQuery?: string;
 };
 
-export function QaTelegramCard({ article, compact = false }: QaTelegramCardProps) {
+export function QaTelegramCard({ article, compact = false, searchQuery = '' }: QaTelegramCardProps) {
   const question = article.question ?? article.title;
   const answer = article.answer ?? article.excerpt;
   const numberLabel =
@@ -25,12 +28,14 @@ export function QaTelegramCard({ article, compact = false }: QaTelegramCardProps
 
       <div className="qa-tg-section">
         <p className="qa-tg-label">❓ {numberLabel}</p>
-        <p className="qa-tg-text">{question}</p>
+        <p className="qa-tg-text">{highlightText(question, searchQuery)}</p>
       </div>
 
       <div className="qa-tg-section">
         <p className="qa-tg-label">✅ ЖООП:</p>
-        <p className={`qa-tg-text${compact ? ' qa-tg-text-compact' : ''}`}>{answer}</p>
+        <p className={`qa-tg-text${compact ? ' qa-tg-text-compact' : ''}`}>
+          {highlightText(answer, searchQuery)}
+        </p>
       </div>
 
       <div className="qa-tg-footer">

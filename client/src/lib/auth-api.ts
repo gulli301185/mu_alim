@@ -37,6 +37,16 @@ export type UpdateProfileInput = {
   newPassword?: string;
 };
 
+export class AuthApiError extends Error {
+  fields?: Record<string, string>;
+
+  constructor(message: string, fields?: Record<string, string>) {
+    super(message);
+    this.name = 'AuthApiError';
+    this.fields = fields;
+  }
+}
+
 function authHeaders(token: string) {
   return {
     'Content-Type': 'application/json',
@@ -44,12 +54,12 @@ function authHeaders(token: string) {
   };
 }
 
-async function parseError(res: Response, fallback: string) {
+async function parseApiError(res: Response, fallback: string): Promise<AuthApiError> {
   try {
-    const data = (await res.json()) as { error?: string };
-    return data.error ?? fallback;
+    const data = (await res.json()) as { error?: string; fields?: Record<string, string> };
+    return new AuthApiError(data.error ?? fallback, data.fields);
   } catch {
-    return fallback;
+    return new AuthApiError(fallback);
   }
 }
 
@@ -73,13 +83,23 @@ export function saveStoredAuth(session: AuthSession | null) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
 
-export async function loginRequest(input: LoginInput): Promise<AuthSession> {
+export async function loginUserRequest(input: LoginInput): Promise<AuthSession> {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(await parseError(res, 'Кирүү ийгиликсиз'));
+  if (!res.ok) throw await parseApiError(res, 'Кирүү ийгиликсиз');
+  return res.json() as Promise<AuthSession>;
+}
+
+export async function adminLoginRequest(input: LoginInput): Promise<AuthSession> {
+  const res = await fetch(`${API_BASE}/api/auth/admin/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw await parseApiError(res, 'Кирүү ийгиликсиз');
   return res.json() as Promise<AuthSession>;
 }
 
@@ -89,15 +109,39 @@ export async function registerRequest(input: RegisterInput): Promise<AuthSession
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(await parseError(res, 'Каттоо ийгиликсиз'));
+  if (!res.ok) throw await parseApiError(res, 'Каттоо ийгиликсиз');
   return res.json() as Promise<AuthSession>;
+}
+
+export async function forgotPasswordRequest(email: string): Promise<{ message: string; resetUrl?: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw await parseApiError(res, 'Сурам ийгиликсиз');
+  return res.json() as Promise<{ message: string; resetUrl?: string }>;
+}
+
+export async function resetPasswordRequest(input: {
+  token: string;
+  password: string;
+  confirmPassword: string;
+}): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw await parseApiError(res, 'Сыр сөздү өзгөртүү ийгиликсиз');
+  return res.json() as Promise<{ message: string }>;
 }
 
 export async function fetchMe(token: string): Promise<AuthUser> {
   const res = await fetch(`${API_BASE}/api/auth/me`, {
     headers: authHeaders(token),
   });
-  if (!res.ok) throw new Error(await parseError(res, 'Сессия жараксыз'));
+  if (!res.ok) throw await parseApiError(res, 'Сессия жараксыз');
   const data = (await res.json()) as { user: AuthUser };
   return data.user;
 }
@@ -111,7 +155,7 @@ export async function updateProfileRequest(
     headers: authHeaders(token),
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(await parseError(res, 'Жаңыртуу ийгиликсиз'));
+  if (!res.ok) throw await parseApiError(res, 'Жаңыртуу ийгиликсиз');
   const data = (await res.json()) as { user: AuthUser };
   return data.user;
 }

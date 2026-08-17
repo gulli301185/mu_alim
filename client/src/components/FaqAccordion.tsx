@@ -13,7 +13,7 @@ export function FaqAccordion({ id, className = '', hideTitle = false }: FaqAccor
 
   return (
     <div id={id} className={`faq-panel ui-card ${className}`.trim()}>
-      {!hideTitle && <h2 className="faq-panel-title">Cуроо-жооп</h2>}
+      {!hideTitle && <h2 className="faq-panel-title">Суроо-жооп</h2>}
       <div className="faq-accordion">
         {FAQ.map((f, i) => {
           const isOpen = openIndex === i;

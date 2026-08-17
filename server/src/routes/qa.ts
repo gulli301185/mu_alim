@@ -5,6 +5,9 @@ import { prisma } from '../lib/prisma.js';
 import { asyncHandler } from '../lib/async-handler.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { uniqueSlug } from '../lib/slug.js';
+import { parseTelegramHtmlExport } from '../lib/telegram-html-parser.js';
+import { importQaArticles } from '../lib/qa-import-service.js';
+import { parseQuestionNumberSearch } from '../lib/qa-search.js';
 
 export const qaRouter = Router();
 
@@ -19,6 +22,8 @@ function toClient(article: {
   excerpt: string | null;
   tags: string[];
   type: 'text' | 'video';
+  telegramViews: number;
+  siteViews: number;
   views: number;
   publishedAt: Date;
 }) {
@@ -36,7 +41,7 @@ function toClient(article: {
     answer: article.answer,
     excerpt,
     tags: article.tags,
-    views: article.views,
+    views: (article.telegramViews ?? 0) + (article.siteViews ?? 0),
     publishedAt: article.publishedAt.toISOString(),
     type: article.type,
     source: 'telegram' as const,
@@ -56,23 +61,35 @@ qaRouter.get(
     const where: Prisma.QaArticleWhereInput = {
       isPublished: true,
       ...(search
-        ? {
-            OR: [
+        ? (() => {
+            const or: Prisma.QaArticleWhereInput[] = [
               { question: { contains: search, mode: 'insensitive' as const } },
               { answer: { contains: search, mode: 'insensitive' as const } },
               { tags: { has: search.toLowerCase() } },
-            ],
-          }
+            ];
+
+            const questionNumber = parseQuestionNumberSearch(search);
+            if (questionNumber != null) {
+              or.unshift({ questionNumber });
+            }
+
+            return { OR: or };
+          })()
         : {}),
     };
 
     const orderBy: Prisma.QaArticleOrderByWithRelationInput[] =
       sort === 'newest'
-        ? [{ publishedAt: 'desc' }]
+        ? [{ publishedAt: 'desc' }, { questionNumber: { sort: 'asc', nulls: 'last' } }]
         : sort === 'oldest'
-          ? [{ publishedAt: 'asc' }]
+          ? [{ publishedAt: 'asc' }, { questionNumber: { sort: 'asc', nulls: 'last' } }]
           : sort === 'popular'
-            ? [{ views: 'desc' }]
+            ? [
+                { views: 'desc' },
+                { siteViews: 'desc' },
+                { telegramViews: 'desc' },
+                { questionNumber: { sort: 'asc', nulls: 'last' } },
+              ]
             : [{ questionNumber: { sort: 'asc', nulls: 'last' } }, { publishedAt: 'desc' }];
 
     const [items, total] = await Promise.all([
@@ -85,17 +102,13 @@ qaRouter.get(
       prisma.qaArticle.count({ where }),
     ]);
 
+    res.set('Cache-Control', 'no-store');
     res.json({
-      items: items.map((item, index) => {
-        const client = toClient(item);
-        if (sort === 'default') {
-          client.number = (page - 1) * limit + index + 1;
-        }
-        return client;
-      }),
+      items: items.map((item) => toClient(item)),
       total,
       page,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+      sort,
     });
   }),
 );
@@ -112,12 +125,7 @@ qaRouter.get(
       return;
     }
 
-    const updated = await prisma.qaArticle.update({
-      where: { id: article.id },
-      data: { views: { increment: 1 } },
-    });
-
-    const client = toClient(updated);
+    const client = toClient(article);
     if (client.number == null) {
       const rank = await prisma.qaArticle.count({
         where: {
@@ -135,6 +143,36 @@ qaRouter.get(
     }
 
     res.json(client);
+  }),
+);
+
+qaRouter.post(
+  '/:slug/view',
+  asyncHandler(async (req, res) => {
+    const article = await prisma.qaArticle.findFirst({
+      where: { slug: req.params.slug, isPublished: true },
+    });
+
+    if (!article) {
+      res.status(404).json({ error: 'Суроо табылган жок' });
+      return;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.qaArticle.update({
+        where: { id: article.id },
+        data: { siteViews: { increment: 1 } },
+      });
+
+      return tx.qaArticle.update({
+        where: { id: row.id },
+        data: { views: row.telegramViews + row.siteViews },
+      });
+    });
+
+    res.json({
+      views: (updated.telegramViews ?? 0) + (updated.siteViews ?? 0),
+    });
   }),
 );
 
@@ -228,5 +266,26 @@ qaRouter.delete(
 
     await prisma.qaArticle.delete({ where: { id: req.params.id } });
     res.status(204).send();
+  }),
+);
+
+qaRouter.post(
+  '/import/telegram-html',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const html = typeof req.body?.html === 'string' ? req.body.html : '';
+    if (html.length < 100) {
+      res.status(400).json({ error: 'Веб-барактын маалыматы керек' });
+      return;
+    }
+
+    const items = parseTelegramHtmlExport(html);
+    if (items.length === 0) {
+      res.status(400).json({ error: 'Суроо-жооп табылган жок' });
+      return;
+    }
+
+    const result = await importQaArticles(prisma, items);
+    res.json({ message: 'Телеграм экспорту ийгиликтүү импорт кылынды', ...result });
   }),
 );
