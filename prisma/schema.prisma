@@ -51,6 +51,13 @@ enum TestType {
   @@map("test_type")
 }
 
+enum QuestionType {
+  choice
+  text
+
+  @@map("question_type")
+}
+
 enum ReviewStatus {
   pending
   approved
@@ -337,13 +344,15 @@ model Test {
 
 // Table #13 omitted in TZ — inferred from question_options & test_questions relations
 model Question {
-  id           String   @id @default(uuid()) @db.Uuid
-  courseId     String   @map("course_id") @db.Uuid
-  questionText String   @map("question_text") @db.Text
-  explanation  String?  @db.Text
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id                String       @id @default(uuid()) @db.Uuid
+  courseId          String       @map("course_id") @db.Uuid
+  questionText      String       @map("question_text") @db.Text
+  questionType      QuestionType @default(choice) @map("question_type")
+  correctTextAnswer String?      @map("correct_text_answer") @db.Text
+  explanation       String?      @db.Text
+  isActive          Boolean      @default(true) @map("is_active")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   course        Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   options       QuestionOption[]
@@ -404,13 +413,14 @@ model TestAnswer {
   id               String   @id @default(uuid()) @db.Uuid
   attemptId        String   @map("attempt_id") @db.Uuid
   questionId       String   @map("question_id") @db.Uuid
-  selectedOptionId String   @map("selected_option_id") @db.Uuid
+  selectedOptionId String?  @map("selected_option_id") @db.Uuid
+  textAnswer       String?  @map("text_answer") @db.Text
   isCorrect        Boolean  @map("is_correct")
   answeredAt       DateTime @map("answered_at") @db.Timestamptz
 
-  attempt        TestAttempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question       Question       @relation(fields: [questionId], references: [id])
-  selectedOption QuestionOption @relation(fields: [selectedOptionId], references: [id])
+  attempt        TestAttempt     @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question       Question        @relation(fields: [questionId], references: [id])
+  selectedOption QuestionOption? @relation(fields: [selectedOptionId], references: [id])
 
   @@index([attemptId])
   @@map("test_answers")

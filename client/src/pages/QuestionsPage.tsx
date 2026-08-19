@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import { QaPagination } from '../components/QaPagination';
 import { QaTelegramCard } from '../components/QaTelegramCard';
 import { QaAdminForm } from '../components/QaAdminForm';
@@ -14,6 +14,7 @@ import {
   type QuestionArticle,
   type QuestionSort,
 } from '../lib/qa-api';
+import { getErrorMessage, toastError } from '../lib/toast';
 
 const SORT_VALUES = new Set<QuestionSort>(['default', 'newest', 'oldest', 'popular']);
 
@@ -28,6 +29,7 @@ function QaAdminList({
   onReload,
   onDelete,
   searchQuery = '',
+  basePath = '/admin/questions',
 }: {
   items: QuestionArticle[];
   loading: boolean;
@@ -35,11 +37,12 @@ function QaAdminList({
   onReload: () => void;
   onDelete: (article: QuestionArticle) => void;
   searchQuery?: string;
+  basePath?: string;
 }) {
   if (error) {
     return (
       <div className="qa-empty ui-card">
-        <p>{error}</p>
+        <p>Жүктөлбөдү.</p>
         <button type="button" className="btn-gold qa-admin-btn" onClick={onReload}>
           Кайра жүктөө
         </button>
@@ -74,11 +77,11 @@ function QaAdminList({
             </p>
           </div>
           <div className="qa-admin-row-actions">
-            <Link to={`/questions/${article.slug ?? article.id}`} className="qa-admin-btn qa-admin-btn-muted">
+            <Link to={`${basePath}/${article.slug ?? article.id}`} className="qa-admin-btn qa-admin-btn-muted">
               Көрүү
             </Link>
             <Link
-              to={`/questions/${article.slug ?? article.id}?edit=1`}
+              to={`${basePath}/${article.slug ?? article.id}?edit=1`}
               className="qa-admin-btn qa-admin-btn-muted"
             >
               Өзгөртүү
@@ -97,7 +100,7 @@ function QaAdminList({
   );
 }
 
-export function QuestionsPage() {
+export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   const { isAdmin, token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [queryInput, setQueryInput] = useState(() => searchParams.get('q') ?? '');
@@ -170,10 +173,12 @@ export function QuestionsPage() {
       setTotal(data.total);
       setTotalPages(data.totalPages);
     } catch {
+      const message = 'Маалымат базасынан жүктөө ийгиликсиз.';
+      toastError(message);
       setItems([]);
       setTotal(0);
       setTotalPages(1);
-      setError('Маалымат базасынан жүктөө ийгиликсиз.');
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -203,7 +208,7 @@ export function QuestionsPage() {
       await deleteQaArticle(token, article.recordId);
       await load();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Өчүрүү ийгиликсиз');
+      toastError(getErrorMessage(err, 'Өчүрүү ийгиликсиз'));
     }
   };
 
@@ -215,7 +220,7 @@ export function QuestionsPage() {
 
   const listReturnSearch = searchParams.toString();
 
-  if (isAdmin) {
+  if (adminMode || isAdmin) {
     return (
       <section className="qa-page qa-page-admin">
         <div className="wrap qa-page-wrap">
@@ -224,19 +229,44 @@ export function QuestionsPage() {
             <button
               type="button"
               className="btn-gold qa-admin-btn qa-admin-btn-add"
-              onClick={() => setShowCreate((v) => !v)}
+              onClick={() => setShowCreate(true)}
             >
               <Plus className="h-5 w-5" />
-              {showCreate ? 'Жабуу' : 'Жаңы суроо'}
+              Жаңы суроо
             </button>
           </header>
 
           {showCreate ? (
-            <QaAdminForm
-              submitLabel="Сактоо"
-              onCancel={() => setShowCreate(false)}
-              onSubmit={handleCreate}
-            />
+            <div className="auth-modal-overlay" role="presentation" onClick={() => setShowCreate(false)}>
+              <div
+                className="auth-modal ui-card admin-qa-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="qa-create-modal-title"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <header className="admin-lesson-modal-head">
+                  <h3 id="qa-create-modal-title" className="admin-section-title">
+                    Жаңы суроо
+                  </h3>
+                  <button
+                    type="button"
+                    className="auth-modal-close"
+                    onClick={() => setShowCreate(false)}
+                    aria-label="Жабуу"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </header>
+
+                <QaAdminForm
+                  variant="modal"
+                  submitLabel="Сактоо"
+                  onCancel={() => setShowCreate(false)}
+                  onSubmit={handleCreate}
+                />
+              </div>
+            </div>
           ) : null}
 
           <label className="qa-admin-search">

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { PasswordField } from './PasswordField';
 import { AuthTextField, Mail, User, Phone } from './AuthTextField';
 import { AuthApiError } from '../lib/auth-api';
+import { getErrorMessage, toastError } from '../lib/toast';
 import {
   forgotPasswordSchema,
   formatZodErrors,
@@ -27,7 +28,6 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
   const { loginUser, register, forgotPassword, isLoggingIn, isRegistering } = useAuth();
   const [tab, setTab] = useState<AuthTab>(initialTab);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
   const [forgotResetUrl, setForgotResetUrl] = useState<string | null>(null);
@@ -47,7 +47,6 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
   useEffect(() => {
     if (open) {
       setTab(initialTab);
-      setError(null);
       setFieldErrors({});
       setForgotMessage(null);
       setForgotResetUrl(null);
@@ -71,7 +70,6 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
 
   const switchTab = (next: AuthTab) => {
     setTab(next);
-    setError(null);
     setFieldErrors({});
     setForgotMessage(null);
     setForgotResetUrl(null);
@@ -80,13 +78,12 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(null);
     setFieldErrors({});
 
     const parsed = loginSchema.safeParse(loginForm);
     if (!parsed.success) {
       setFieldErrors(formatZodErrors(parsed.error));
-      setError(firstZodError(parsed.error));
+      toastError(firstZodError(parsed.error));
       return;
     }
 
@@ -95,12 +92,8 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
       await loginUser(parsed.data);
       onClose();
     } catch (err) {
-      if (err instanceof AuthApiError) {
-        setError(err.message);
-        if (err.fields) setFieldErrors(err.fields);
-      } else {
-        setError(err instanceof Error ? err.message : 'Кирүү ийгиликсиз');
-      }
+      if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
+      toastError(getErrorMessage(err, 'Кирүү ийгиликсиз'));
     } finally {
       setLoading(false);
     }
@@ -108,13 +101,12 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
 
   const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(null);
     setFieldErrors({});
 
     const parsed = registerSchema.safeParse(registerForm);
     if (!parsed.success) {
       setFieldErrors(formatZodErrors(parsed.error));
-      setError(firstZodError(parsed.error));
+      toastError(firstZodError(parsed.error));
       return;
     }
 
@@ -129,12 +121,8 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
       });
       onClose();
     } catch (err) {
-      if (err instanceof AuthApiError) {
-        setError(err.message);
-        if (err.fields) setFieldErrors(err.fields);
-      } else {
-        setError(err instanceof Error ? err.message : 'Каттоо ийгиликсиз');
-      }
+      if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
+      toastError(getErrorMessage(err, 'Каттоо ийгиликсиз'));
     } finally {
       setLoading(false);
     }
@@ -142,7 +130,6 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
 
   const handleForgot = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(null);
     setFieldErrors({});
     setForgotMessage(null);
     setForgotResetUrl(null);
@@ -150,7 +137,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
     const parsed = forgotPasswordSchema.safeParse({ email: forgotEmail });
     if (!parsed.success) {
       setFieldErrors(formatZodErrors(parsed.error));
-      setError(firstZodError(parsed.error));
+      toastError(firstZodError(parsed.error));
       return;
     }
 
@@ -160,12 +147,8 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
       setForgotMessage(result.message);
       if (result.resetUrl) setForgotResetUrl(result.resetUrl);
     } catch (err) {
-      if (err instanceof AuthApiError) {
-        setError(err.message);
-        if (err.fields) setFieldErrors(err.fields);
-      } else {
-        setError(err instanceof Error ? err.message : 'Сурам ийгиликсиз');
-      }
+      if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
+      toastError(getErrorMessage(err, 'Сурам ийгиликсиз'));
     } finally {
       setLoading(false);
     }
@@ -216,7 +199,6 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
         ) : null}
 
         <div className="auth-modal-body" ref={bodyRef}>
-          {error ? <p className="auth-modal-error">{error}</p> : null}
           {forgotMessage ? <p className="auth-modal-success">{forgotMessage}</p> : null}
           {forgotResetUrl ? (
             <p className="auth-modal-dev-link">

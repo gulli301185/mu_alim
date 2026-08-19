@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { getErrorMessage, toastError } from '../lib/toast';
 
 export type QaFormValues = {
   question: string;
@@ -11,18 +12,23 @@ type QaAdminFormProps = {
   submitLabel: string;
   onSubmit: (values: QaFormValues) => Promise<void>;
   onCancel?: () => void;
+  variant?: 'inline' | 'modal';
 };
 
-export function QaAdminForm({ initial, submitLabel, onSubmit, onCancel }: QaAdminFormProps) {
+export function QaAdminForm({
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+  variant = 'inline',
+}: QaAdminFormProps) {
   const [question, setQuestion] = useState(initial?.question ?? '');
   const [answer, setAnswer] = useState(initial?.answer ?? '');
   const [number, setNumber] = useState(initial?.number != null ? String(initial.number) : '');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       await onSubmit({
@@ -31,15 +37,17 @@ export function QaAdminForm({ initial, submitLabel, onSubmit, onCancel }: QaAdmi
         number: number.trim() ? Number(number) : undefined,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ката кетти');
+      toastError(getErrorMessage(err, 'Ката кетти'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form className="qa-admin-form ui-card" onSubmit={(e) => void handleSubmit(e)}>
-      {error ? <p className="auth-modal-error">{error}</p> : null}
+    <form
+      className={variant === 'modal' ? 'admin-lesson-form' : 'qa-admin-form ui-card'}
+      onSubmit={(e) => void handleSubmit(e)}
+    >
 
       <label className="qa-admin-field">
         <span className="qa-admin-label">Суроо</span>
@@ -77,7 +85,7 @@ export function QaAdminForm({ initial, submitLabel, onSubmit, onCancel }: QaAdmi
       <div className="qa-admin-form-actions">
         {onCancel ? (
           <button type="button" className="qa-admin-btn qa-admin-btn-muted" onClick={onCancel}>
-            Жабуу
+            {variant === 'modal' ? 'Жокко чыгаруу' : 'Жабуу'}
           </button>
         ) : null}
         <button type="submit" className="btn-gold qa-admin-btn" disabled={loading}>

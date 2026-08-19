@@ -98,6 +98,7 @@ function MenuDropdown({
 function AuthButtons({
   loading,
   user,
+  isAdmin,
   isLoggingOut,
   onLogin,
   onRegister,
@@ -105,6 +106,7 @@ function AuthButtons({
 }: {
   loading: boolean;
   user: AuthUser | null;
+  isAdmin: boolean;
   isLoggingOut: boolean;
   onLogin: () => void;
   onRegister: () => void;
@@ -112,6 +114,20 @@ function AuthButtons({
 }) {
   if (loading) {
     return <span className="header-auth-loading">...</span>;
+  }
+
+  if (user && isAdmin) {
+    return (
+      <button
+        type="button"
+        className="header-logout-btn"
+        onClick={onLogout}
+        disabled={isLoggingOut}
+      >
+        <LogOut className="h-4 w-4" />
+        {isLoggingOut ? 'Чыгууда...' : 'Чыгуу'}
+      </button>
+    );
   }
 
   if (user) {
@@ -210,13 +226,15 @@ function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
 export function Header({
   dark,
   onToggle,
+  adminArea = false,
   adminSimple = false,
 }: {
   dark: boolean;
   onToggle: () => void;
+  adminArea?: boolean;
   adminSimple?: boolean;
 }) {
-  const { user, loading, logout, isLoggingOut } = useAuth();
+  const { user, loading, logout, isLoggingOut, isAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lang, setLang] = useState<LangCode>(() => {
@@ -257,6 +275,7 @@ export function Header({
   };
 
   const openAuth = (tab: 'login' | 'register' = 'login') => {
+    if (adminArea || isAdmin) return;
     setAuthTab(tab);
     setAuthOpen(true);
     closeAll();
@@ -278,7 +297,10 @@ export function Header({
       <div className="header-body">
         <div className="header-dots" aria-hidden />
         <div className="wrap header-inner">
-          <Link to="/questions" className="header-logo no-underline shrink-0">
+          <Link
+            to={adminArea || isAdmin ? '/admin/questions' : '/'}
+            className="header-logo no-underline shrink-0"
+          >
             <img src="/logo-mualim.png" alt="МУАЛИМ" className="header-logo-img" />
             <span className="header-brand-name">МУАЛИМ</span>
           </Link>
@@ -332,14 +354,27 @@ export function Header({
             ) : null}
 
             <div className="header-auth-actions">
-              <AuthButtons
-                loading={loading}
-                user={user}
-                isLoggingOut={isLoggingOut}
-                onLogin={() => openAuth('login')}
-                onRegister={() => openAuth('register')}
-                onLogout={logout}
-              />
+              {!adminArea ? (
+                <AuthButtons
+                  loading={loading}
+                  user={user}
+                  isAdmin={isAdmin}
+                  isLoggingOut={isLoggingOut}
+                  onLogin={() => openAuth('login')}
+                  onRegister={() => openAuth('register')}
+                  onLogout={logout}
+                />
+              ) : isAdmin ? (
+                <AuthButtons
+                  loading={loading}
+                  user={user}
+                  isAdmin={isAdmin}
+                  isLoggingOut={isLoggingOut}
+                  onLogin={() => openAuth('login')}
+                  onRegister={() => openAuth('register')}
+                  onLogout={logout}
+                />
+              ) : null}
             </div>
 
             <button
@@ -369,7 +404,7 @@ export function Header({
             </div>
             <p className="header-mobile-label">Меню</p>
             <div className="header-mobile-group">{renderMenuLinks(closeAll)}</div>
-            {!loading && user ? (
+            {!loading && user && !isAdmin ? (
               <div className="header-mobile-user">
                 <UserMenu onCloseMobile={closeAll} />
                 <Link to="/profile" className="header-login-btn header-login-btn-mobile" onClick={closeAll}>
@@ -416,7 +451,9 @@ export function Header({
         </div>
       </div>
 
-      <UserAuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab={authTab} />
+      {!adminArea ? (
+        <UserAuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab={authTab} />
+      ) : null}
     </header>
   );
 }

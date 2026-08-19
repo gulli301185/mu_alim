@@ -1,5 +1,13 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
-const AUTH_STORAGE_KEY = 'mualim_auth';
+const USER_AUTH_STORAGE_KEY = 'mualim_user_auth';
+const ADMIN_AUTH_STORAGE_KEY = 'mualim_admin_auth';
+const LEGACY_AUTH_STORAGE_KEY = 'mualim_auth';
+
+export type SessionKind = 'user' | 'admin';
+
+function storageKeyFor(kind: SessionKind) {
+  return kind === 'admin' ? ADMIN_AUTH_STORAGE_KEY : USER_AUTH_STORAGE_KEY;
+}
 
 export type AuthUser = {
   id: string;
@@ -63,10 +71,17 @@ async function parseApiError(res: Response, fallback: string): Promise<AuthApiEr
   }
 }
 
-export function loadStoredAuth(): AuthSession | null {
+async function authFetch(url: string, init: RequestInit, _fallback: string): Promise<Response> {
   try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!raw) return null;
+    return await fetch(url, init);
+  } catch {
+    throw new AuthApiError('Сервер иштебейт. API иштеп жатканын текшериңиз.');
+  }
+}
+
+function parseStoredSession(raw: string | null): AuthSession | null {
+  if (!raw) return null;
+  try {
     const parsed = JSON.parse(raw) as AuthSession;
     if (!parsed?.token || !parsed?.user?.id) return null;
     return parsed;
@@ -75,30 +90,63 @@ export function loadStoredAuth(): AuthSession | null {
   }
 }
 
-export function saveStoredAuth(session: AuthSession | null) {
+export function loadStoredAuth(kind: SessionKind): AuthSession | null {
+  const session = parseStoredSession(localStorage.getItem(storageKeyFor(kind)));
+  if (session) return session;
+
+  const legacy = parseStoredSession(localStorage.getItem(LEGACY_AUTH_STORAGE_KEY));
+  if (!legacy) return null;
+
+  const legacyKind: SessionKind = legacy.user.role === 'admin' ? 'admin' : 'user';
+  if (legacyKind !== kind) return null;
+
+  saveStoredAuth(kind, legacy);
+  localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+  return legacy;
+}
+
+export function saveStoredAuth(kind: SessionKind, session: AuthSession | null) {
   if (!session) {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(storageKeyFor(kind));
     return;
   }
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  localStorage.setItem(storageKeyFor(kind), JSON.stringify(session));
+}
+
+export function clearStoredAuth(kind: SessionKind) {
+  localStorage.removeItem(storageKeyFor(kind));
+}
+
+export function clearAllStoredAuth() {
+  localStorage.removeItem(USER_AUTH_STORAGE_KEY);
+  localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+  localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
+}
+
+export function detectStoredSessionKind(): SessionKind | null {
+  const admin = loadStoredAuth('admin');
+  if (admin) return 'admin';
+  const user = loadStoredAuth('user');
+  if (user) return 'user';
+  return null;
 }
 
 export async function loginUserRequest(input: LoginInput): Promise<AuthSession> {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
+  const res = await authFetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
-  });
+  }, 'Кирүү ийгиликсиз');
   if (!res.ok) throw await parseApiError(res, 'Кирүү ийгиликсиз');
   return res.json() as Promise<AuthSession>;
 }
 
 export async function adminLoginRequest(input: LoginInput): Promise<AuthSession> {
-  const res = await fetch(`${API_BASE}/api/auth/admin/login`, {
+  const res = await authFetch(`${API_BASE}/api/auth/admin/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
-  });
+  }, 'Кирүү ийгиликсиз');
   if (!res.ok) throw await parseApiError(res, 'Кирүү ийгиликсиз');
   return res.json() as Promise<AuthSession>;
 }

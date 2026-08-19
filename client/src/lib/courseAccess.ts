@@ -7,6 +7,8 @@ export const CERTIFICATE_THRESHOLD = 0.9;
 export type CourseProgress = {
   completedLessonIds: string[];
   lessonScores?: Record<string, number>;
+  finalTestPassed?: boolean;
+  finalTestScore?: number;
   certificateNumber?: string;
   certificateIssuedAt?: string;
 };
@@ -76,11 +78,24 @@ export function isCourseFullyComplete(progress: CourseProgress, totalLessons: nu
 export function isCertificateEligible(
   progress: CourseProgress,
   totalLessons: number,
-  lessonIds: string[],
 ): boolean {
   if (!isCourseFullyComplete(progress, totalLessons)) return false;
-  const average = getAverageScore(progress, lessonIds);
-  return average !== null && average >= CERTIFICATE_THRESHOLD * 100;
+  return Boolean(progress.finalTestPassed);
+}
+
+export function markFinalTestResult(
+  courseId: string,
+  passed: boolean,
+  scorePercent: number,
+): CourseProgress {
+  const progress = loadCourseProgress(courseId);
+  const next: CourseProgress = {
+    ...progress,
+    finalTestPassed: passed,
+    finalTestScore: Math.max(progress.finalTestScore ?? 0, scorePercent),
+  };
+  saveCourseProgress(courseId, next);
+  return next;
 }
 
 export function markLessonComplete(

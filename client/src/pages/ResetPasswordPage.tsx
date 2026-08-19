@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthApiError } from '../lib/auth-api';
+import { getErrorMessage, toastError, toastSuccess } from '../lib/toast';
 import { useAuth } from '../context/AuthContext';
 import { PasswordField } from '../components/PasswordField';
 import {
@@ -20,20 +21,18 @@ export function ResetPasswordPage() {
 
   const [form, setForm] = useState({ password: '', confirmPassword: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(null);
     setFieldErrors({});
     setSuccess(null);
 
     const parsed = resetPasswordSchema.safeParse({ token, ...form });
     if (!parsed.success) {
       setFieldErrors(formatZodErrors(parsed.error));
-      setError(firstZodError(parsed.error));
+      toastError(firstZodError(parsed.error));
       return;
     }
 
@@ -41,14 +40,11 @@ export function ResetPasswordPage() {
     try {
       const result = await resetPassword(parsed.data);
       setSuccess(result.message);
+      toastSuccess(result.message);
       setTimeout(() => navigate('/', { replace: true }), 2000);
     } catch (err) {
-      if (err instanceof AuthApiError) {
-        setError(err.message);
-        if (err.fields) setFieldErrors(err.fields);
-      } else {
-        setError(err instanceof Error ? err.message : 'Сыр сөздү өзгөртүү ийгиликсиз');
-      }
+      if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
+      toastError(getErrorMessage(err, 'Сыр сөздү өзгөртүү ийгиликсиз'));
     } finally {
       setLoading(false);
     }
@@ -79,7 +75,6 @@ export function ResetPasswordPage() {
             <p className="admin-login-subtitle">Жаңы сыр сөздү киргизиңиз</p>
           </div>
 
-          {error ? <p className="auth-modal-error">{error}</p> : null}
           {success ? <p className="auth-modal-success">{success}</p> : null}
 
           <form className="auth-modal-form" onSubmit={(e) => void handleSubmit(e)} noValidate>

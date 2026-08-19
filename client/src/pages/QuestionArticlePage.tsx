@@ -11,13 +11,15 @@ import {
   updateQaArticle,
   type QuestionArticle,
 } from '../lib/qa-api';
+import { getErrorMessage, toastError } from '../lib/toast';
 
-export function QuestionArticlePage() {
+export function QuestionArticlePage({ adminMode = false }: { adminMode?: boolean }) {
   const { articleId } = useParams<{ articleId: string }>();
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAdmin, token, loading: authLoading } = useAuth();
+  const questionsBase = adminMode || isAdmin ? '/admin/questions' : '/questions';
   const [article, setArticle] = useState<QuestionArticle | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,8 @@ export function QuestionArticlePage() {
   const load = useCallback(async () => {
     if (!articleId) {
       setLoading(false);
-      setError('Суроо табылган жок.');
+      toastError('Суроо табылган жок.');
+      setError('not-found');
       return;
     }
 
@@ -36,7 +39,7 @@ export function QuestionArticlePage() {
       const data = await fetchQaBySlug(articleId);
       setArticle(data);
 
-      if (!authLoading && !isAdmin) {
+      if (!authLoading && !isAdmin && !adminMode) {
         const viewResult = await recordQaView(articleId);
         if (viewResult) {
           setArticle((prev) => (prev ? { ...prev, views: viewResult.views } : prev));
@@ -44,11 +47,12 @@ export function QuestionArticlePage() {
       }
     } catch {
       setArticle(undefined);
-      setError('Макала базадан табылган жок.');
+      toastError('Макала базадан табылган жок.');
+      setError('not-found');
     } finally {
       setLoading(false);
     }
-  }, [articleId, authLoading, isAdmin]);
+  }, [articleId, authLoading, isAdmin, adminMode]);
 
   useEffect(() => {
     void load();
@@ -64,7 +68,7 @@ export function QuestionArticlePage() {
     setArticle(updated);
     setEditing(false);
     if (updated.slug && updated.slug !== articleId) {
-      navigate(`/questions/${updated.slug}`, { replace: true });
+      navigate(`${questionsBase}/${updated.slug}`, { replace: true });
     }
   };
 
@@ -74,9 +78,9 @@ export function QuestionArticlePage() {
     if (!ok) return;
     try {
       await deleteQaArticle(token, article.recordId);
-      navigate('/questions');
+      navigate(questionsBase);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Өчүрүү ийгиликсиз');
+      toastError(getErrorMessage(err, 'Өчүрүү ийгиликсиз'));
     }
   };
 
@@ -86,7 +90,7 @@ export function QuestionArticlePage() {
     '';
 
   const backToQuestions = () => {
-    navigate(listReturnSearch ? `/questions?${listReturnSearch}` : '/questions');
+    navigate(listReturnSearch ? `${questionsBase}?${listReturnSearch}` : questionsBase);
   };
 
   if (loading) {
@@ -106,8 +110,8 @@ export function QuestionArticlePage() {
       <section className="qa-page qa-page-admin">
         <div className="wrap qa-page-wrap">
           <div className="qa-empty ui-card">
-            <p>{error ?? 'Макала табылган жок.'}</p>
-            <Link to="/questions" className="btn-gold qa-admin-btn">
+            <p>Макала табылган жок.</p>
+            <Link to={questionsBase} className="btn-gold qa-admin-btn">
               Артка
             </Link>
           </div>
@@ -116,7 +120,7 @@ export function QuestionArticlePage() {
     );
   }
 
-  if (isAdmin) {
+  if (adminMode || isAdmin) {
     return (
       <section className="qa-page qa-page-admin">
         <div className="wrap qa-article-page-wrap">

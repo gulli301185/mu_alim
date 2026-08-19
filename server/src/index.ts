@@ -9,6 +9,9 @@ import { authRouter } from './routes/auth.js';
 import { qaRouter } from './routes/qa.js';
 import { prayerRouter } from './routes/prayer.js';
 import { lessonsRouter } from './routes/lessons.js';
+import { adminUsersRouter } from './routes/admin-users.js';
+import { coursesRouter } from './routes/courses.js';
+import { testsRouter } from './routes/tests.js';
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../.env') });
 
@@ -32,6 +35,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/qa', qaRouter);
 app.use('/api/prayer', prayerRouter);
 app.use('/api', lessonsRouter);
+app.use('/api', coursesRouter);
+app.use('/api', testsRouter);
+app.use('/api/admin/users', adminUsersRouter);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

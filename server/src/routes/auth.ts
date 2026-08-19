@@ -37,7 +37,9 @@ function toPublicUser(user: {
 }
 
 async function authenticateUser(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+  });
   if (!user || !user.isActive) return null;
 
   const ok = await bcrypt.compare(password, user.passwordHash);

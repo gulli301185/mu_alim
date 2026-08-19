@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Mail, User, Phone, Shield } from 'lucide-react';
+import { Mail, User, Phone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getUserDisplayName } from '../lib/auth-api';
+import { getErrorMessage, toastError, toastSuccess } from '../lib/toast';
 import { PasswordField } from '../components/PasswordField';
 
 export function ProfilePage() {
-  const { user, loading, isAdmin, updateProfile, logout } = useAuth();
+  const { user, loading, updateProfile, logout } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,7 +16,6 @@ export function ProfilePage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,11 +44,10 @@ export function ProfilePage() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(null);
     setSuccess(null);
 
     if (newPassword && newPassword !== confirmPassword) {
-      setError('Жаңы сыр сөздөр дал келген жок');
+      toastError('Жаңы сыр сөздөр дал келген жок');
       return;
     }
 
@@ -67,8 +66,9 @@ export function ProfilePage() {
       setNewPassword('');
       setConfirmPassword('');
       setSuccess('Профиль ийгиликтүү жаңыртылды');
+      toastSuccess('Профиль ийгиликтүү жаңыртылды');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Жаңыртуу ийгиликсиз');
+      toastError(getErrorMessage(err, 'Жаңыртуу ийгиликсиз'));
     } finally {
       setSaving(false);
     }
@@ -83,12 +83,6 @@ export function ProfilePage() {
             <h1 className="profile-page-title">{getUserDisplayName(user)}</h1>
             <p className="profile-page-subtitle">{user.email}</p>
           </div>
-          {isAdmin ? (
-            <span className="profile-role-badge">
-              <Shield className="h-4 w-4" />
-              Админ
-            </span>
-          ) : null}
         </header>
 
         <div className="profile-grid">
@@ -97,7 +91,7 @@ export function ProfilePage() {
             <h2 className="profile-summary-name">{getUserDisplayName(user)}</h2>
             <p className="profile-summary-email">{user.email}</p>
             {user.phone ? <p className="profile-summary-phone">{user.phone}</p> : null}
-            <p className="profile-summary-role">{isAdmin ? 'Администратор' : 'Колдонуучу'}</p>
+            <p className="profile-summary-role">Колдонуучу</p>
             <button type="button" className="profile-logout-btn" onClick={logout}>
               Чыгуу (Logout)
             </button>
@@ -109,7 +103,6 @@ export function ProfilePage() {
           <form className="ui-card profile-form" onSubmit={(e) => void handleSubmit(e)}>
             <h2 className="profile-form-title">Профиль маалыматтары</h2>
 
-            {error ? <p className="auth-modal-error">{error}</p> : null}
             {success ? <p className="profile-success">{success}</p> : null}
 
             <div className="profile-form-grid">

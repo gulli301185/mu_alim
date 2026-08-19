@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Play, Mic, Video, Users, Calendar, ChevronDown, MapPin, Star,
 } from 'lucide-react';
 import {
-  SITE, STATS, QUICK_ACCESS, FREE_VIDEOS, PAID_COURSES,
+  STATS, QUICK_ACCESS, PAID_COURSES,
   HADITH, AYAH, EVENTS, TEACHER,
 } from '../data/landing';
 import {
@@ -15,6 +16,9 @@ import {
   type PrayerRegion,
   type PrayerTimesResponse,
 } from '../lib/prayer-api';
+import { fetchFreeLessons, formatCourseDuration } from '../lib/course-api';
+import { toastError } from '../lib/toast';
+import { youtubeThumbnail } from '../lib/youtube';
 import { FaqAccordion } from '../components/FaqAccordion';
 
 const STAT_ICONS = [Mic, Video, Users, Calendar];
@@ -95,7 +99,8 @@ type VideoPanelItem = {
   title: string;
   duration: string;
   thumbnail: string;
-  url: string;
+  href: string;
+  external?: boolean;
   date?: string;
   subtitle?: string;
   badge?: string;
@@ -103,6 +108,31 @@ type VideoPanelItem = {
   rating?: number;
   price?: string;
 };
+
+function VideoPanelLink({
+  href,
+  external,
+  className,
+  children,
+}: {
+  href: string;
+  external?: boolean;
+  className: string;
+  children: ReactNode;
+}) {
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link to={href} className={className}>
+      {children}
+    </Link>
+  );
+}
 
 function StarRating({ value }: { value: number }) {
   return (
@@ -201,18 +231,13 @@ function VideoPanel({
             {linkLabel}
           </a>
         ) : (
-          <a href={linkHref} className="panel-link">
+          <Link to={linkHref} className="panel-link">
             {linkLabel}
-          </a>
+          </Link>
         )}
       </div>
       <div className="videos-split">
-        <a
-          href={featured.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="video-main block no-underline"
-        >
+        <VideoPanelLink href={featured.href} external={featured.external} className="video-main block no-underline">
           <img src={featured.thumbnail} alt={featured.title} />
           <div className="video-play">
             <div className="play-circle-white">
@@ -231,14 +256,13 @@ function VideoPanel({
               />
             </div>
           )}
-        </a>
+        </VideoPanelLink>
         <div className="videos-side-list">
           {sideItems.map((v) => (
-            <a
+            <VideoPanelLink
               key={v.id}
-              href={v.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={v.href}
+              external={v.external}
               className="video-side-item no-underline"
             >
               <div className="video-side-thumb-wrap">
@@ -257,7 +281,7 @@ function VideoPanel({
                   v.date && <p className="video-side-date">{formatVideoDate(v.date)}</p>
                 )}
               </div>
-            </a>
+            </VideoPanelLink>
           ))}
         </div>
       </div>
@@ -274,8 +298,29 @@ export function LandingPage() {
   const countdown = useCountdownTo(prayerData?.nextPrayer?.at ?? null);
   const today = prayerData?.date ? new Date(`${prayerData.date}T12:00:00+06:00`) : new Date();
 
-  const featured = FREE_VIDEOS[0];
-  const sideVideos = FREE_VIDEOS.slice(1, 5);
+  const { data: freeLessonsData, isLoading: freeVideosLoading } = useQuery({
+    queryKey: ['free-lessons'],
+    queryFn: fetchFreeLessons,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const freeVideoItems = useMemo<VideoPanelItem[]>(() => {
+    return (freeLessonsData?.items ?? []).map((lesson) => {
+      const dateMatch = lesson.description?.match(/\d{4}-\d{2}-\d{2}/);
+      return {
+        id: lesson.id,
+        title: lesson.title,
+        duration: formatCourseDuration(lesson.durationSeconds),
+        thumbnail: youtubeThumbnail(lesson.youtubeVideoId),
+        href: `/courses/${lesson.courseSlug}/learn?lesson=${lesson.id}`,
+        date: dateMatch ? dateMatch[0] : undefined,
+        badge: 'Бекер',
+      };
+    });
+  }, [freeLessonsData]);
+
+  const featured = freeVideoItems[0];
+  const sideVideos = freeVideoItems.slice(1, 5);
 
   useEffect(() => {
     let cancelled = false;
@@ -293,7 +338,10 @@ export function LandingPage() {
             : data.defaultRegionId;
         setRegionId(initial);
       } catch {
-        if (!cancelled) setPrayerError('Аймактарды жүктөө ийгиликсиз');
+        if (!cancelled) {
+          toastError('Аймактарды жүктөө ийгиликсиз');
+          setPrayerError('load');
+        }
       }
     }
 
@@ -319,7 +367,8 @@ export function LandingPage() {
       } catch {
         if (!cancelled) {
           setPrayerData(null);
-          setPrayerError('Намаз убакыттарын жүктөө ийгиликсиз');
+          toastError('Намаз убакыттарын жүктөө ийгиликсиз');
+          setPrayerError('load');
         }
       } finally {
         if (!cancelled) setPrayerLoading(false);
@@ -410,7 +459,7 @@ export function LandingPage() {
                   {prayerLoading ? (
                     <p className="prayer-status">Жүктөлүүдө...</p>
                   ) : prayerError ? (
-                    <p className="prayer-status prayer-status-error">{prayerError}</p>
+                    <p className="prayer-status prayer-status-error">Жүктөлбөдү</p>
                   ) : (
                     prayerData?.times.map((p) => (
                       <div
@@ -484,22 +533,18 @@ export function LandingPage() {
               id="videos"
               panelTitle="Акыркы баяндар"
               linkLabel="Бардык видеолор"
-              linkHref={SITE.youtubeFree}
-              featured={{
-                id: featured.id,
-                title: featured.title,
-                duration: featured.duration,
-                thumbnail: featured.thumbnail,
-                url: featured.url,
-              }}
-              sideItems={sideVideos.map((v) => ({
-                id: v.id,
-                title: v.title,
-                duration: v.duration,
-                thumbnail: v.thumbnail,
-                url: v.url,
-                date: v.date,
-              }))}
+              linkHref="/courses/free-bayanlar"
+              featured={
+                featured ?? {
+                  id: 'loading',
+                  title: freeVideosLoading ? 'Жүктөлүүдө...' : 'Видеолор жок',
+                  duration: '—',
+                  thumbnail: youtubeThumbnail('ZkpJ1ezB2TI'),
+                  href: '/courses/free-bayanlar',
+                  badge: 'Бекер',
+                }
+              }
+              sideItems={sideVideos}
             />
 
             <PaidCoursesSection />
