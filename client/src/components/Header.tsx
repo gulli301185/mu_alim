@@ -301,8 +301,13 @@ export function Header({
             to={adminArea || isAdmin ? '/admin/questions' : '/'}
             className="header-logo no-underline shrink-0"
           >
-            <img src="/logo-mualim.png" alt="МУАЛИМ" className="header-logo-img" />
-            <span className="header-brand-name">МУАЛИМ</span>
+            <img src="/logo-mualim.png" alt="" className="header-logo-img" aria-hidden />
+            <span className="header-brand-wordmark" aria-label="Mualim Academy">
+              <span className="header-brand-wordmark-text">
+                <span className="header-brand-wordmark-gold">Mu</span>
+                <span className="header-brand-wordmark-light">alim</span>
+              </span>
+            </span>
           </Link>
 
           {!adminSimple ? (
@@ -404,6 +409,15 @@ export function Header({
             </div>
             <p className="header-mobile-label">Меню</p>
             <div className="header-mobile-group">{renderMenuLinks(closeAll)}</div>
+            <button
+              type="button"
+              onClick={() => { onToggle(); closeAll(); }}
+              className="theme-btn theme-btn-mobile w-full justify-center mt-3"
+              aria-label="Тема"
+            >
+              {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              {dark ? 'Жарык' : 'Караңгы'}
+            </button>
             {!loading && user && !isAdmin ? (
               <div className="header-mobile-user">
                 <UserMenu onCloseMobile={closeAll} />

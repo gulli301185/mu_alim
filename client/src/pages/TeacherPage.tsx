@@ -50,6 +50,14 @@ export function TeacherPage() {
                 </div>
               </div>
 
+              <article className="teacher-profile-card teacher-profile-card-accent">
+                <div className="teacher-profile-bio">
+                  {TEACHER.bioParagraphs.map((paragraph) => (
+                    <p key={paragraph.slice(0, 40)}>{paragraph}</p>
+                  ))}
+                </div>
+              </article>
+
               <article className="teacher-profile-card teacher-profile-card-accent teacher-profile-card-grow">
                 <h2 className="teacher-profile-card-title">
                   <Briefcase className="h-5 w-5" />
@@ -69,21 +77,6 @@ export function TeacherPage() {
                     </li>
                   ))}
                 </ol>
-              </article>
-
-              <article className="teacher-profile-card teacher-profile-card-accent teacher-profile-card-bottom">
-                <h2 className="teacher-profile-card-title">
-                  <Languages className="h-5 w-5" />
-                  Тилдер
-                </h2>
-                <ul className="teacher-language-list">
-                  {TEACHER.languages.map((lang) => (
-                    <li key={lang.name} className="teacher-language-list-item">
-                      <span className="teacher-language-name">{lang.name}</span>
-                      <span className="teacher-language-level">— {lang.level}</span>
-                    </li>
-                  ))}
-                </ul>
               </article>
             </div>
 
@@ -108,6 +101,21 @@ export function TeacherPage() {
                     </li>
                   ))}
                 </ol>
+              </article>
+
+              <article className="teacher-profile-card teacher-profile-card-accent">
+                <h2 className="teacher-profile-card-title">
+                  <Languages className="h-5 w-5" />
+                  Тилдер
+                </h2>
+                <ul className="teacher-language-list">
+                  {TEACHER.languages.map((lang) => (
+                    <li key={lang.name} className="teacher-language-list-item">
+                      <span className="teacher-language-name">{lang.name}</span>
+                      <span className="teacher-language-level">— {lang.level}</span>
+                    </li>
+                  ))}
+                </ul>
               </article>
             </div>
           </div>
