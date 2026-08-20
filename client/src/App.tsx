@@ -14,7 +14,7 @@ import {
 } from './components/RequireRole';
 import { LandingPage } from './pages/LandingPage';
 import { TeacherPage } from './pages/TeacherPage';
-import { CourseDetailPage, CoursesIndexPage } from './pages/CourseDetailPage';
+import { CourseDetailPage, CoursesIndexPage, FreeCoursesPage } from './pages/CourseDetailPage';
 import { CourseLearnPage } from './pages/CourseLearnPage';
 import { QuestionsPage } from './pages/QuestionsPage';
 import { QuestionArticlePage } from './pages/QuestionArticlePage';
@@ -42,6 +42,7 @@ export default function App() {
                 <Route path="/ustaz" element={<TeacherPage />} />
                 <Route path="/questions" element={<QuestionsPage />} />
                 <Route path="/questions/:articleId" element={<QuestionArticlePage />} />
+                <Route path="/courses/free" element={<FreeCoursesPage />} />
                 <Route path="/courses" element={<CoursesIndexPage />} />
                 <Route path="/courses/:courseId" element={<CourseDetailPage />} />
                 <Route path="/courses/:courseId/learn" element={<CourseLearnPage />} />

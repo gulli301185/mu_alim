@@ -46,7 +46,7 @@ const createSchema = z.object({
   youtubeUrl: z.string().trim().min(1).max(500),
   durationSeconds: z.number().int().positive().optional(),
   lessonOrder: z.number().int().positive(),
-  isPublished: z.boolean().optional().default(false),
+    isPublished: z.boolean().optional().default(true),
 });
 
 const updateSchema = z.object({
