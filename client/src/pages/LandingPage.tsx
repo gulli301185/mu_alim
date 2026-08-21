@@ -257,7 +257,8 @@ function VideoPanel({
             </div>
           )}
         </VideoPanelLink>
-        <div className="videos-side-list">
+        <div className="videos-side-wrap">
+          <div className="videos-side-list">
           {sideItems.map((v) => (
             <VideoPanelLink
               key={v.id}
@@ -283,6 +284,7 @@ function VideoPanel({
               </div>
             </VideoPanelLink>
           ))}
+          </div>
         </div>
       </div>
     </div>
@@ -320,7 +322,7 @@ export function LandingPage() {
   }, [freeLessonsData]);
 
   const featured = freeVideoItems[0];
-  const sideVideos = freeVideoItems.slice(1, 5);
+  const sideVideos = freeVideoItems.slice(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -384,18 +386,13 @@ export function LandingPage() {
   return (
     <>
       <section id="hero" className="hero-mosque">
-        <div className="wrap hero-inner">
-          <h1 className="hero-title max-w-2xl">
-            Билим аркылуу<br />жакшы жашоого кадам
-          </h1>
-          <p className="hero-sub">
-            Куран жана Сүннөттүн негизинде ишенимдүү материалдар. Бекер Ютуб баяндар жана акылуу онлайн курстар.
-          </p>
-          <div className="flex flex-wrap gap-3 mt-8">
-            <a href="#videos" className="btn-gold">БАЯНДАРДЫ КӨРҮҮ</a>
-            <a href="#videos" className="btn-outline">АКЫРКЫ ВИДЕО</a>
-          </div>
+        <img src="/sky-hero.jpg" alt="" className="hero-sky-photo" />
+        <div className="hero-sky-text">
+          <p className="hero-sky-title">Бийиктикке умтул!</p>
+          <p className="hero-sky-sub">Билим эркиндикке жол ачат, амал ийгиликке жеткирет.</p>
+          <p className="hero-sky-name">Мухаммадалим</p>
         </div>
+        <img src="/tunduk-hero.jpg" alt="" className="hero-mosque-photo" />
       </section>
 
       <div className="wrap">
@@ -479,12 +476,6 @@ export function LandingPage() {
                 </div>
 
                 <div className="countdown-box">
-                  <img
-                    src="/mosque-hero.jpg"
-                    alt=""
-                    className="countdown-mosque"
-                    aria-hidden="true"
-                  />
                   <p className="countdown-label">
                     {prayerData?.nextPrayer
                       ? `Кийинки: ${prayerData.nextPrayer.name}`
@@ -533,14 +524,14 @@ export function LandingPage() {
               id="videos"
               panelTitle="Акыркы баяндар"
               linkLabel="Бардык видеолор"
-              linkHref="/courses/free-bayanlar"
+              linkHref="/courses/free"
               featured={
                 featured ?? {
                   id: 'loading',
                   title: freeVideosLoading ? 'Жүктөлүүдө...' : 'Видеолор жок',
                   duration: '—',
                   thumbnail: youtubeThumbnail('ZkpJ1ezB2TI'),
-                  href: '/courses/free-bayanlar',
+                  href: '/courses/free',
                   badge: 'Бекер',
                 }
               }

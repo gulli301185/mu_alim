@@ -53,8 +53,7 @@ function canAccessLesson(
   lessonId: string,
   completedLessonIds: string[],
 ) {
-  if (isFree) return true;
-  if (!paid) return false;
+  if (!isFree && !paid) return false;
   if (completedLessonIds.includes(lessonId)) return true;
   return isLessonUnlocked(lessons, lessonId, completedLessonIds);
 }
@@ -139,7 +138,11 @@ export function CourseLearnPage() {
   useEffect(() => {
     if (!lessons.length) return;
 
-    if (lessonFromQuery && lessons.some((l) => l.id === lessonFromQuery)) {
+    if (
+      lessonFromQuery &&
+      lessons.some((l) => l.id === lessonFromQuery) &&
+      canAccessLesson(isFree, paid, lessons, lessonFromQuery, progress.completedLessonIds)
+    ) {
       setActiveLessonId(lessonFromQuery);
       return;
     }
@@ -471,9 +474,9 @@ export function CourseLearnPage() {
     <section className="course-learn-page">
       <div className="wrap course-learn-inner">
         <div className="course-learn-head">
-          <Link to="/courses" className="course-learn-back">
+          <Link to={isFree ? '/courses/free' : '/courses'} className="course-learn-back">
             <ArrowLeft className="h-4 w-4" />
-            Курстарга кайтуу
+            {isFree ? 'Бекер курстарга' : 'Курстарга'} кайтуу
           </Link>
           <div>
             <p className="course-learn-label">Менин курсум</p>
@@ -569,8 +572,8 @@ export function CourseLearnPage() {
               </div>
             ) : null}
 
-            <Link to="/courses" className="course-learn-back-courses">
-              Курстарга өтүү
+            <Link to={isFree ? '/courses/free' : '/courses'} className="course-learn-back-courses">
+              {isFree ? 'Бекер курстарга өтүү' : 'Курстарга өтүү'}
             </Link>
           </aside>
 
@@ -596,7 +599,10 @@ export function CourseLearnPage() {
             ) : (
               <>
                 <div className="course-learn-main-head">
-                  <h2 className="course-learn-main-title">{activeLesson.title}</h2>
+                  <div className="course-learn-main-heading">
+                    <h2 className="course-learn-main-title">{activeLesson.title}</h2>
+                    <p className="course-learn-main-author">Сабактын автору Мухаммадалим Халил</p>
+                  </div>
                   <span className="course-learn-main-step">
                     {activeLesson.order} / {lessonCount}
                   </span>

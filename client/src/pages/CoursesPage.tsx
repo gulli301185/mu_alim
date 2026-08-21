@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, CreditCard, Loader2 } from 'lucide-react';
-import { PAYMENT_TERMS } from '../data/landing';
+import { PAYMENT_TERMS, SITE } from '../data/landing';
 import { isCoursePaid, savePaidCourse } from '../lib/courseAccess';
 
 const PAYMENT_METHODS = [
@@ -22,6 +22,7 @@ type CoursePaymentBlockProps = {
   courseTitle: string;
   coursePrice: string;
   lessonCount: number;
+  telegramUrl?: string;
   learnPath?: string;
   navigateOnPaid?: boolean;
   onPaid?: () => void;
@@ -32,6 +33,7 @@ export function CoursePaymentBlock({
   courseTitle,
   coursePrice,
   lessonCount,
+  telegramUrl = SITE.paidTelegramInvite,
   learnPath,
   navigateOnPaid = false,
   onPaid,
@@ -55,7 +57,7 @@ export function CoursePaymentBlock({
       savePaidCourse(courseId);
       setPaymentStatus('paid');
       onPaid?.();
-      if (navigateOnPaid && learnPath) {
+      if (!telegramUrl && navigateOnPaid && learnPath) {
         navigate(learnPath);
       }
     }, paymentMethod === 'mbank' ? 1400 : 1800);
@@ -67,9 +69,18 @@ export function CoursePaymentBlock({
         <CheckCircle2 className="courses-payment-success-icon" aria-hidden />
         <p className="courses-payment-success-title">Төлөнгөн!</p>
         <p className="courses-payment-success-text">
-          {courseTitle} курсу активдештирилди. Видеого өтүүгө даярсыз.
+          {courseTitle} курсу активдештирилди. Сабактар Telegram группасында.
         </p>
-        {learnPath ? (
+        {telegramUrl ? (
+          <a
+            href={telegramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary courses-payment-btn w-full"
+          >
+            Telegramга өтүү
+          </a>
+        ) : learnPath ? (
           <Link to={learnPath} className="btn-primary courses-payment-btn w-full">
             Видеого өтүү
           </Link>
@@ -85,7 +96,9 @@ export function CoursePaymentBlock({
         <span className="courses-payment-title">Төлөм</span>
       </div>
       <p className="courses-payment-price">{coursePrice}</p>
-      <p className="courses-payment-hint">{lessonCount} видео-сабакка кирүү</p>
+      <p className="courses-payment-hint">
+        {lessonCount} сабак · төлөгөндөн кийин Telegram группасына кирүү ачылат
+      </p>
 
       <div className="courses-payment-methods">
         {PAYMENT_METHODS.map((method) => (

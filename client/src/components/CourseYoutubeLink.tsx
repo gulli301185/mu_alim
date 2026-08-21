@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { Maximize2, Minimize2, Play } from 'lucide-react';
 
 type CourseYoutubePlayerProps = {
   videoId: string;
@@ -12,8 +13,11 @@ type YtPlayer = {
   getCurrentTime: () => number;
   getDuration: () => number;
   getPlayerState: () => number;
+  getVideoData?: () => { video_id?: string };
   playVideo: () => void;
+  pauseVideo: () => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+  loadVideoById: (options: string | { videoId: string; startSeconds?: number }) => void;
 };
 
 declare global {
@@ -71,6 +75,7 @@ function loadYoutubeApi() {
 const WATCH_THRESHOLD = 0.95;
 const ENDED = 0;
 const PLAYING = 1;
+const PAUSED = 2;
 const SEEK_JUMP_SECONDS = 4;
 const PROGRESS_TICK_MS = 1000;
 
@@ -91,26 +96,64 @@ export function CourseYoutubePlayer({
   const [watchProgress, setWatchProgress] = useState(0);
   const [watchComplete, setWatchComplete] = useState(false);
   const [seekNotice, setSeekNotice] = useState(false);
+  const [endedCover, setEndedCover] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const videoIdRef = useRef(videoId);
+  const embedRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     onWatchCompleteRef.current = onWatchComplete;
   }, [onWatchComplete]);
 
   useEffect(() => {
-    completedRef.current = false;
+    const onFsChange = () => {
+      const node = embedRef.current;
+      const active =
+        document.fullscreenElement === node ||
+        (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement === node;
+      setIsFullscreen(Boolean(active));
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    const node = embedRef.current;
+    if (!node) return;
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+    const active = document.fullscreenElement || doc.webkitFullscreenElement;
+    if (active) {
+      void (document.exitFullscreen?.() ?? doc.webkitExitFullscreen?.());
+      return;
+    }
+    const request =
+      node.requestFullscreen?.bind(node) ??
+      (node as HTMLDivElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.bind(node);
+    void request?.();
+  };
+
+  useEffect(() => {
+    completedRef.current = !requireFullWatch;
     watchedSecondsRef.current = 0;
     lastKnownTimeRef.current = 0;
     lastPlayingAtRef.current = null;
-    setWatchProgress(0);
-    setWatchComplete(false);
+    videoIdRef.current = videoId;
+    setWatchProgress(requireFullWatch ? 0 : 100);
+    setWatchComplete(!requireFullWatch);
     setSeekNotice(false);
+    setEndedCover(false);
+    setIsPlaying(false);
 
     if (!requireFullWatch) {
-      completedRef.current = true;
-      setWatchProgress(100);
-      setWatchComplete(true);
       onWatchCompleteRef.current?.();
-      return;
     }
 
     let progressTimer: number | undefined;
@@ -139,9 +182,25 @@ export function CourseYoutubePlayer({
       seekNoticeTimer = window.setTimeout(() => setSeekNotice(false), 3000);
     };
 
+    const keepAssignedVideo = (player: YtPlayer) => {
+      const playingId = player.getVideoData?.()?.video_id;
+      if (!playingId || playingId === videoIdRef.current) return true;
+      player.loadVideoById({
+        videoId: videoIdRef.current,
+        startSeconds: Math.max(0, lastKnownTimeRef.current),
+      });
+      showSeekNotice();
+      return false;
+    };
+
     const updateProgress = () => {
       const player = playerRef.current;
-      if (!player || completedRef.current) return;
+      if (!player || completedRef.current || !requireFullWatch) {
+        if (player && requireFullWatch) keepAssignedVideo(player);
+        return;
+      }
+
+      if (!keepAssignedVideo(player)) return;
 
       const duration = player.getDuration();
       const current = player.getCurrentTime();
@@ -149,11 +208,7 @@ export function CourseYoutubePlayer({
       if (!duration || duration <= 0) return;
 
       const forwardJump = current - lastKnownTimeRef.current;
-      if (
-        forwardJump > SEEK_JUMP_SECONDS &&
-        lastKnownTimeRef.current > 0 &&
-        state === PLAYING
-      ) {
+      if (forwardJump > SEEK_JUMP_SECONDS && lastKnownTimeRef.current > 0 && state !== ENDED) {
         resetWatch(player);
         showSeekNotice();
         return;
@@ -192,23 +247,39 @@ export function CourseYoutubePlayer({
           rel: 0,
           modestbranding: 1,
           playsinline: 1,
+          fs: 0,
+          origin: window.location.origin,
         },
         events: {
           onReady: (event) => {
             playerRef.current = event.target;
-            progressTimer = window.setInterval(updateProgress, PROGRESS_TICK_MS);
+            const iframe = document.querySelector<HTMLIFrameElement>(`#${playerHostId} iframe`);
+            if (iframe) iframe.style.pointerEvents = 'none';
+            if (requireFullWatch) {
+              progressTimer = window.setInterval(updateProgress, PROGRESS_TICK_MS);
+            }
           },
           onStateChange: (event) => {
             const player = event.target;
             playerRef.current = player;
 
-            if (completedRef.current) return;
+            if (event.data === PLAYING) setIsPlaying(true);
+            if (event.data === PAUSED || event.data === ENDED) setIsPlaying(false);
+
+            if (!requireFullWatch) return;
+
+            keepAssignedVideo(player);
 
             if (event.data === ENDED) {
               const duration = player.getDuration();
-              if (duration > 0 && watchedSecondsRef.current / duration >= WATCH_THRESHOLD) {
+              const watchedEnough =
+                completedRef.current ||
+                (duration > 0 && watchedSecondsRef.current / duration >= WATCH_THRESHOLD);
+              if (watchedEnough) {
                 markComplete();
+                setEndedCover(true);
               } else {
+                setEndedCover(false);
                 player.seekTo(0, true);
                 lastKnownTimeRef.current = 0;
                 showSeekNotice();
@@ -216,6 +287,11 @@ export function CourseYoutubePlayer({
               return;
             }
 
+            if (event.data === PLAYING) {
+              setEndedCover(false);
+            }
+
+            if (completedRef.current) return;
             updateProgress();
           },
         },
@@ -233,12 +309,54 @@ export function CourseYoutubePlayer({
 
   return (
     <div className="course-learn-youtube-wrap">
-      <div className="course-learn-embed">
+      <div
+        ref={embedRef}
+        className="course-learn-embed"
+        onContextMenu={(event) => event.preventDefault()}
+      >
         <div id={playerHostId} className="course-learn-youtube-host" title={title} />
+        <div className="course-learn-yt-chrome-block" aria-hidden />
+        <div className="course-learn-yt-chrome-block-bottom" aria-hidden />
+        {!endedCover ? (
+          <button
+            type="button"
+            className="course-learn-yt-shield"
+            aria-label={isPlaying ? 'Пауза' : 'Ойнотуу'}
+            onClick={() => {
+              const player = playerRef.current;
+              if (!player) return;
+              if (player.getPlayerState() === PLAYING) player.pauseVideo();
+              else player.playVideo();
+            }}
+          >
+            {!isPlaying ? (
+              <span className="course-learn-yt-play" aria-hidden>
+                <Play className="h-10 w-10" fill="currentColor" />
+              </span>
+            ) : null}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="course-learn-yt-fs"
+          aria-label={isFullscreen ? 'Толук экрандан чыгуу' : 'Толук экран'}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleFullscreen();
+          }}
+        >
+          {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+        </button>
         {requireFullWatch && seekNotice ? (
           <p className="course-learn-video-notice">
-            Алдыга секирүүгө болбойт — видеону башынан көрүңүз
+            Бул сабакта башка видеого өтүүгө жана алдыга секирүүгө болбойт
           </p>
+        ) : null}
+        {requireFullWatch && endedCover ? (
+          <div className="course-learn-yt-end-cover">
+            <p>Сабак аякталды</p>
+            <span>Төмөнкү «Улантуу» баскычын басыңыз</span>
+          </div>
         ) : null}
       </div>
       {requireFullWatch && !watchComplete ? (

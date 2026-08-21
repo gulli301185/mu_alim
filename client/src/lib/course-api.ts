@@ -80,6 +80,8 @@ export function isFreeCourse(course: Pick<CourseSummary, 'courseType'>) {
   return course.courseType === 'free';
 }
 
+export const FREE_COURSE_LEARN_PATH = '/courses/free-bayanlar/learn';
+
 export function courseTypeLabel(type: CourseType) {
   return type === 'free' ? 'Бекер' : 'Акы төлөнүүчү';
 }
