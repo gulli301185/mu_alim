@@ -26,7 +26,10 @@ export function FaqAccordion({ id, className = '', hideTitle = false }: FaqAccor
                 aria-expanded={isOpen}
               >
                 <span>{f.q}</span>
-                <ChevronDown className={`faq-chevron ${isOpen ? 'faq-chevron-open' : ''}`} />
+                <ChevronDown
+                  className={`faq-chevron ${isOpen ? 'faq-chevron-open' : ''}`}
+                  strokeWidth={2.75}
+                />
               </button>
               <div className={`faq-content ${isOpen ? 'faq-content-open' : ''}`}>
                 <p>{f.a}</p>

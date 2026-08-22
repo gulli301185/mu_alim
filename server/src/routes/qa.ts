@@ -113,6 +113,79 @@ qaRouter.get(
   }),
 );
 
+function bishkekDateKey(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bishkek',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+const DAILY_START_DATE = '2026-08-22';
+
+function dateKeyToUtcDays(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+function dailySkip(dateKey: string, total: number) {
+  const elapsed = dateKeyToUtcDays(dateKey) - dateKeyToUtcDays(DAILY_START_DATE);
+  const dayOffset = elapsed < 0 ? 0 : elapsed;
+  return dayOffset % total;
+}
+
+qaRouter.get(
+  '/daily',
+  asyncHandler(async (_req, res) => {
+    const articles = await prisma.qaArticle.findMany({
+      where: { isPublished: true },
+      orderBy: [{ questionNumber: { sort: 'asc', nulls: 'last' } }, { publishedAt: 'asc' }],
+    });
+
+    if (articles.length === 0) {
+      res.status(404).json({ error: 'Суроо табылган жок' });
+      return;
+    }
+
+    const date = bishkekDateKey();
+    const article = articles[dailySkip(date, articles.length)];
+
+    if (!article) {
+      res.status(404).json({ error: 'Суроо табылган жок' });
+      return;
+    }
+
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      ...toClient(article),
+      date,
+    });
+  }),
+);
+
+/** Static admin paths must be registered before `/:slug` / `/:id`. */
+qaRouter.post(
+  '/import/telegram-html',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const html = typeof req.body?.html === 'string' ? req.body.html : '';
+    if (html.length < 100) {
+      res.status(400).json({ error: 'Веб-барактын маалыматы керек' });
+      return;
+    }
+
+    const items = parseTelegramHtmlExport(html);
+    if (items.length === 0) {
+      res.status(400).json({ error: 'Суроо-жооп табылган жок' });
+      return;
+    }
+
+    const result = await importQaArticles(prisma, items);
+    res.json({ message: 'Телеграм экспорту ийгиликтүү импорт кылынды', ...result });
+  }),
+);
+
 qaRouter.get(
   '/:slug',
   asyncHandler(async (req, res) => {
@@ -266,26 +339,5 @@ qaRouter.delete(
 
     await prisma.qaArticle.delete({ where: { id: req.params.id } });
     res.status(204).send();
-  }),
-);
-
-qaRouter.post(
-  '/import/telegram-html',
-  requireAdmin,
-  asyncHandler(async (req, res) => {
-    const html = typeof req.body?.html === 'string' ? req.body.html : '';
-    if (html.length < 100) {
-      res.status(400).json({ error: 'Веб-барактын маалыматы керек' });
-      return;
-    }
-
-    const items = parseTelegramHtmlExport(html);
-    if (items.length === 0) {
-      res.status(400).json({ error: 'Суроо-жооп табылган жок' });
-      return;
-    }
-
-    const result = await importQaArticles(prisma, items);
-    res.json({ message: 'Телеграм экспорту ийгиликтүү импорт кылынды', ...result });
   }),
 );

@@ -34,6 +34,22 @@ async function parseApiError(res: Response, fallback: string) {
   }
 }
 
+export function todayBishkek() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bishkek',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+export async function fetchDailyQa(): Promise<(QuestionArticle & { date?: string }) | null> {
+  const res = await fetch(`${API_BASE}/api/qa/daily`, { cache: 'no-store' });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(await parseApiError(res, 'API error'));
+  return res.json() as Promise<QuestionArticle & { date?: string }>;
+}
+
 export async function fetchQaList(params: {
   page?: number;
   limit?: number;

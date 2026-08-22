@@ -28,6 +28,8 @@ import { AdminCoursesPage } from './pages/admin/AdminCoursesPage';
 import { AdminCourseDetailPage } from './pages/admin/AdminCourseDetailPage';
 import { AdminTestsPage } from './pages/admin/AdminTestsPage';
 import { AdminSectionPlaceholder } from './pages/admin/AdminSectionPlaceholder';
+import { AdminReviewsPage } from './pages/admin/AdminReviewsPage';
+import { AdminHeroPage } from './pages/admin/AdminHeroPage';
 
 export default function App() {
   return (
@@ -44,8 +46,8 @@ export default function App() {
                 <Route path="/questions/:articleId" element={<QuestionArticlePage />} />
                 <Route path="/courses/free" element={<FreeCoursesPage />} />
                 <Route path="/courses" element={<CoursesIndexPage />} />
-                <Route path="/courses/:courseId" element={<CourseDetailPage />} />
                 <Route path="/courses/:courseId/learn" element={<CourseLearnPage />} />
+                <Route path="/courses/:courseId" element={<CourseDetailPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
               </Route>
 
@@ -83,7 +85,8 @@ export default function App() {
                   />
                   <Route path="hadiths" element={<AdminSectionPlaceholder section="hadiths" />} />
                   <Route path="teacher" element={<AdminSectionPlaceholder section="teacher" />} />
-                  <Route path="reviews" element={<AdminSectionPlaceholder section="reviews" />} />
+                  <Route path="reviews" element={<AdminReviewsPage />} />
+                  <Route path="hero" element={<AdminHeroPage />} />
                 </Route>
               </Route>
 

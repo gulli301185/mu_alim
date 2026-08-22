@@ -4,6 +4,7 @@ import {
   BookOpen,
   ClipboardList,
   HelpCircle,
+  ImageIcon,
   LayoutDashboard,
   ScrollText,
   Star,
@@ -69,6 +70,12 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     title: 'Контент',
     items: [
       {
+        to: '/admin/hero',
+        label: 'Башкы баннер',
+        icon: ImageIcon,
+        description: 'Булут, баннер жана тексттер',
+      },
+      {
         to: '/admin/questions',
         label: '100 суроо-жооп',
         icon: HelpCircle,
@@ -129,6 +136,10 @@ export const ADMIN_SECTION_META: Record<
     title: 'Мугалим',
     subtitle: 'Мугалимдин биографиясы, билими жана соцтармактар',
     tzRef: 'ТЗ §21, §25',
+  },
+  hero: {
+    title: 'Башкы баннер',
+    subtitle: 'Булут сүрөтү, баннер жана тексттер',
   },
   reviews: {
     title: 'Пикирлер',

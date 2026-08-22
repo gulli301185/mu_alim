@@ -42,6 +42,7 @@ import {
   SITE_LOGO_URL,
 } from '../lib/certificatePdf';
 import { toastError } from '../lib/toast';
+import { CourseReviewsSection } from '../components/CourseReviews';
 
 type LessonPhase = 'video' | 'review';
 type ViewMode = 'lesson' | 'final-test';
@@ -730,6 +731,13 @@ export function CourseLearnPage() {
             )}
           </article>
         </div>
+        {courseId ? (
+          <CourseReviewsSection
+            courseRef={courseId}
+            courseTitle={course?.title}
+            courseSlug={course?.slug}
+          />
+        ) : null}
       </div>
     </section>
   );

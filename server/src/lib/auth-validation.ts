@@ -53,7 +53,8 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z
   .object({
-    token: z.string().min(1, 'Токен табылган жок'),
+    token: z.string().trim().min(1, 'Кодду киргизиңиз'),
+    email: emailSchema.optional(),
     password: passwordSchema,
     confirmPassword: z.string().min(1, 'Сыр сөздү кайталаңыз'),
   })

@@ -78,6 +78,19 @@ export const FREE_COURSE = {
   description: 'Муалим академиясынын бекер видео баяндары — YouTube шилтемелери аркылуу.',
 } as const;
 
+export const AKHLAQ_LESSONS = [
+  { title: '1-сабак: Киришүү — адеп-ахлак илими', videoId: 'jWh55FxqLhQ', duration: '12:20' },
+  { title: '2-сабак: Ата-энеге адеп', videoId: 'ZkpJ1ezB2TI', duration: '18:40' },
+  { title: '3-сабак: Коңшуга мамиле', videoId: 'iBn8RH4GSko', duration: '15:10' },
+  { title: '4-сабак: Тилди сактоо', videoId: '-x5ZVt-W1Yg', duration: '14:25' },
+  { title: '5-сабак: Чынчылдык жана ишеним', videoId: 'mtKKIbWbRWc', duration: '16:05' },
+  { title: '6-сабак: Жөнөкөйлүк', videoId: 'jWh55FxqLhQ', duration: '13:50' },
+  { title: '7-сабак: Ызаа жана сый', videoId: 'ZkpJ1ezB2TI', duration: '17:15' },
+  { title: '8-сабак: Ачууну башкаруу', videoId: 'iBn8RH4GSko', duration: '14:40' },
+  { title: '9-сабак: Жакшы жүрүм-турум', videoId: '-x5ZVt-W1Yg', duration: '15:55' },
+  { title: '10-сабак: Адепти күнүмдүк турмушта', videoId: 'mtKKIbWbRWc', duration: '19:10' },
+] as const;
+
 export const DEMO_PAID_LESSONS = [
   {
     slug: 'family',

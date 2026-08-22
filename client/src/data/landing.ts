@@ -6,13 +6,15 @@ export const SITE = {
   youtubeFree: "https://www.youtube.com/@Muhammadalim_Halil",
   paidTelegramInvite: "https://t.me/+ncXfxR-Xd5Y1Zjky",
   phone: "+996 500 864 404",
+  /** WhatsAppка жазуу үчүн (цифралар гана, өлкө коду менен) */
+  whatsappDigits: "996500864404",
   email: "info@mualim.academy",
   address: "Бишкек ш., Кыргызстан",
 };
 
 export const PAYMENT_TERMS = [
-  "Төлөм ырасталганда курс материалдарына Telegram группасы аркылуу кирүү берилет.",
-  "Кирүү шилтемеси төлөмдөн кийин дароо ачылат.",
+  "Катталуу үчүн WhatsApp номериңизди калтырып, бизге жазыңыз.",
+  "Төлөм ырасталганда администратор сизди Telegram группасына кошот — сабактарга ушундан доступ ачылат.",
   "Курс материалдарын үчүнчү жактарга берүү, көчүрүү же таратууга тыюу салынат.",
   "Төлөм кайтарылбайт, эгер курс материалына кирүү ачылган болсо.",
   "Техникалык көйгөйлөр үчүн колдоо: " + SITE.phone,
@@ -32,7 +34,7 @@ export const FOOTER_COLUMNS = [
   {
     title: "Маалымат",
     links: [
-      { label: "Намаз убакыттары", href: "/#prayer" },
+      { label: "Пикирлер", href: "/#reviews" },
       { label: "Суроо-жооп", href: "/questions" },
       { label: "Биздин сабактар", href: "/#videos" },
       { label: "Байланыш", href: "/#contact" },
@@ -67,7 +69,7 @@ export const NAV_PRIMARY = [
 export const NAV_MENU = [
   { label: 'Суроо-жооп', href: '/questions' },
   { label: 'Курстар', href: '/courses' },
-  { label: 'Намаз', href: '/#prayer' },
+  { label: 'Пикирлер', href: '/#reviews' },
   { label: 'Байланыш', href: '/#contact' },
   { label: 'Баяндар', href: '/#videos' },
 ] as const;
@@ -88,7 +90,7 @@ export const STATS = [
 ] as const;
 
 export const QUICK_ACCESS = [
-  { label: "Намаз убакыттары", href: "/#prayer", emoji: "🕌" },
+  { label: "Пикирлер", href: "/#reviews", emoji: "⭐" },
   { label: "Курстар", href: "/courses", emoji: "📖" },
   { label: "Дубалар", href: "/#ayah", emoji: "🤲" },
   { label: "Акыркы баян", href: "/#videos", emoji: "▶️" },

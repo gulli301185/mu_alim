@@ -161,18 +161,19 @@ export async function registerRequest(input: RegisterInput): Promise<AuthSession
   return res.json() as Promise<AuthSession>;
 }
 
-export async function forgotPasswordRequest(email: string): Promise<{ message: string; resetUrl?: string }> {
+export async function forgotPasswordRequest(email: string): Promise<{ message: string; code?: string }> {
   const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   });
   if (!res.ok) throw await parseApiError(res, 'Сурам ийгиликсиз');
-  return res.json() as Promise<{ message: string; resetUrl?: string }>;
+  return res.json() as Promise<{ message: string; code?: string }>;
 }
 
 export async function resetPasswordRequest(input: {
   token: string;
+  email?: string;
   password: string;
   confirmPassword: string;
 }): Promise<{ message: string }> {

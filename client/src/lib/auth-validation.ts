@@ -59,13 +59,23 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z
   .object({
-    token: z.string().min(1, 'Токен табылган жок'),
+    token: z.string().trim().min(1, 'Кодду киргизиңиз'),
+    email: emailSchema.optional(),
     password: passwordSchema,
     confirmPassword: z.string().min(1, 'Сыр сөздү кайталаңыз'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Сыр сөздөр дал келген жок',
     path: ['confirmPassword'],
+  })
+  .superRefine((data, ctx) => {
+    if (data.email && !/^\d{6}$/.test(data.token)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['token'],
+        message: 'Код 6 сандан турушу керек',
+      });
+    }
   });
 
 export type FieldErrors = Record<string, string>;

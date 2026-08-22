@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
@@ -15,8 +15,7 @@ import {
 
 export const authRouter = Router();
 
-const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 function toPublicUser(user: {
   id: string;
@@ -164,7 +163,7 @@ authRouter.post(
     const user = await prisma.user.findUnique({ where: { email } });
 
     const genericMessage =
-      'Эгер бул электрондук почта менен аккаунт бар болсо, сыр сөздү калыбына келтирүү шилтемеси жиберилди';
+      'Эгер бул электрондук почта менен аккаунт бар болсо, код түзүлдү';
 
     if (!user || !user.isActive || user.role === 'admin') {
       res.json({ message: genericMessage });
@@ -176,24 +175,30 @@ authRouter.post(
       data: { usedAt: new Date() },
     });
 
-    const token = randomBytes(32).toString('hex');
-    await prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        token,
-        expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
-      },
-    });
-
-    const resetUrl = `${CLIENT_ORIGIN}/reset-password?token=${token}`;
+    let code = String(randomInt(100000, 1000000));
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        await prisma.passwordResetToken.create({
+          data: {
+            userId: user.id,
+            token: code,
+            expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+          },
+        });
+        break;
+      } catch {
+        code = String(randomInt(100000, 1000000));
+        if (attempt === 4) throw new Error('Код түзүлгөн жок');
+      }
+    }
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[password-reset] ${email}: ${resetUrl}`);
+      console.log(`[password-reset] ${email}: code ${code}`);
     }
 
     res.json({
-      message: genericMessage,
-      ...(process.env.NODE_ENV !== 'production' ? { resetUrl } : {}),
+      message: 'Код түзүлдү. Аны жазып, жаңы сыр сөздү коюңуз',
+      code,
     });
   }),
 );
@@ -207,15 +212,27 @@ authRouter.post(
       return;
     }
 
-    const record = await prisma.passwordResetToken.findUnique({
-      where: { token: parsed.data.token },
-      include: { user: true },
-    });
+    const token = parsed.data.token.trim();
+    const email = parsed.data.email?.trim().toLowerCase();
+
+    const record = email
+      ? await prisma.passwordResetToken.findFirst({
+          where: {
+            token,
+            usedAt: null,
+            user: { email, isActive: true },
+          },
+          include: { user: true },
+        })
+      : await prisma.passwordResetToken.findUnique({
+          where: { token },
+          include: { user: true },
+        });
 
     if (!record || record.usedAt || record.expiresAt < new Date() || !record.user.isActive) {
       res.status(400).json({
-        error: 'Шилтеме жараксыз же мөөнөтү өткөн',
-        fields: { token: 'Шилтеме жараксыз же мөөнөтү өткөн' },
+        error: 'Код жараксыз же мөөнөтү өткөн',
+        fields: { token: 'Код жараксыз же мөөнөтү өткөн' },
       });
       return;
     }

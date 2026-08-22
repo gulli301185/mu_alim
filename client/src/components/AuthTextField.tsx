@@ -1,4 +1,4 @@
-import { Mail, User, Phone } from 'lucide-react';
+import { Mail, User, Phone, KeyRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { InputHTMLAttributes } from 'react';
 
@@ -9,7 +9,15 @@ type AuthTextFieldProps = {
   hint?: string;
 } & Pick<
   InputHTMLAttributes<HTMLInputElement>,
-  'type' | 'name' | 'placeholder' | 'required' | 'autoComplete' | 'value' | 'onChange'
+  | 'type'
+  | 'name'
+  | 'placeholder'
+  | 'required'
+  | 'autoComplete'
+  | 'value'
+  | 'onChange'
+  | 'maxLength'
+  | 'inputMode'
 >;
 
 export function AuthTextField({
@@ -24,6 +32,8 @@ export function AuthTextField({
   onChange,
   error,
   hint,
+  maxLength,
+  inputMode,
 }: AuthTextFieldProps) {
   return (
     <label className="auth-modal-field">
@@ -39,6 +49,8 @@ export function AuthTextField({
           placeholder={placeholder}
           required={required}
           autoComplete={autoComplete}
+          maxLength={maxLength}
+          inputMode={inputMode}
           value={value}
           onChange={onChange}
         />
@@ -49,4 +61,4 @@ export function AuthTextField({
   );
 }
 
-export { Mail, User, Phone };
+export { Mail, User, Phone, KeyRound };

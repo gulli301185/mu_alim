@@ -11,7 +11,7 @@
   "tags": [
     { "name": "Health", "description": "Текшерүү" },
     { "name": "Auth", "description": "Кирүү" },
-    { "name": "QA", "description": "Суроо-жооп" }
+    { "name": "Hero", "description": "Башкы баннер" }
   ],
   "paths": {
     "/api/health": {
@@ -159,6 +159,16 @@
         "responses": { "201": { "description": "Түзүлдү" }, "401": { "description": "Auth кerek" }, "403": { "description": "Admin кerek" } }
       }
     },
+    "/api/qa/daily": {
+      "get": {
+        "tags": ["QA"],
+        "summary": "Күндүн суроо-жообу (күн сайын алмашат)",
+        "responses": {
+          "200": { "description": "Бүгүнкү суроо-жооп" },
+          "404": { "description": "Суроо жок" }
+        }
+      }
+    },
     "/api/qa/{slug}": {
       "get": {
         "tags": ["QA"],
@@ -204,6 +214,62 @@
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "204": { "description": "Өчүрүлдү" }, "404": { "description": "Табылган жок" } }
+      }
+    },
+    "/api/hero": {
+      "get": {
+        "tags": ["Hero"],
+        "summary": "Башкы баннер (булут, баннер, тексттер)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": { "type": "string" },
+                    "subtitle": { "type": "string" },
+                    "name": { "type": "string" },
+                    "skyImageUrl": { "type": "string" },
+                    "bannerImageUrl": { "type": "string" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/hero": {
+      "put": {
+        "tags": ["Hero"],
+        "summary": "Баннерди жаңыртуу (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "subtitle", "name", "skyImageUrl", "bannerImageUrl"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "subtitle": { "type": "string" },
+                  "name": { "type": "string" },
+                  "skyImageUrl": { "type": "string" },
+                  "bannerImageUrl": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Сакталды" },
+          "400": { "description": "Сурам туура эмес" },
+          "401": { "description": "Кирүү талап кылынат" }
+        }
       }
     }
   },

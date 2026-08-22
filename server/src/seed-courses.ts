@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import {
+  AKHLAQ_LESSONS,
   DEMO_PAID_LESSONS,
   FREE_COURSE,
   FREE_VIDEOS_SEED,
@@ -123,6 +124,35 @@ async function seedPaidCourses(paidCategoryId: string) {
   console.log(`✓ Paid courses: ${PAID_COURSES_SEED.length}`);
 }
 
+async function seedAkhlaqLessons() {
+  const course = await prisma.course.findUnique({ where: { slug: 'akhlaq' } });
+  if (!course) return;
+
+  for (const [index, lesson] of AKHLAQ_LESSONS.entries()) {
+    const lessonOrder = index + 1;
+    const existing = await prisma.lesson.findFirst({
+      where: { courseId: course.id, lessonOrder },
+    });
+    const data = {
+      title: lesson.title,
+      description: 'Адеп-ахлак курсу · видео сабак',
+      youtubeUrl: `https://www.youtube.com/watch?v=${lesson.videoId}`,
+      youtubeVideoId: lesson.videoId,
+      durationSeconds: parseDurationToSeconds(lesson.duration),
+      isPublished: true,
+    };
+    if (existing) {
+      await prisma.lesson.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.lesson.create({
+        data: { courseId: course.id, lessonOrder, ...data },
+      });
+    }
+  }
+
+  console.log(`✓ Akhlaq lessons: ${AKHLAQ_LESSONS.length}`);
+}
+
 async function seedDemoPaidLessons() {
   for (const lesson of DEMO_PAID_LESSONS) {
     const course = await prisma.course.findUnique({ where: { slug: lesson.slug } });
@@ -165,6 +195,7 @@ async function main() {
 
   await seedFreeCourse(freeCategory.id);
   await seedPaidCourses(paidCategory.id);
+  await seedAkhlaqLessons();
   await seedDemoPaidLessons();
 
   const courseCount = await prisma.course.count();

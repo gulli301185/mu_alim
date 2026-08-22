@@ -429,20 +429,22 @@ model TestAnswer {
 // ─── Reviews & Certificates ──────────────────────────────────────────────────
 
 model Review {
-  id        String       @id @default(uuid()) @db.Uuid
-  userId    String       @map("user_id") @db.Uuid
-  courseId  String       @map("course_id") @db.Uuid
-  rating    Int          @db.SmallInt
-  comment   String?      @db.Text
-  status    ReviewStatus
-  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @map("user_id") @db.Uuid
+  courseId      String       @map("course_id") @db.Uuid
+  rating        Int          @db.SmallInt
+  comment       String?      @db.Text
+  displayName   String?      @map("display_name") @db.VarChar(150)
+  isAdminPosted Boolean      @default(false) @map("is_admin_posted")
+  status        ReviewStatus
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, courseId])
   @@index([courseId, status])
+  @@index([status, createdAt])
   @@map("reviews")
 }
 
@@ -543,4 +545,17 @@ model PrayerLocation {
   isActive  Boolean @default(true) @map("is_active")
 
   @@map("prayer_locations")
+}
+
+model HeroBanner {
+  id             String   @id @default("default") @db.VarChar(32)
+  title          String   @db.VarChar(200)
+  subtitle       String   @db.VarChar(500)
+  name           String   @db.VarChar(150)
+  skyImageUrl    String   @map("sky_image_url") @db.VarChar(500)
+  bannerImageUrl String   @map("banner_image_url") @db.VarChar(500)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("hero_banners")
 }

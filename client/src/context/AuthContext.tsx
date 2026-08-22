@@ -34,9 +34,10 @@ type AuthContextValue = {
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
   updateProfile: (input: UpdateProfileInput) => Promise<void>;
-  forgotPassword: (email: string) => Promise<{ message: string; resetUrl?: string }>;
+  forgotPassword: (email: string) => Promise<{ message: string; code?: string }>;
   resetPassword: (input: {
     token: string;
+    email?: string;
     password: string;
     confirmPassword: string;
   }) => Promise<{ message: string }>;
@@ -207,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const resetPassword = useCallback(
-    async (input: { token: string; password: string; confirmPassword: string }) =>
+    async (input: { token: string; email?: string; password: string; confirmPassword: string }) =>
       resetPasswordMutation.mutateAsync(input),
     [resetPasswordMutation],
   );

@@ -1,20 +1,34 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckCircle2, CreditCard, Loader2 } from 'lucide-react';
+import { CheckCircle2, MessageCircle, Loader2 } from 'lucide-react';
 import { PAYMENT_TERMS, SITE } from '../data/landing';
 import { isCoursePaid, savePaidCourse } from '../lib/courseAccess';
 
-const PAYMENT_METHODS = [
-  { id: 'mbank', label: 'MBank' },
-  { id: 'card', label: 'Visa / MC' },
-  { id: 'elcart', label: 'Элкарт' },
-] as const;
+type EnrollStatus = 'idle' | 'sending' | 'sent' | 'paid';
 
-type PaymentMethodId = (typeof PAYMENT_METHODS)[number]['id'];
-type PaymentStatus = 'idle' | 'processing' | 'paid';
+function normalizeWhatsapp(value: string) {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < 9) return null;
+  if (digits.startsWith('996')) return digits;
+  if (digits.startsWith('0') && digits.length >= 10) return `996${digits.slice(1)}`;
+  if (digits.length === 9) return `996${digits}`;
+  return digits;
+}
 
-function methodLabel(id: PaymentMethodId) {
-  return PAYMENT_METHODS.find((m) => m.id === id)?.label ?? id;
+function buildWhatsappEnrollUrl(input: {
+  courseTitle: string;
+  coursePrice: string;
+  userWhatsapp: string;
+}) {
+  const text = [
+    'Ассаламу алейкум!',
+    `${input.courseTitle} курсуна катталайын.`,
+    `Баасы: ${input.coursePrice}`,
+    `Менин WhatsApp номерим: ${input.userWhatsapp}`,
+    'Төлөм реквизиттерин жана кирүүнү күтөм.',
+  ].join('\n');
+
+  return `https://wa.me/${SITE.whatsappDigits}?text=${encodeURIComponent(text)}`;
 }
 
 type CoursePaymentBlockProps = {
@@ -39,37 +53,64 @@ export function CoursePaymentBlock({
   onPaid,
 }: CoursePaymentBlockProps) {
   const navigate = useNavigate();
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>('mbank');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [whatsappError, setWhatsappError] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(() =>
+  const [status, setStatus] = useState<EnrollStatus>(() =>
     isCoursePaid(courseId) ? 'paid' : 'idle',
   );
 
   useEffect(() => {
-    setPaymentStatus(isCoursePaid(courseId) ? 'paid' : 'idle');
+    setStatus(isCoursePaid(courseId) ? 'paid' : 'idle');
     setTermsAccepted(false);
+    setWhatsappError('');
   }, [courseId]);
 
-  const handlePay = () => {
-    if (!termsAccepted || paymentStatus === 'processing' || paymentStatus === 'paid') return;
-    setPaymentStatus('processing');
+  const handleEnrollWhatsapp = () => {
+    if (status === 'sending' || status === 'paid') return;
+
+    const normalized = normalizeWhatsapp(whatsapp);
+    if (!normalized) {
+      setWhatsappError('WhatsApp номерин туура жазыңыз (+996 ...)');
+      return;
+    }
+    if (!termsAccepted) {
+      setWhatsappError('Төлөм шарттары менен макул болуңуз');
+      return;
+    }
+
+    setWhatsappError('');
+    setStatus('sending');
+
+    const url = buildWhatsappEnrollUrl({
+      courseTitle,
+      coursePrice,
+      userWhatsapp: `+${normalized}`,
+    });
+
+    window.open(url, '_blank', 'noopener,noreferrer');
+
     window.setTimeout(() => {
-      savePaidCourse(courseId);
-      setPaymentStatus('paid');
-      onPaid?.();
-      if (!telegramUrl && navigateOnPaid && learnPath) {
-        navigate(learnPath);
-      }
-    }, paymentMethod === 'mbank' ? 1400 : 1800);
+      setStatus('sent');
+    }, 600);
   };
 
-  if (paymentStatus === 'paid') {
+  const handleUnlockAfterConfirm = () => {
+    savePaidCourse(courseId);
+    setStatus('paid');
+    onPaid?.();
+    if (!telegramUrl && navigateOnPaid && learnPath) {
+      navigate(learnPath);
+    }
+  };
+
+  if (status === 'paid') {
     return (
       <div className="courses-payment-success">
         <CheckCircle2 className="courses-payment-success-icon" aria-hidden />
-        <p className="courses-payment-success-title">Төлөнгөн!</p>
+        <p className="courses-payment-success-title">Доступ ачылды!</p>
         <p className="courses-payment-success-text">
-          {courseTitle} курсу активдештирилди. Сабактар Telegram группасында.
+          {courseTitle} — сабактар Telegram группасында.
         </p>
         {telegramUrl ? (
           <a
@@ -89,41 +130,80 @@ export function CoursePaymentBlock({
     );
   }
 
+  if (status === 'sent') {
+    const normalized = normalizeWhatsapp(whatsapp);
+    const reopenUrl = buildWhatsappEnrollUrl({
+      courseTitle,
+      coursePrice,
+      userWhatsapp: normalized ? `+${normalized}` : SITE.phone,
+    });
+
+    return (
+      <div className="courses-payment-success courses-enroll-pending">
+        <MessageCircle className="courses-payment-success-icon" aria-hidden />
+        <p className="courses-payment-success-title">Заявка жөнөтүлдү</p>
+        <p className="courses-payment-success-text">
+          WhatsAppка жаздыңыз. Андан кийин доступ мындай берилет:
+        </p>
+        <ol className="courses-enroll-steps">
+          <li>Администратор төлөм реквизиттерин WhatsAppтан жөнөтөт.</li>
+          <li>Төлөгөндөн кийин скриншот же ырастоону жибересиз.</li>
+          <li>Төлөм текшерилгенден кийин сизди Telegram группасына кошот — сабактарга ушундан доступ ачылат.</li>
+        </ol>
+        <a
+          href={reopenUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-primary courses-payment-btn w-full"
+        >
+          WhatsAppты кайра ачуу
+        </a>
+        <button
+          type="button"
+          className="courses-payment-btn courses-enroll-unlock-btn w-full"
+          onClick={handleUnlockAfterConfirm}
+        >
+          Админ кошкон — Telegramга өтүү
+        </button>
+        <p className="courses-payment-success-note">
+          Администратор сизди группага кошкондон кийин гана басыңыз.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="courses-payment-block">
       <div className="courses-payment-top">
-        <CreditCard className="h-4 w-4" aria-hidden />
-        <span className="courses-payment-title">Төлөм</span>
+        <MessageCircle className="h-4 w-4" aria-hidden />
+        <span className="courses-payment-title">WhatsApp менен катталуу</span>
       </div>
       <p className="courses-payment-price">{coursePrice}</p>
       <p className="courses-payment-hint">
-        {lessonCount} сабак · төлөгөндөн кийин Telegram группасына кирүү ачылат
+        {lessonCount} сабак · номерди калтырып, WhatsAppка жазыңыз — төлөмдөн кийин Telegramдан доступ
+        берилет
       </p>
 
-      <div className="courses-payment-methods">
-        {PAYMENT_METHODS.map((method) => (
-          <label
-            key={method.id}
-            className={`courses-payment-method${
-              paymentMethod === method.id ? ' courses-payment-method-active' : ''
-            }`}
-          >
-            <input
-              type="radio"
-              name={`payment-${courseId}`}
-              value={method.id}
-              checked={paymentMethod === method.id}
-              onChange={() => setPaymentMethod(method.id)}
-              className="courses-payment-radio"
-              disabled={paymentStatus === 'processing'}
-            />
-            <span>{method.label}</span>
-          </label>
-        ))}
-      </div>
+      <label className="courses-enroll-whatsapp-label">
+        <span>WhatsApp номериңиз</span>
+        <input
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="+996 700 000 000"
+          value={whatsapp}
+          onChange={(e) => {
+            setWhatsapp(e.target.value);
+            if (whatsappError) setWhatsappError('');
+          }}
+          className="courses-enroll-whatsapp-input"
+          disabled={status === 'sending'}
+        />
+      </label>
+      {whatsappError ? <p className="courses-enroll-whatsapp-error">{whatsappError}</p> : null}
 
       <div className="courses-payment-terms">
-        <p className="courses-payment-terms-title">Төлөм шарттары</p>
+        <p className="courses-payment-terms-title">Катталуу жана төлөм шарттары</p>
         <ul className="courses-payment-terms-list">
           {PAYMENT_TERMS.map((term) => (
             <li key={term}>{term}</li>
@@ -137,24 +217,24 @@ export function CoursePaymentBlock({
           checked={termsAccepted}
           onChange={(e) => setTermsAccepted(e.target.checked)}
           className="courses-payment-terms-checkbox"
-          disabled={paymentStatus === 'processing'}
+          disabled={status === 'sending'}
         />
-        <span>Төлөм шарттары менен макулмун</span>
+        <span>Шарттар менен макулмун</span>
       </label>
 
       <button
         type="button"
         className="btn-primary courses-payment-btn w-full"
-        onClick={handlePay}
-        disabled={!termsAccepted || paymentStatus === 'processing'}
+        onClick={handleEnrollWhatsapp}
+        disabled={status === 'sending' || !termsAccepted || !whatsapp.trim()}
       >
-        {paymentStatus === 'processing' ? (
+        {status === 'sending' ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            {paymentMethod === 'mbank' ? 'MBank текшерилүүдө...' : 'Төлөм жүргүзүлүүдө...'}
+            WhatsApp ачылууда...
           </>
         ) : (
-          `Төлөө — ${methodLabel(paymentMethod)}`
+          'WhatsAppка жазуу'
         )}
       </button>
     </div>

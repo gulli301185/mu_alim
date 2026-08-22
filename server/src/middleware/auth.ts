@@ -45,3 +45,19 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
     next();
   });
 }
+
+export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) {
+    next();
+    return;
+  }
+
+  try {
+    req.user = jwt.verify(token, JWT_SECRET) as AuthUser;
+  } catch {
+    /* ignore invalid token for public endpoints */
+  }
+  next();
+}

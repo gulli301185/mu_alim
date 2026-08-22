@@ -12,6 +12,8 @@ import { lessonsRouter } from './routes/lessons.js';
 import { adminUsersRouter } from './routes/admin-users.js';
 import { coursesRouter } from './routes/courses.js';
 import { testsRouter } from './routes/tests.js';
+import { reviewsRouter } from './routes/reviews.js';
+import { heroRouter } from './routes/hero.js';
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../.env') });
 
@@ -34,10 +36,13 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/qa', qaRouter);
 app.use('/api/prayer', prayerRouter);
+app.use('/api/admin/users', adminUsersRouter);
+app.use('/api', heroRouter);
+app.use('/api', reviewsRouter);
+app.use('/api', testsRouter);
+/** Course lesson CRUD before `/courses/:ref` style catch-alls in other routers. */
 app.use('/api', lessonsRouter);
 app.use('/api', coursesRouter);
-app.use('/api', testsRouter);
-app.use('/api/admin/users', adminUsersRouter);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

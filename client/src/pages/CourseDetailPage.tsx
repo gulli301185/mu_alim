@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, Navigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BookOpen, CheckCircle2, GraduationCap, Lock, Play, Star, Youtube } from 'lucide-react';
+import { ArrowLeft, BookOpen, GraduationCap, Lock, Play, Star, Youtube } from 'lucide-react';
 import {
   fetchCourseByRef,
   fetchFreeLessons,
@@ -10,26 +10,12 @@ import {
   type CourseSummary,
   type FreeLessonItem,
 } from '../lib/course-api';
-import {
-  isCoursePaid,
-  loadCourseProgress,
-  markLessonComplete,
-} from '../lib/courseAccess';
-import { CourseYoutubePlayer } from '../components/CourseYoutubeLink';
+import { isCoursePaid } from '../lib/courseAccess';
 import { getLessonsByCourse, type LessonDto } from '../lib/lesson-api';
 import { youtubeThumbnail } from '../lib/youtube';
 import { SITE } from '../data/landing';
+import { CourseReviewsSection } from '../components/CourseReviews';
 import { CoursePaymentBlock } from './CoursesPage';
-
-function isFreeLessonUnlocked(
-  lessons: LessonDto[],
-  lessonId: string,
-  completedLessonIds: string[],
-) {
-  const index = lessons.findIndex((lesson) => lesson.id === lessonId);
-  if (index <= 0) return true;
-  return completedLessonIds.includes(lessons[index - 1].id);
-}
 
 function StarRating({ compact = false }: { compact?: boolean }) {
   const value = 4.9;
@@ -48,52 +34,39 @@ function StarRating({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function FreeLessonsSidebar({
+function PaidLessonsSidebar({
   lessons,
   activeLessonId,
-  completedLessonIds,
+  unlocked,
   onSelect,
 }: {
   lessons: LessonDto[];
   activeLessonId: string;
-  completedLessonIds: string[];
+  unlocked: boolean;
   onSelect: (lessonId: string) => void;
 }) {
-  const watchingIncomplete = !completedLessonIds.includes(activeLessonId);
-
   return (
     <aside className="courses-sidebar ui-card">
       <h2 className="courses-sidebar-title">
         <BookOpen className="h-5 w-5" aria-hidden />
-        Бардык сабактар ({lessons.length})
+        Сабактар ({lessons.length})
       </h2>
       <ul className="courses-sidebar-list free-lessons-sidebar-list">
         {lessons.map((lesson) => {
           const active = lesson.id === activeLessonId;
-          const completed = completedLessonIds.includes(lesson.id);
-          const unlocked = isFreeLessonUnlocked(lessons, lesson.id, completedLessonIds);
           return (
             <li key={lesson.id}>
               <button
                 type="button"
                 className={`courses-sidebar-item free-lesson-sidebar-item courses-sidebar-item-free${
                   active ? ' courses-sidebar-item-active' : ''
-                }${completed ? ' courses-sidebar-item-done' : ''}${
-                  !unlocked ? ' courses-sidebar-item-locked' : ''
-                }`}
-                disabled={!unlocked || (watchingIncomplete && !active)}
-                onClick={() => {
-                  if (!unlocked) return;
-                  if (watchingIncomplete && lesson.id !== activeLessonId) return;
-                  onSelect(lesson.id);
-                }}
+                }${!unlocked ? ' courses-sidebar-item-locked' : ''}`}
+                onClick={() => onSelect(lesson.id)}
               >
                 <span className="free-lesson-sidebar-thumb">
                   <img src={youtubeThumbnail(lesson.youtubeVideoId)} alt="" />
                   <span className="free-lesson-sidebar-play">
-                    {completed ? (
-                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-                    ) : unlocked ? (
+                    {unlocked ? (
                       <Play className="h-3 w-3" fill="currentColor" aria-hidden />
                     ) : (
                       <Lock className="h-3 w-3" aria-hidden />
@@ -106,9 +79,7 @@ function FreeLessonsSidebar({
                     {formatCourseDuration(lesson.durationSeconds)}
                   </span>
                 </span>
-                <span className="courses-sidebar-price">
-                  {completed ? 'Көрүлдү' : unlocked ? 'Бекер' : 'Кулуп'}
-                </span>
+                <span className="courses-sidebar-price">{unlocked ? 'Ачылды' : 'Кулуп'}</span>
               </button>
             </li>
           );
@@ -118,56 +89,10 @@ function FreeLessonsSidebar({
   );
 }
 
-function CoursesSidebar({
-  activeCourseId,
-  courses,
-}: {
-  activeCourseId: string;
-  courses: CourseSummary[];
-}) {
-  const paidCourseIds = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('mualim-paid-courses') ?? '[]') as string[] : [];
-
-  return (
-    <aside className="courses-sidebar ui-card">
-      <h2 className="courses-sidebar-title">
-        <BookOpen className="h-5 w-5" aria-hidden />
-        Бардык курстар
-      </h2>
-      <ul className="courses-sidebar-list">
-        {courses.map((course) => (
-          <li key={course.id}>
-            <NavLink
-              to={`/courses/${course.id}`}
-              className={({ isActive }) =>
-                `courses-sidebar-item${isActive || course.id === activeCourseId ? ' courses-sidebar-item-active' : ''}${
-                  paidCourseIds.includes(course.id) ? ' courses-sidebar-item-paid' : ''
-                }`
-              }
-            >
-              <span className="courses-sidebar-text">
-                <span className="courses-sidebar-name">{course.title}</span>
-                <span className="courses-sidebar-meta">
-                  <StarRating compact />
-                  <span className="courses-sidebar-lessons">{course.lessonCount} сабак</span>
-                </span>
-              </span>
-              <span className="courses-sidebar-price">{course.priceLabel}</span>
-            </NavLink>
-          </li>
-        ))}
-      </ul>
-    </aside>
-  );
-}
-
 export function CourseDetailPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const [paid, setPaid] = useState(false);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
-  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() =>
-    courseId ? loadCourseProgress(courseId).completedLessonIds : [],
-  );
-  const [openedCompleted, setOpenedCompleted] = useState(false);
 
   const { data: course, isLoading, isError } = useQuery({
     queryKey: ['course', courseId],
@@ -175,12 +100,10 @@ export function CourseDetailPage() {
     enabled: Boolean(courseId),
   });
 
-  const free = course ? isFreeCourse(course) : false;
-
-  const { data: courseLessons, isLoading: lessonsLoading } = useQuery({
+  const { data: courseLessons } = useQuery({
     queryKey: ['course-lessons', courseId],
     queryFn: () => getLessonsByCourse(courseId!),
-    enabled: Boolean(courseId && course && free),
+    enabled: Boolean(courseId && course),
     staleTime: 0,
     refetchOnMount: 'always',
   });
@@ -194,10 +117,7 @@ export function CourseDetailPage() {
   );
 
   useEffect(() => {
-    if (courseId) {
-      setPaid(isCoursePaid(courseId));
-      setCompletedLessonIds(loadCourseProgress(courseId).completedLessonIds);
-    }
+    if (courseId) setPaid(isCoursePaid(courseId));
   }, [courseId]);
 
   useEffect(() => {
@@ -206,49 +126,12 @@ export function CourseDetailPage() {
       return;
     }
     setActiveLessonId((prev) => {
-      if (
-        prev &&
-        publishedLessons.some((lesson) => lesson.id === prev) &&
-        isFreeLessonUnlocked(publishedLessons, prev, completedLessonIds)
-      ) {
+      if (prev && publishedLessons.some((lesson) => lesson.id === prev)) {
         return prev;
       }
-      const firstOpen =
-        publishedLessons.find((lesson) =>
-          isFreeLessonUnlocked(publishedLessons, lesson.id, completedLessonIds),
-        ) ?? publishedLessons[0];
-      return firstOpen.id;
+      return publishedLessons[0].id;
     });
-  }, [publishedLessons, completedLessonIds]);
-
-  useEffect(() => {
-    if (!activeLessonId || !courseId) return;
-    setOpenedCompleted(loadCourseProgress(courseId).completedLessonIds.includes(activeLessonId));
-  }, [activeLessonId, courseId]);
-
-  const { data: paidCoursesData } = useQuery({
-    queryKey: ['courses', 'paid'],
-    queryFn: () => import('../lib/course-api').then((m) => m.fetchCourses({ type: 'paid', limit: 100 })),
-    enabled: Boolean(course && !free),
-  });
-
-  const { data: freeCoursesData } = useQuery({
-    queryKey: ['courses', 'free'],
-    queryFn: () => import('../lib/course-api').then((m) => m.fetchCourses({ type: 'free', limit: 100 })),
-    enabled: Boolean(course && !free),
-  });
-
-  const sidebarCourses = [
-    ...(freeCoursesData?.items ?? []),
-    ...(paidCoursesData?.items ?? []),
-  ];
-
-  const handleFreeWatchComplete = useCallback(() => {
-    if (!courseId || !activeLessonId) return;
-    if (completedLessonIds.includes(activeLessonId)) return;
-    const next = markLessonComplete(courseId, activeLessonId);
-    setCompletedLessonIds(next.completedLessonIds);
-  }, [activeLessonId, completedLessonIds, courseId]);
+  }, [publishedLessons]);
 
   if (isLoading) {
     return (
@@ -278,7 +161,6 @@ export function CourseDetailPage() {
     return <Navigate to={`/courses/${course.slug}/learn`} replace />;
   }
 
-  const freeCourse = false;
   const coursesListPath = '/courses';
   const activeLesson =
     publishedLessons.find((lesson) => lesson.id === activeLessonId) ?? publishedLessons[0];
@@ -291,11 +173,9 @@ export function CourseDetailPage() {
       <div className="wrap courses-page-inner">
         <div className="courses-page-head">
           <p className="courses-page-label">Муалим академиясы</p>
-          <h1 className="courses-page-title">{freeCourse ? 'Бекер сабактар' : 'Акылуу курстар'}</h1>
+          <h1 className="courses-page-title">{course.title}</h1>
           <p className="courses-page-subtitle">
-            {freeCourse
-              ? 'Видеону сайттан көрүңүз. Биринчи сабак бүткөнчө кийинкиге өтүүгө болбойт.'
-              : 'Курстан тандаңыз, төлөңүз — андан кийин видеолор сайттан көрүлөт.'}
+            Курстун сабактарын караңыз. Төлөгөндөн кийин видеолор ачылат.
           </p>
         </div>
 
@@ -303,95 +183,42 @@ export function CourseDetailPage() {
           <div className="courses-payment-panel ui-card">
             <div className="courses-payment-panel-body">
               <p className="courses-payment-panel-label">
-                {freeCourse ? 'Тандалган сабак' : 'Тандалган курс'}
+                {activeLesson ? 'Тандалган сабак' : 'Тандалган курс'}
               </p>
               <h2 className="courses-payment-course-name">
-                {freeCourse && activeLesson ? activeLesson.title : course.title}
+                {activeLesson ? activeLesson.title : course.title}
               </h2>
               <div className="courses-payment-course-meta">
                 <StarRating compact />
-                {freeCourse && activeLesson ? (
+                {activeLesson ? (
                   <>
                     <span>
                       {activeLesson.lessonOrder} / {publishedLessons.length} сабак
                     </span>
-                    <span>Бекер</span>
+                    <span>{course.priceLabel}</span>
                   </>
                 ) : (
                   <>
-                    <span>{course.lessonCount} видео-сабак</span>
+                    <span>{publishedLessons.length || course.lessonCount} видео-сабак</span>
                     <span>{course.priceLabel}</span>
                   </>
                 )}
               </div>
 
-              {freeCourse && activeLesson ? (
-                <div className="courses-free-watch">
-                  <CourseYoutubePlayer
-                    key={activeLesson.id}
-                    videoId={activeLesson.youtubeVideoId}
-                    title={activeLesson.title}
-                    onWatchComplete={handleFreeWatchComplete}
-                    requireFullWatch={!openedCompleted}
-                  />
+              <div className="courses-detail-preview">
+                <img src={youtubeThumbnail(previewVideoId)} alt="" className="courses-detail-preview-img" />
+                <div className="courses-detail-preview-overlay">
+                  <Play className="h-6 w-6" fill="currentColor" aria-hidden />
                 </div>
-              ) : (
-                <div className="courses-detail-preview">
-                  <img src={youtubeThumbnail(previewVideoId)} alt="" className="courses-detail-preview-img" />
-                  <div className="courses-detail-preview-overlay">
-                    <Play className="h-6 w-6" fill="currentColor" aria-hidden />
-                  </div>
-                </div>
-              )}
-
-              <p className="courses-payment-course-desc">
-                {freeCourse && activeLesson?.description
-                  ? activeLesson.description
-                  : course.description}
-              </p>
-              {previewDuration ? (
-                <p className="courses-payment-hint">
-                  Узактыгы: {formatCourseDuration(previewDuration)}
-                </p>
-              ) : null}
+              </div>
 
               <div className="courses-payment-divider" />
 
-              {freeCourse ? (
-                publishedLessons.length > 0 && activeLesson ? (
-                  completedLessonIds.includes(activeLesson.id) ? (
-                    <div className="courses-detail-paid-actions">
-                      <p className="courses-payment-hint">Сабак аякталды. Кийинки сабакка өтсөңүз болот.</p>
-                      {(() => {
-                        const nextLesson = publishedLessons.find(
-                          (lesson) =>
-                            isFreeLessonUnlocked(publishedLessons, lesson.id, completedLessonIds) &&
-                            !completedLessonIds.includes(lesson.id),
-                        );
-                        return nextLesson ? (
-                          <button
-                            type="button"
-                            className="btn-primary courses-payment-btn w-full"
-                            onClick={() => setActiveLessonId(nextLesson.id)}
-                          >
-                            Кийинки сабак
-                          </button>
-                        ) : (
-                          <p className="courses-payment-hint">Бардык сабактар аякталды.</p>
-                        );
-                      })()}
-                    </div>
-                  ) : (
-                    <p className="courses-payment-hint">
-                      Видеону аягына чейин көрүңүз — андан кийин кийинки сабак ачылат.
-                    </p>
-                  )
-                ) : (
-                  <p className="courses-payment-hint">Жарыяланган сабактар азырынча жок.</p>
-                )
-              ) : paid ? (
+              {paid ? (
                 <div className="courses-detail-paid-actions">
-                  <p className="courses-payment-hint">Сабактар Telegram группасында.</p>
+                  <p className="courses-payment-hint">
+                    Төлөм ырасталды. Сабактар Telegram группасында.
+                  </p>
                   <a
                     href={SITE.paidTelegramInvite}
                     target="_blank"
@@ -406,36 +233,48 @@ export function CourseDetailPage() {
                   courseId={courseId}
                   courseTitle={course.title}
                   coursePrice={course.priceLabel}
-                  lessonCount={course.lessonCount}
+                  lessonCount={publishedLessons.length || course.lessonCount}
                   telegramUrl={SITE.paidTelegramInvite}
                   onPaid={() => setPaid(true)}
                 />
               )}
+
+              <p className="courses-payment-course-desc">
+                {activeLesson?.description || course.description}
+              </p>
+              {previewDuration ? (
+                <p className="courses-payment-hint">
+                  Узактыгы: {formatCourseDuration(previewDuration)}
+                </p>
+              ) : null}
             </div>
           </div>
 
-          {freeCourse ? (
-            publishedLessons.length > 0 && activeLesson ? (
-              <FreeLessonsSidebar
-                lessons={publishedLessons}
-                activeLessonId={activeLesson.id}
-                completedLessonIds={completedLessonIds}
-                onSelect={setActiveLessonId}
-              />
-            ) : (
-              <aside className="courses-sidebar ui-card">
-                <h2 className="courses-sidebar-title">Бардык сабактар (0)</h2>
-                <p className="courses-page-subtitle m-0 px-1">Сабактар азырынча жок.</p>
-              </aside>
-            )
+          {publishedLessons.length > 0 && activeLesson ? (
+            <PaidLessonsSidebar
+              lessons={publishedLessons}
+              activeLessonId={activeLesson.id}
+              unlocked={paid}
+              onSelect={setActiveLessonId}
+            />
           ) : (
-            <CoursesSidebar activeCourseId={courseId} courses={sidebarCourses} />
+            <aside className="courses-sidebar ui-card">
+              <h2 className="courses-sidebar-title">Сабактар (0)</h2>
+              <p className="courses-page-subtitle m-0 px-1">Сабактар азырынча жок.</p>
+            </aside>
           )}
         </div>
 
+        <CourseReviewsSection
+          courseRef={courseId}
+          courseTitle={course.title}
+          courseSlug={course.slug}
+          hideCards
+        />
+
         <Link to={coursesListPath} className="courses-page-back">
           <ArrowLeft className="h-4 w-4" />
-          {freeCourse ? 'Бардык бекер сабактарга' : 'Бардык курстарга'} кайтуу
+          Бардык курстарга кайтуу
         </Link>
       </div>
     </section>
@@ -494,7 +333,7 @@ function CoursesHubSwitch({ active }: { active: 'free' | 'paid' }) {
 function CourseHubCard({ course, free = false }: { course: CourseSummary; free?: boolean }) {
   return (
     <Link
-      to={free ? `/courses/${course.slug}/learn` : `/courses/${course.id}`}
+      to={free ? `/courses/${course.slug}/learn` : `/courses/${course.slug}`}
       className="courses-hub-card no-underline"
     >
       <div className="courses-hub-card-media">
