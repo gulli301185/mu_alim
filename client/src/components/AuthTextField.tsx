@@ -55,6 +55,7 @@ export function AuthTextField({
           onChange={onChange}
         />
       </span>
+      {/* toi */}
       {hint && !error ? <span className="auth-modal-field-hint">{hint}</span> : null}
       {error ? <span className="auth-modal-field-error">{error}</span> : null}
     </label>
