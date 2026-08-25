@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 import {
   GraduationCap,
   MapPin,
@@ -7,8 +7,8 @@ import {
   Languages,
   Calendar,
   Users,
-} from 'lucide-react';
-import { TEACHER } from '../data/landing';
+} from "lucide-react";
+import { TEACHER } from "../data/landing";
 
 export function TeacherPage() {
   return (
@@ -16,7 +16,11 @@ export function TeacherPage() {
       <section className="teacher-hero">
         <div className="wrap teacher-hero-grid">
           <div className="teacher-photo-wrap">
-            <img src="/ustaz.png?v=4" alt={TEACHER.name} className="teacher-photo" />
+            <img
+              src="/ustaz.png?v=4"
+              alt={TEACHER.name}
+              className="teacher-photo"
+            />
           </div>
           <div className="teacher-quote-panel">
             <span className="teacher-quote-mark">"</span>
@@ -28,7 +32,7 @@ export function TeacherPage() {
           </div>
         </div>
       </section>
-
+{/* toi */}
       <section className="teacher-profile-page">
         <div className="wrap teacher-profile-wrap">
           <div className="teacher-profile-layout">
@@ -65,8 +69,13 @@ export function TeacherPage() {
                 </h2>
                 <ol className="teacher-education-list">
                   {TEACHER.workExperience.map((item) => (
-                    <li key={`${item.period}-${item.role}`} className="teacher-education-item">
-                      <span className="teacher-education-period">{item.period}</span>
+                    <li
+                      key={`${item.period}-${item.role}`}
+                      className="teacher-education-item"
+                    >
+                      <span className="teacher-education-period">
+                        {item.period}
+                      </span>
                       <div className="teacher-education-content">
                         <p className="teacher-education-place">{item.role}</p>
                         <p className="teacher-education-city">
@@ -88,8 +97,13 @@ export function TeacherPage() {
                 </h2>
                 <ol className="teacher-education-list">
                   {TEACHER.education.map((item) => (
-                    <li key={`${item.period}-${item.place}`} className="teacher-education-item">
-                      <span className="teacher-education-period">{item.period}</span>
+                    <li
+                      key={`${item.period}-${item.place}`}
+                      className="teacher-education-item"
+                    >
+                      <span className="teacher-education-period">
+                        {item.period}
+                      </span>
                       <div className="teacher-education-content">
                         <p className="teacher-education-place">{item.place}</p>
                         <p className="teacher-education-city">
@@ -112,7 +126,9 @@ export function TeacherPage() {
                   {TEACHER.languages.map((lang) => (
                     <li key={lang.name} className="teacher-language-list-item">
                       <span className="teacher-language-name">{lang.name}</span>
-                      <span className="teacher-language-level">— {lang.level}</span>
+                      <span className="teacher-language-level">
+                        — {lang.level}
+                      </span>
                     </li>
                   ))}
                 </ul>
