@@ -1,6 +1,12 @@
 import { Link } from 'react-router-dom';
-import { ChevronUp, MapPin, Phone } from 'lucide-react';
+import { ChevronUp, Mail, MapPin, Phone } from 'lucide-react';
 import { SITE, FOOTER_COLUMNS, SOCIAL } from '../data/landing';
+import { useAuthModal } from '../context/AuthModalContext';
+import { useContactPanel } from '../context/ContactPanelContext';
+import { useSiteImages } from '../context/SiteImagesContext';
+import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
+
+const FOOTER_BRAND = 'Mualim';
 
 function SocialLogo({ name }: { name: string }) {
   switch (name) {
@@ -33,7 +39,33 @@ function SocialLogo({ name }: { name: string }) {
   }
 }
 
-function FooterLink({ href, label }: { href: string; label: string }) {
+function FooterLink({
+  href,
+  label,
+  onRegister,
+  onContact,
+}: {
+  href: string;
+  label: string;
+  onRegister?: () => void;
+  onContact?: () => void;
+}) {
+  if (label === 'Катталуу') {
+    return (
+      <button type="button" className="footer-link" onClick={onRegister}>
+        {label}
+      </button>
+    );
+  }
+
+  if (label === 'Байланыш') {
+    return (
+      <button type="button" className="footer-link" onClick={onContact}>
+        {label}
+      </button>
+    );
+  }
+
   if (href.startsWith('http') || href.startsWith('tel:') || href.startsWith('mailto:') || href.startsWith('/#')) {
     return <a href={href} className="footer-link">{label}</a>;
   }
@@ -41,10 +73,13 @@ function FooterLink({ href, label }: { href: string; label: string }) {
 }
 
 export function Footer() {
+  const { image } = useSiteImages();
+  const { openAuth } = useAuthModal();
+  const { openContact } = useContactPanel();
   const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
   return (
-    <footer id="contact" className="footer-wave">
+    <footer className="footer-wave">
       <svg className="footer-wave-svg" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden>
         <path
           d="M0,80 L0,120 L1440,120 L1440,20 C1200,60 960,0 720,40 C480,80 240,20 0,80 Z"
@@ -59,64 +94,81 @@ export function Footer() {
       </svg>
 
       <div className="footer-body">
-        <div className="footer-dots" aria-hidden />
-
         <div className="wrap footer-inner">
           <div className="footer-grid">
             <div className="footer-brand">
               <Link to="/" className="footer-brand-top">
-                <img src="/logo-mualim.png" alt={SITE.name} className="footer-brand-logo" />
-                <span className="footer-brand-name">{SITE.name}</span>
+                <img src={image(SITE_IMAGE_KEYS.logo)} alt={FOOTER_BRAND} className="footer-brand-logo" />
+                <span className="footer-brand-name">{FOOTER_BRAND}</span>
               </Link>
-              <p className="footer-brand-desc">
-                {SITE.tagline}. Куран жана Сүннөт негизинде ишенимдүү билим — бекер баяндар жана онлайн курстар.
+              <p className="footer-brand-motto">
+                <span>БИЛИМ – ЭРКИНДИК,</span>
+                <span>ИЗДЕНҮҮ – ӨМҮР.</span>
               </p>
-              <div className="footer-contact-info">
-                <p className="footer-contact-item">
-                  <MapPin className="h-4 w-4 shrink-0 text-gold" />
-                  <span>{SITE.address}</span>
-                </p>
-                <a href={`tel:${SITE.phone.replace(/\s/g, '')}`} className="footer-contact-item footer-contact-link">
-                  <Phone className="h-4 w-4 shrink-0 text-gold" />
-                  <span>{SITE.phone}</span>
-                </a>
+              <div className="footer-social-row">
+                {SOCIAL.map((s) => (
+                  <a
+                    key={s.name}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="footer-social-icon"
+                    title={s.name}
+                    aria-label={s.name}
+                  >
+                    <SocialLogo name={s.name} />
+                  </a>
+                ))}
               </div>
             </div>
 
             {FOOTER_COLUMNS.map((col) => (
-              <div key={col.title}>
+              <div key={col.title} className="footer-col">
                 <h3 className="footer-heading">{col.title}</h3>
                 <ul className="footer-links">
                   {col.links.map((item) => (
                     <li key={item.label}>
-                      <FooterLink href={item.href} label={item.label} />
+                      <FooterLink
+                        href={item.href}
+                        label={item.label}
+                        onRegister={() => openAuth('register')}
+                        onContact={openContact}
+                      />
                     </li>
                   ))}
                 </ul>
               </div>
             ))}
+
+            <div className="footer-col footer-col-contact">
+              <h3 className="footer-heading">Байланыш</h3>
+              <ul className="footer-contact-list">
+                <li>
+                  <a href={`tel:${SITE.phone.replace(/\s/g, '')}`} className="footer-contact-item footer-contact-link">
+                    <Phone className="footer-contact-icon" aria-hidden />
+                    <span>{SITE.phone}</span>
+                  </a>
+                </li>
+                <li>
+                  <a href={`mailto:${SITE.email}`} className="footer-contact-item footer-contact-link">
+                    <Mail className="footer-contact-icon" aria-hidden />
+                    <span>{SITE.email}</span>
+                  </a>
+                </li>
+                <li>
+                  <p className="footer-contact-item">
+                    <MapPin className="footer-contact-icon" aria-hidden />
+                    <span>{SITE.address}</span>
+                  </p>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <div className="footer-bottom">
-            <p className="footer-copyright">© {new Date().getFullYear()} {SITE.name}</p>
-
-            <div className="footer-social-row">
-              {SOCIAL.map((s) => (
-                <a
-                  key={s.name}
-                  href={s.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="footer-social-icon"
-                  style={{ backgroundColor: s.color }}
-                  title={s.name}
-                  aria-label={s.name}
-                >
-                  <SocialLogo name={s.name} />
-                </a>
-              ))}
-            </div>
-
+            <p className="footer-copyright">
+              © {new Date().getFullYear()} {FOOTER_BRAND}. Бардык укуктар корголгон.
+            </p>
             <button type="button" className="footer-top-btn" onClick={scrollTop} aria-label="Жогору">
               <ChevronUp className="h-4 w-4" />
             </button>

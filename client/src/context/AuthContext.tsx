@@ -7,7 +7,9 @@ import {
   clearStoredAuth,
   detectStoredSessionKind,
   fetchMe,
+  confirmCodeRequest,
   forgotPasswordRequest,
+  isRegisterPending,
   loadStoredAuth,
   loginUserRequest,
   registerRequest,
@@ -21,6 +23,7 @@ import {
   type UpdateProfileInput,
 } from '../lib/auth-api';
 import { authKeys } from '../lib/auth-keys';
+import { enrollmentKeys } from '../hooks/useMyEnrollments';
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -31,13 +34,14 @@ type AuthContextValue = {
   isUser: boolean;
   loginUser: (input: LoginInput) => Promise<void>;
   loginAdmin: (input: LoginInput) => Promise<void>;
-  register: (input: RegisterInput) => Promise<void>;
+  register: (input: RegisterInput) => Promise<{ needsConfirmation: true; email: string; message: string } | void>;
+  confirmCode: (input: { email: string; code: string }) => Promise<void>;
   logout: () => void;
   updateProfile: (input: UpdateProfileInput) => Promise<void>;
-  forgotPassword: (email: string) => Promise<{ message: string; code?: string }>;
+  forgotPassword: (input: { email: string }) => Promise<{ message: string }>;
   resetPassword: (input: {
     token: string;
-    email?: string;
+    email: string;
     password: string;
     confirmPassword: string;
   }) => Promise<{ message: string }>;
@@ -85,6 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSessionKind(kind);
       setToken(nextToken);
       queryClient.setQueryData(authKeys.me(), user);
+      if (kind === 'user') {
+        void queryClient.invalidateQueries({ queryKey: enrollmentKeys.mine() });
+        queryClient.removeQueries({ queryKey: ['course-progress'] });
+      }
     },
     [queryClient],
   );
@@ -95,6 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionKind(null);
     setToken(null);
     queryClient.removeQueries({ queryKey: authKeys.all });
+    queryClient.removeQueries({ queryKey: enrollmentKeys.all });
+    queryClient.removeQueries({ queryKey: ['course-progress'] });
   }, [queryClient, sessionKind]);
 
   useEffect(() => {
@@ -137,6 +147,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...input,
         email: input.email.trim().toLowerCase(),
       }),
+    onSuccess: (result) => {
+      if (isRegisterPending(result)) return;
+      applySession('user', result.token, result.user);
+      navigate('/', { replace: true });
+    },
+  });
+
+  const confirmCodeMutation = useMutation({
+    mutationFn: confirmCodeRequest,
     onSuccess: (session) => applySession('user', session.token, session.user),
   });
 
@@ -153,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const forgotPasswordMutation = useMutation({
-    mutationFn: (email: string) => forgotPasswordRequest(email.trim().toLowerCase()),
+    mutationFn: (input: { email: string }) => forgotPasswordRequest(input),
   });
 
   const resetPasswordMutation = useMutation({
@@ -166,6 +185,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearSession();
       if (kind === 'admin') {
         navigate('/admin/login', { replace: true });
+      } else {
+        navigate('/', { replace: true });
       }
     },
   });
@@ -173,8 +194,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginUser = useCallback(
     async (input: LoginInput) => {
       await loginUserMutation.mutateAsync(input);
+      navigate('/', { replace: true });
     },
-    [loginUserMutation],
+    [loginUserMutation, navigate],
   );
 
   const loginAdmin = useCallback(
@@ -186,9 +208,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (input: RegisterInput) => {
-      await registerMutation.mutateAsync(input);
+      const result = await registerMutation.mutateAsync(input);
+      if (isRegisterPending(result)) {
+        return { needsConfirmation: true as const, email: result.email, message: result.message };
+      }
     },
     [registerMutation],
+  );
+
+  const confirmCode = useCallback(
+    async (input: { email: string; code: string }) => {
+      await confirmCodeMutation.mutateAsync(input);
+      navigate('/', { replace: true });
+    },
+    [confirmCodeMutation, navigate],
   );
 
   const logout = useCallback(() => {
@@ -203,13 +236,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const forgotPassword = useCallback(
-    async (email: string) => forgotPasswordMutation.mutateAsync(email),
+    async (input: { email: string }) => forgotPasswordMutation.mutateAsync(input),
     [forgotPasswordMutation],
   );
 
   const resetPassword = useCallback(
-    async (input: { token: string; email?: string; password: string; confirmPassword: string }) =>
-      resetPasswordMutation.mutateAsync(input),
+    async (input: {
+      token: string;
+      email: string;
+      password: string;
+      confirmPassword: string;
+    }) => resetPasswordMutation.mutateAsync(input),
     [resetPasswordMutation],
   );
 
@@ -231,12 +268,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginUser,
       loginAdmin,
       register,
+      confirmCode,
       logout,
       updateProfile,
       forgotPassword,
       resetPassword,
       isLoggingIn: loginUserMutation.isPending || loginAdminMutation.isPending,
-      isRegistering: registerMutation.isPending,
+      isRegistering: registerMutation.isPending || confirmCodeMutation.isPending,
       isLoggingOut: logoutMutation.isPending,
     }),
     [
@@ -249,6 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginUser,
       loginAdmin,
       register,
+      confirmCode,
       logout,
       updateProfile,
       forgotPassword,
@@ -256,6 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginUserMutation.isPending,
       loginAdminMutation.isPending,
       registerMutation.isPending,
+      confirmCodeMutation.isPending,
       logoutMutation.isPending,
     ],
   );

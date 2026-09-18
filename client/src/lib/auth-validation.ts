@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeKgPhone } from './phone';
 
 const nameRegex = /^[\p{L}\s'-]+$/u;
 
@@ -6,23 +7,33 @@ export const passwordSchema = z
   .string()
   .min(8, 'Сыр сөз кеминде 8 символдон турушу керек')
   .max(128, 'Сыр сөз өтө узун')
-  .regex(/[a-zA-Z]/, 'Сыр сөздө жок дегенде бир тамга болушу керек')
+  .regex(/[a-zA-Zа-яА-ЯёЁөӨүҮңҢ]/, 'Сыр сөздө жок дегенде бир тамга болушу керек')
   .regex(/[0-9]/, 'Сыр сөздө жок дегенде бир сан болушу керек');
 
 export const emailSchema = z
   .string()
   .trim()
   .min(1, 'Электрондук почтаны толтуруңуз')
-  .email('Электрондук почта туура эмес');
+  .max(255, 'Электрондук почта өтө узун')
+  .toLowerCase()
+  .email('Электрондук почта туура эмес. Мисалы: aty@gmail.com')
+  .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value), 'Электрондук почта туура эмес');
 
-export const phoneSchema = z
+export const requiredPhoneSchema = z
   .string()
   .trim()
-  .optional()
-  .refine(
-    (value) => !value || /^\+?[0-9\s()-]{7,20}$/.test(value),
-    'Телефон туура эмес',
-  );
+  .min(1, 'Телефон номерин толтуруңуз')
+  .transform((value, ctx) => {
+    const phone = normalizeKgPhone(value);
+    if (!phone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Телефон туура эмес. Мисалы: +996 700 123 456',
+      });
+      return z.NEVER;
+    }
+    return phone;
+  });
 
 export const loginSchema = z.object({
   email: emailSchema,
@@ -44,7 +55,7 @@ export const registerSchema = z
       .max(100, 'Фамилия өтө узун')
       .regex(nameRegex, 'Фамилияда тек тамгалар болушу керек'),
     email: emailSchema,
-    phone: phoneSchema,
+    phone: requiredPhoneSchema,
     password: passwordSchema,
     confirmPassword: z.string().min(1, 'Сыр сөздү кайталаңыз'),
   })
@@ -57,25 +68,27 @@ export const forgotPasswordSchema = z.object({
   email: emailSchema,
 });
 
+export const confirmCodeSchema = z.object({
+  email: emailSchema,
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Код 6 сандан турушу керек'),
+});
+
 export const resetPasswordSchema = z
   .object({
-    token: z.string().trim().min(1, 'Кодду киргизиңиз'),
-    email: emailSchema.optional(),
+    token: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, 'Код 6 сандан турушу керек'),
+    email: emailSchema,
     password: passwordSchema,
     confirmPassword: z.string().min(1, 'Сыр сөздү кайталаңыз'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Сыр сөздөр дал келген жок',
     path: ['confirmPassword'],
-  })
-  .superRefine((data, ctx) => {
-    if (data.email && !/^\d{6}$/.test(data.token)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['token'],
-        message: 'Код 6 сандан турушу керек',
-      });
-    }
   });
 
 export type FieldErrors = Record<string, string>;

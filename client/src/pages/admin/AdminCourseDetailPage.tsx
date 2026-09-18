@@ -9,12 +9,13 @@ import {
   deleteAdminCourse,
   fetchAdminCourse,
   fetchAdminCourseLessons,
+  importAdminLessonsFromPlaylist,
   updateAdminCourse,
   type LessonDto,
 } from '../../lib/admin-courses-api';
 import { deleteLesson, updateLesson } from '../../lib/lesson-api';
 import { AdminSelect } from '../../components/admin/AdminSelect';
-import { getErrorMessage, toastError } from '../../lib/toast';
+import { getErrorMessage, toastError, toastSuccess } from '../../lib/toast';
 
 type LessonFormState = {
   title: string;
@@ -80,6 +81,8 @@ export function AdminCourseDetailPage() {
   const [showLessonForm, setShowLessonForm] = useState(false);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [lessonForm, setLessonForm] = useState<LessonFormState>(emptyLessonForm(1));
+  const [playlistUrl, setPlaylistUrl] = useState('');
+  const [importingPlaylist, setImportingPlaylist] = useState(false);
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
@@ -189,6 +192,41 @@ export function AdminCourseDetailPage() {
       toastError(getErrorMessage(err, 'Сабак сакталган жок'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImportPlaylist = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!token || !courseRef || isNew) return;
+    const url = playlistUrl.trim();
+    if (!url) {
+      toastError('YouTube плейлист шилтемесин коюңуз');
+      return;
+    }
+
+    const replace =
+      lessons.length > 0
+        ? window.confirm(
+            'Бул курста сабактар бар. OK — эскилерин өчүрүп, плейлисттен жаңысын коёт. Cancel — бар сабактарга кошулат.',
+          )
+        : false;
+
+    setImportingPlaylist(true);
+    try {
+      const result = await importAdminLessonsFromPlaylist(token, courseRef, {
+        playlistUrl: url,
+        replace,
+      });
+      await loadLessons();
+      toastSuccess(
+        result.skipped
+          ? `${result.imported} сабак кошулду, ${result.skipped} кайталанды.`
+          : `${result.imported} сабак плейлисттен кошулду.`,
+      );
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Плейлист импорттолгон жок'));
+    } finally {
+      setImportingPlaylist(false);
     }
   };
 
@@ -334,6 +372,27 @@ export function AdminCourseDetailPage() {
                 </button>
               </header>
 
+              <form className="admin-lesson-form" onSubmit={(e) => void handleImportPlaylist(e)}>
+                <h4 className="admin-lesson-form-title">Плейлисттен кошуу</h4>
+                <label className="qa-admin-field">
+                  <span className="qa-admin-label">YouTube плейлист</span>
+                  <input
+                    className="qa-admin-input"
+                    value={playlistUrl}
+                    onChange={(e) => setPlaylistUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/playlist?list=..."
+                  />
+                </label>
+                <p className="admin-user-empty" style={{ margin: 0 }}>
+                  YouTube Studio → Плейлист → Бөлүшүү → шилтемени ушул жерге коюңуз.
+                </p>
+                <div className="qa-admin-form-actions">
+                  <button type="submit" className="btn-gold qa-admin-btn" disabled={saving || importingPlaylist}>
+                    {importingPlaylist ? 'Импорттолууда...' : 'Плейлисттен кошуу'}
+                  </button>
+                </div>
+              </form>
+
               {showLessonForm ? (
                 <form className="admin-lesson-form" onSubmit={(e) => void handleSaveLesson(e)}>
                   <h4 className="admin-lesson-form-title">
@@ -349,7 +408,7 @@ export function AdminCourseDetailPage() {
                     />
                   </label>
                   <label className="qa-admin-field">
-                    <span className="qa-admin-label">YouTube шилтемesi</span>
+                    <span className="qa-admin-label">YouTube шилтемеси</span>
                     <input
                       className="qa-admin-input"
                       value={lessonForm.youtubeUrl}

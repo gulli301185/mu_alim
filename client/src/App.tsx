@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AppToaster } from './components/AppToaster';
 import { AuthProvider } from './context/AuthContext';
+import { SiteImagesProvider } from './context/SiteImagesContext';
 import { queryClient } from './lib/query-client';
 import { AdminLoginLayout, PublicLayout } from './components/AppLayouts';
 import { AdminDashboardLayout } from './components/admin/AdminDashboardLayout';
@@ -30,12 +31,14 @@ import { AdminTestsPage } from './pages/admin/AdminTestsPage';
 import { AdminSectionPlaceholder } from './pages/admin/AdminSectionPlaceholder';
 import { AdminReviewsPage } from './pages/admin/AdminReviewsPage';
 import { AdminHeroPage } from './pages/admin/AdminHeroPage';
+import { AdminUstazImagesPage } from './pages/admin/AdminUstazImagesPage';
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AuthProvider>
+        <SiteImagesProvider>
+          <AuthProvider>
           <AppToaster />
           <Routes>
             <Route element={<PublicLayout />}>
@@ -84,9 +87,10 @@ export default function App() {
                     element={<AdminSectionPlaceholder section="certificates" />}
                   />
                   <Route path="hadiths" element={<AdminSectionPlaceholder section="hadiths" />} />
-                  <Route path="teacher" element={<AdminSectionPlaceholder section="teacher" />} />
+                  <Route path="teacher" element={<Navigate to="/admin/questions" replace />} />
                   <Route path="reviews" element={<AdminReviewsPage />} />
                   <Route path="hero" element={<AdminHeroPage />} />
+                  <Route path="ustaz-images" element={<AdminUstazImagesPage />} />
                 </Route>
               </Route>
 
@@ -94,6 +98,7 @@ export default function App() {
             </Route>
           </Routes>
         </AuthProvider>
+        </SiteImagesProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

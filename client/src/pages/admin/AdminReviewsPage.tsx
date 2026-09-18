@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Check, Search, Star, Trash2, X } from 'lucide-react';
+import { Check, Pencil, Search, Star, Trash2, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { QaPagination } from '../../components/QaPagination';
 import { AdminSelect } from '../../components/admin/AdminSelect';
@@ -10,6 +10,8 @@ import {
   deleteReview,
   fetchAdminReviews,
   moderateReview,
+  updateAdminReview,
+  uploadAdminReviewVideo,
   type CourseReview,
   type ReviewStatus,
 } from '../../lib/reviews-api';
@@ -47,6 +49,10 @@ export function AdminReviewsPage() {
   const [displayName, setDisplayName] = useState('');
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -83,27 +89,67 @@ export function AdminReviewsPage() {
     });
   }, [token]);
 
+  const resetForm = () => {
+    setEditingId(null);
+    setComment('');
+    setVideoUrl('');
+    setVideoFile(null);
+    setFileInputKey((value) => value + 1);
+    setDisplayName('');
+    setRating(5);
+    setCourseRef((current) => current || courses[0]?.slug || '');
+  };
+
+  const startEdit = (item: CourseReview) => {
+    setEditingId(item.id);
+    setDisplayName(item.authorName);
+    setRating(item.rating);
+    setComment(item.comment ?? '');
+    setVideoUrl(item.videoUrl ?? '');
+    setVideoFile(null);
+    if (item.courseSlug) setCourseRef(item.courseSlug);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const runCreate = async (event: FormEvent) => {
     event.preventDefault();
-    if (!token || !courseRef || !comment.trim() || !displayName.trim()) return;
+    const hasVideo = Boolean(videoFile || videoUrl.trim());
+    if (!token || !courseRef || !displayName.trim() || (!comment.trim() && !hasVideo)) return;
     setSaving(true);
     try {
-      await createAdminReview(token, {
+      let uploadedUrl = videoUrl.trim() || undefined;
+      if (videoFile) {
+        uploadedUrl = (await uploadAdminReviewVideo(token, videoFile)).url;
+      }
+
+      const payload = {
         courseRef,
         rating,
-        comment: comment.trim(),
         displayName: displayName.trim(),
-      });
-      toastSuccess('Пикир кошулду');
-      setComment('');
-      setDisplayName('');
-      setRating(5);
-      setTab('approved');
-      setPage(1);
+        ...(comment.trim() ? { comment: comment.trim() } : { comment: '' }),
+        ...(uploadedUrl ? { videoUrl: uploadedUrl } : { videoUrl: '' }),
+      };
+
+      if (editingId) {
+        await updateAdminReview(token, editingId, payload);
+        toastSuccess('Пикир өзгөртүлдү');
+      } else {
+        await createAdminReview(token, {
+          courseRef,
+          rating,
+          displayName: displayName.trim(),
+          ...(comment.trim() ? { comment: comment.trim() } : {}),
+          ...(uploadedUrl ? { videoUrl: uploadedUrl } : {}),
+        });
+        toastSuccess('Пикир кошулду');
+        setTab('approved');
+        setPage(1);
+      }
+      resetForm();
       await queryClient.invalidateQueries({ queryKey: ['public-reviews'] });
       await load();
     } catch (err) {
-      toastError(getErrorMessage(err, 'Пикир кошулган жок'));
+      toastError(getErrorMessage(err, editingId ? 'Пикир өзгөртүлгөн жок' : 'Пикир кошулган жок'));
     } finally {
       setSaving(false);
     }
@@ -146,13 +192,13 @@ export function AdminReviewsPage() {
         <div>
           <h1 className="admin-section-title">Пикирлер</h1>
           <p className="admin-section-subtitle">
-            Жылдызды жана ысымды сиз толтурасыз — окуучунун отзывуна жараша · {total} пикир
+            Отзывду кошуу, өзгөртүү жана өчүрүү · {total} пикир
           </p>
         </div>
       </header>
 
       <form className="ui-card qa-admin-form" onSubmit={(event) => void runCreate(event)}>
-        <p className="qa-admin-label">Жаңы отзыв</p>
+        <p className="qa-admin-label">{editingId ? 'Отзывду өзгөртүү' : 'Жаңы отзыв'}</p>
         <div className="qa-admin-field">
           <label className="qa-admin-label" htmlFor="review-course">Курс</label>
           <AdminSelect
@@ -208,14 +254,40 @@ export function AdminReviewsPage() {
             maxLength={8000}
             value={comment}
             onChange={(event) => setComment(event.target.value)}
-            placeholder="Окуучунун отзывунун текстин бул жерге көчүрүңүз"
-            required
+            placeholder="Текст отзыв болсо бул жерге жазыңыз. Видео отзыв үчүн бош калтырса болот."
           />
         </div>
+        <div className="qa-admin-field">
+          <label className="qa-admin-label" htmlFor="review-video">Видео отзыв</label>
+          <input
+            id="review-video"
+            key={fileInputKey}
+            className="qa-admin-input"
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov"
+            onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
+          />
+          {videoFile ? (
+            <p className="admin-section-subtitle m-0">{videoFile.name}</p>
+          ) : videoUrl ? (
+            <p className="admin-section-subtitle m-0">Учурдагы видео: {videoUrl}</p>
+          ) : (
+            <p className="admin-section-subtitle m-0">Тексттин ордуна слайдерге видео отзыв кошулат.</p>
+          )}
+        </div>
         <div className="qa-admin-form-actions">
-          <button type="submit" className="btn-primary" disabled={saving || !courseRef || !displayName.trim()}>
-            {saving ? 'Сакталууда...' : 'Пикирди чыгаруу'}
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={saving || !courseRef || !displayName.trim() || (!comment.trim() && !videoFile && !videoUrl.trim())}
+          >
+            {saving ? 'Сакталууда...' : editingId ? 'Өзгөртүүлөрдү сактоо' : 'Пикирди чыгаруу'}
           </button>
+          {editingId ? (
+            <button type="button" className="qa-admin-btn qa-admin-btn-muted" onClick={resetForm} disabled={saving}>
+              Жокко чыгаруу
+            </button>
+          ) : null}
         </div>
       </form>
 
@@ -273,7 +345,7 @@ export function AdminReviewsPage() {
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id}>
+                <tr key={item.id} className={editingId === item.id ? 'admin-review-row-editing' : undefined}>
                   <td>
                     <strong>{item.authorName}</strong>
                     {item.authorEmail ? (
@@ -292,7 +364,13 @@ export function AdminReviewsPage() {
                       ))}
                     </span>
                   </td>
-                  <td className="admin-review-comment">{item.comment || '—'}</td>
+                  <td className="admin-review-comment">
+                    {item.videoUrl ? (
+                      <span>Видео отзыв{item.comment ? ` · ${item.comment}` : ''}</span>
+                    ) : (
+                      item.comment || '—'
+                    )}
+                  </td>
                   <td>
                     <span
                       className={`admin-users-status ${
@@ -308,6 +386,15 @@ export function AdminReviewsPage() {
                   </td>
                   <td>
                     <div className="admin-review-actions">
+                      <button
+                        type="button"
+                        className="admin-review-btn admin-review-btn-edit"
+                        disabled={busyId === item.id}
+                        onClick={() => startEdit(item)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Өзгөртүү
+                      </button>
                       {item.status !== 'approved' ? (
                         <button
                           type="button"

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { asyncHandler } from '../lib/async-handler.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { optionalAuth, requireAdmin, requireAuth } from '../middleware/auth.js';
 
 export const testsRouter = Router();
 
@@ -156,7 +156,7 @@ async function findFinalTestForCourse(courseId: string, activeOnly = false) {
       courseId,
       testType: 'final',
       lessonId: null,
-      ...(activeOnly ? { isActive: true, course: { courseType: 'paid' } } : {}),
+      ...(activeOnly ? { isActive: true } : {}),
     },
     include: {
       testQuestions: {
@@ -242,6 +242,54 @@ function gradeTestAnswers(
     total,
     passingScore: Number(test.passingScore),
     details,
+  };
+}
+
+const FINAL_TEST_FAIL_LIMIT = 3;
+const FINAL_TEST_LOCK_MS = 24 * 60 * 60 * 1000;
+
+type TestLockState = {
+  locked: boolean;
+  lockedUntil: string | null;
+  remainingAttempts: number;
+  failedInWindow: number;
+};
+
+async function getFinalTestLockState(userId: string, testId: string): Promise<TestLockState> {
+  const attempts = await prisma.testAttempt.findMany({
+    where: { userId, testId, completedAt: { not: null } },
+    orderBy: { completedAt: 'asc' },
+    select: { passed: true, completedAt: true },
+  });
+
+  let lastPassIndex = -1;
+  for (let i = 0; i < attempts.length; i += 1) {
+    if (attempts[i].passed) lastPassIndex = i;
+  }
+  const fails = attempts.slice(lastPassIndex + 1).filter((item) => !item.passed);
+  const now = Date.now();
+
+  let index = 0;
+  while (index + FINAL_TEST_FAIL_LIMIT <= fails.length) {
+    const third = fails[index + FINAL_TEST_FAIL_LIMIT - 1];
+    const lockedUntil = new Date((third.completedAt ?? new Date()).getTime() + FINAL_TEST_LOCK_MS);
+    if (now < lockedUntil.getTime()) {
+      return {
+        locked: true,
+        lockedUntil: lockedUntil.toISOString(),
+        remainingAttempts: 0,
+        failedInWindow: FINAL_TEST_FAIL_LIMIT,
+      };
+    }
+    index += FINAL_TEST_FAIL_LIMIT;
+  }
+
+  const leftover = fails.length - index;
+  return {
+    locked: false,
+    lockedUntil: null,
+    remainingAttempts: FINAL_TEST_FAIL_LIMIT - leftover,
+    failedInWindow: leftover,
   };
 }
 
@@ -363,10 +411,6 @@ testsRouter.post(
       res.status(404).json({ error: 'Курс табылган жок' });
       return;
     }
-    if (course.courseType !== 'paid') {
-      res.status(400).json({ error: 'Тесттер акылуу курстар үчүн гана түзүлөт' });
-      return;
-    }
 
     const existing = await prisma.test.findFirst({
       where: { courseId: course.id, testType: 'final', lessonId: null },
@@ -378,7 +422,7 @@ testsRouter.post(
     }
 
     const title = parsed.data.title?.trim() || `${course.title} — курстук тест`;
-    const passingScore = parsed.data.passingScore ?? 80;
+    const passingScore = parsed.data.passingScore ?? 90;
 
     const test = await prisma.$transaction(async (tx) => {
       const createdTest = await tx.test.create({
@@ -492,9 +536,10 @@ testsRouter.delete(
 
 testsRouter.get(
   '/courses/:courseRef/final-test',
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const course = await resolveCourseRef(req.params.courseRef);
-    if (!course || course.courseType !== 'paid') {
+    if (!course) {
       res.status(404).json({ error: 'Тест табылган жок' });
       return;
     }
@@ -509,21 +554,38 @@ testsRouter.get(
       .filter((item) => item.question?.isActive)
       .map((item) => toPublicQuestion(item.question));
 
+    const lock =
+      req.user?.role === 'user'
+        ? await getFinalTestLockState(req.user.id, test.id)
+        : {
+            locked: false,
+            lockedUntil: null,
+            remainingAttempts: FINAL_TEST_FAIL_LIMIT,
+            failedInWindow: 0,
+          };
+
     res.json({
       id: test.id,
       title: test.title,
       passingScore: Number(test.passingScore),
       questions,
+      ...lock,
     });
   }),
 );
 
 testsRouter.post(
   '/courses/:courseRef/final-test/grade',
+  requireAuth,
   asyncHandler(async (req, res) => {
     const parsed = gradeSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Маалымат туура эмес' });
+      return;
+    }
+
+    if (req.user!.role !== 'user') {
+      res.status(403).json({ error: 'Колдонуучу аккаунту керек' });
       return;
     }
 
@@ -539,6 +601,40 @@ testsRouter.post(
       return;
     }
 
-    res.json(gradeTestAnswers(test, parsed.data.answers));
+    const lock = await getFinalTestLockState(req.user!.id, test.id);
+    if (lock.locked) {
+      res.status(423).json({
+        error: 'Тесттен 3 жолу өтпөдүңүз. Даярданып, кайрадан тест тапшырыңыз.',
+        ...lock,
+      });
+      return;
+    }
+
+    const result = gradeTestAnswers(test, parsed.data.answers);
+    const now = new Date();
+    const previousCount = await prisma.testAttempt.count({
+      where: { userId: req.user!.id, testId: test.id },
+    });
+
+    await prisma.testAttempt.create({
+      data: {
+        userId: req.user!.id,
+        testId: test.id,
+        attemptNumber: previousCount + 1,
+        totalQuestions: result.total,
+        correctAnswers: result.correct,
+        score: result.scorePercent,
+        passed: result.passed,
+        startedAt: now,
+        completedAt: now,
+      },
+    });
+
+    const nextLock = await getFinalTestLockState(req.user!.id, test.id);
+
+    res.json({
+      ...result,
+      ...nextLock,
+    });
   }),
 );

@@ -6,6 +6,7 @@ export type CourseReview = {
   id: string;
   rating: number;
   comment: string | null;
+  videoUrl?: string | null;
   status: ReviewStatus;
   createdAt: string;
   updatedAt: string;
@@ -14,6 +15,10 @@ export type CourseReview = {
   courseSlug?: string;
   authorEmail?: string;
 };
+
+export function isVideoReview(review: CourseReview) {
+  return Boolean(review.videoUrl?.trim());
+}
 
 export type CourseReviewsResponse = {
   items: CourseReview[];
@@ -64,12 +69,30 @@ export async function fetchPublicReviews(options?: {
   return res.json() as Promise<PublicReviewsResponse>;
 }
 
+export async function uploadAdminReviewVideo(
+  token: string,
+  file: File,
+): Promise<{ url: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/reviews/upload-video`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': file.type || 'application/octet-stream',
+      'x-file-name': file.name,
+    },
+    body: file,
+  });
+  if (!res.ok) throw new Error(await readError(res, 'Видео жүктөлгөн жок'));
+  return res.json() as Promise<{ url: string }>;
+}
+
 export async function createAdminReview(
   token: string,
   input: {
     courseRef: string;
     rating: number;
-    comment: string;
+    comment?: string;
+    videoUrl?: string;
     displayName: string;
   },
 ): Promise<{ review: CourseReview }> {
@@ -131,14 +154,29 @@ export async function fetchAdminReviews(
   return res.json() as Promise<AdminReviewsResponse>;
 }
 
-export async function moderateReview(token: string, id: string, status: ReviewStatus) {
+export async function updateAdminReview(
+  token: string,
+  id: string,
+  input: {
+    courseRef?: string;
+    rating?: number;
+    comment?: string;
+    videoUrl?: string;
+    displayName?: string;
+    status?: ReviewStatus;
+  },
+): Promise<{ review: CourseReview }> {
   const res = await fetch(`${API_BASE}/api/admin/reviews/${id}`, {
     method: 'PATCH',
     headers: authHeaders(token),
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(await readError(res, 'Статус өзгөргөн жок'));
+  if (!res.ok) throw new Error(await readError(res, 'Пикир өзгөртүлгөн жок'));
   return res.json() as Promise<{ review: CourseReview }>;
+}
+
+export async function moderateReview(token: string, id: string, status: ReviewStatus) {
+  return updateAdminReview(token, id, { status });
 }
 
 export async function deleteReview(token: string, id: string) {

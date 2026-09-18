@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSiteImages } from '../context/SiteImagesContext';
+import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
 import { PasswordField } from './PasswordField';
 import { AuthTextField, Mail, User, Phone, KeyRound } from './AuthTextField';
 import { AuthApiError } from '../lib/auth-api';
 import { getErrorMessage, toastError, toastSuccess } from '../lib/toast';
 import {
+  confirmCodeSchema,
   forgotPasswordSchema,
   formatZodErrors,
   firstZodError,
@@ -26,13 +29,16 @@ type UserAuthModalProps = {
 const PASSWORD_HINT = 'Кеминде 8 символ, тамга жана сан';
 
 export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthModalProps) {
-  const { loginUser, register, forgotPassword, resetPassword, isLoggingIn, isRegistering } = useAuth();
+  const { loginUser, register, confirmCode, forgotPassword, resetPassword, isLoggingIn, isRegistering } = useAuth();
+  const { image } = useSiteImages();
   const [tab, setTab] = useState<AuthTab>(initialTab);
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
-  const [resetCodeHint, setResetCodeHint] = useState<string | null>(null);
   const [forgotStep, setForgotStep] = useState<'email' | 'reset'>('email');
+  const [registerStep, setRegisterStep] = useState<'form' | 'code'>('form');
+  const [registerCode, setRegisterCode] = useState('');
+  const [resendIn, setResendIn] = useState(0);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
@@ -52,11 +58,19 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
       setTab(initialTab);
       setFieldErrors({});
       setForgotMessage(null);
-      setResetCodeHint(null);
       setForgotStep('email');
+      setRegisterStep('form');
+      setRegisterCode('');
+      setResendIn(0);
       setResetForm({ token: '', password: '', confirmPassword: '' });
     }
   }, [open, initialTab]);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const id = window.setInterval(() => setResendIn((n) => (n <= 1 ? 0 : n - 1)), 1000);
+    return () => window.clearInterval(id);
+  }, [resendIn]);
 
   useEffect(() => {
     if (!open) return;
@@ -77,8 +91,10 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
     setTab(next);
     setFieldErrors({});
     setForgotMessage(null);
-    setResetCodeHint(null);
     setForgotStep('email');
+    setRegisterStep('form');
+    setRegisterCode('');
+    setResendIn(0);
     setResetForm({ token: '', password: '', confirmPassword: '' });
     bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -119,13 +135,20 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
 
     setLoading(true);
     try {
-      await register({
+      const result = await register({
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
         email: parsed.data.email,
-        phone: parsed.data.phone || undefined,
+        phone: parsed.data.phone,
         password: parsed.data.password,
       });
+      if (result?.needsConfirmation) {
+        setForgotMessage(result.message);
+        setRegisterStep('code');
+        setResendIn(59);
+        toastSuccess(result.message);
+        return;
+      }
       onClose();
     } catch (err) {
       if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
@@ -135,11 +158,47 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
     }
   };
 
+  const handleConfirmRegister = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFieldErrors({});
+    const parsed = confirmCodeSchema.safeParse({ email: registerForm.email, code: registerCode });
+    if (!parsed.success) {
+      setFieldErrors(formatZodErrors(parsed.error));
+      toastError(firstZodError(parsed.error));
+      return;
+    }
+    setLoading(true);
+    try {
+      await confirmCode(parsed.data);
+      toastSuccess('Сиз ийгиликтүү катталдыңыз!');
+      onClose();
+    } catch (err) {
+      if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
+      toastError(getErrorMessage(err, 'Код туура эмес'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async (email: string) => {
+    if (resendIn > 0 || !email) return;
+    setLoading(true);
+    try {
+      const result = await forgotPassword({ email });
+      setForgotMessage(result.message);
+      setResendIn(59);
+      toastSuccess(result.message);
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Код кайра жөнөтүлгөн жок'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleForgot = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFieldErrors({});
     setForgotMessage(null);
-    setResetCodeHint(null);
 
     const parsed = forgotPasswordSchema.safeParse({ email: forgotEmail });
     if (!parsed.success) {
@@ -150,17 +209,12 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
 
     setLoading(true);
     try {
-      const result = await forgotPassword(parsed.data.email);
-      if (!result.code) {
-        toastError('Бул почта менен аккаунт табылган жок. Катталган почтаны жазыңыз.');
-        setForgotMessage(result.message);
-        return;
-      }
-      setForgotMessage('Код ушул жерде чыгат — почтага кетпейт.');
-      setResetCodeHint(result.code);
-      setResetForm({ token: result.code, password: '', confirmPassword: '' });
+      const result = await forgotPassword({ email: parsed.data.email });
+      setForgotMessage(result.message);
+      setResetForm({ token: '', password: '', confirmPassword: '' });
       setForgotStep('reset');
-      toastSuccess(`Кодуңуз: ${result.code}`);
+      setResendIn(59);
+      toastSuccess(result.message);
     } catch (err) {
       if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
       toastError(getErrorMessage(err, 'Сурам ийгиликсиз'));
@@ -189,7 +243,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
     try {
       const result = await resetPassword(parsed.data);
       toastSuccess(result.message);
-      setLoginForm((form) => ({ ...form, email: forgotEmail, password: '' }));
+      setLoginForm((form) => ({ ...form, password: '' }));
       switchTab('login');
     } catch (err) {
       if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
@@ -213,20 +267,22 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
         </button>
 
         <div className="auth-modal-head">
-          <img src="/logo-mualim.png" alt="" className="auth-modal-logo" aria-hidden />
+          <img src={image(SITE_IMAGE_KEYS.logo)} alt="" className="auth-modal-logo" aria-hidden />
           <h2 id="user-auth-modal-title" className="auth-modal-title">
             {tab === 'forgot' ? 'Сыр сөздү калыбына келтирүү' : 'Колдонуучу каттоосу'}
           </h2>
           <p className="auth-modal-subtitle">
             {tab === 'forgot'
               ? forgotStep === 'reset'
-                ? 'Кодду жазып, жаңы сыр сөздү коюңуз'
-                : 'Электрондук почта дарегиңизди киргизиңиз'
-              : 'Кирүү же жаңы аккаунт түзүү'}
+                ? 'Почтадагы кодду жазып, жаңы сыр сөздү коюңуз. Спам папкасын да караңыз.'
+                : 'Электрондук почтаңызды киргизиңиз — код ошол жакка кетет'
+              : tab === 'register' && registerStep === 'code'
+                ? 'Почтаңызга жөнөтүлгөн 6 сандуу кодду киргизиңиз. Кирүүчү жана Спам папкаларын текшериңиз.'
+                : 'Кирүү же жаңы аккаунт түзүү'}
           </p>
         </div>
 
-        {tab !== 'forgot' ? (
+        {tab !== 'forgot' && !(tab === 'register' && registerStep === 'code') ? (
           <div className="auth-modal-tabs">
             <button
               type="button"
@@ -246,8 +302,6 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
         ) : null}
 
         <div className="auth-modal-body" ref={bodyRef}>
-          {tab === 'forgot' && forgotMessage ? <p className="auth-modal-success">{forgotMessage}</p> : null}
-
           {tab === 'login' ? (
             <form className="auth-modal-form" onSubmit={(e) => void handleLogin(e)} noValidate>
               <AuthTextField
@@ -281,6 +335,40 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
                 Аккаунтуңуз жокпу?{' '}
                 <button type="button" className="auth-modal-switch-btn" onClick={() => switchTab('register')}>
                   Катталуу
+                </button>
+              </p>
+            </form>
+          ) : tab === 'register' && registerStep === 'code' ? (
+            <form className="auth-modal-form" onSubmit={(e) => void handleConfirmRegister(e)} noValidate>
+              {forgotMessage ? <p className="auth-modal-success">{forgotMessage}</p> : null}
+              <AuthTextField
+                label="Код"
+                icon={KeyRound}
+                name="code"
+                placeholder="000000"
+                inputMode="numeric"
+                maxLength={6}
+                autoComplete="one-time-code"
+                value={registerCode}
+                onChange={(e) => setRegisterCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                error={fieldErrors.code}
+                hint={`${registerForm.email} дарегине жөнөтүлгөн код. Кирүүчү жана Спам папкаларын караңыз. 15 мүнөткө чейин жарактуу.`}
+              />
+              <button type="submit" className="btn-gold auth-modal-submit w-full" disabled={loading || isRegistering}>
+                {loading || isRegistering ? 'Текшерилүүдө...' : 'Ырастоо'}
+              </button>
+              <p className="auth-modal-switch">
+                {resendIn > 0 ? (
+                  <span>Кодду кайра жөнөтүү: 00:{String(resendIn).padStart(2, '0')}</span>
+                ) : (
+                  <button type="button" className="auth-modal-switch-btn" onClick={() => void handleResend(registerForm.email)}>
+                    Кодду дагы бир жолу жөнөтүү
+                  </button>
+                )}
+              </p>
+              <p className="auth-modal-switch">
+                <button type="button" className="auth-modal-switch-btn" onClick={() => setRegisterStep('form')}>
+                  ← Формага кайтуу
                 </button>
               </p>
             </form>
@@ -329,7 +417,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
                 value={registerForm.phone}
                 onChange={(e) => setRegisterForm((f) => ({ ...f, phone: e.target.value }))}
                 error={fieldErrors.phone}
-                hint="Милдеттүү эмес"
+                hint="Мисалы: +996 700 123 456"
               />
               <div className="auth-modal-password-row">
                 <PasswordField
@@ -379,13 +467,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
               />
               {forgotStep === 'reset' ? (
                 <>
-                  {resetCodeHint ? (
-                    <div className="auth-reset-code-box">
-                      <p className="auth-reset-code-label">Сиздин код</p>
-                      <p className="auth-reset-code-value">{resetCodeHint}</p>
-                      <p className="auth-reset-code-note">Почтага кетпейт. Ушул терезеде чыгат.</p>
-                    </div>
-                  ) : null}
+                  {forgotMessage ? <p className="auth-modal-success">{forgotMessage}</p> : null}
                   <AuthTextField
                     label="Код"
                     icon={KeyRound}
@@ -402,7 +484,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
                       }))
                     }
                     error={fieldErrors.token}
-                    hint="6 сандан турган код"
+                    hint="Почтаңызга келген 6 сандуу код. Кирүүчү жана Спам папкаларын караңыз."
                   />
                   <PasswordField
                     label="Жаңы сыр сөз"
@@ -424,6 +506,17 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
                     error={fieldErrors.confirmPassword}
                   />
                 </>
+              ) : null}
+              {forgotStep === 'reset' ? (
+                <p className="auth-modal-switch">
+                  {resendIn > 0 ? (
+                    <span>Кодду кайра жөнөтүү: 00:{String(resendIn).padStart(2, '0')}</span>
+                  ) : (
+                    <button type="button" className="auth-modal-switch-btn" onClick={() => void handleResend(forgotEmail)}>
+                      Кодду дагы бир жолу жөнөтүү
+                    </button>
+                  )}
+                </p>
               ) : null}
               <button type="submit" className="btn-gold auth-modal-submit w-full" disabled={loading}>
                 {loading

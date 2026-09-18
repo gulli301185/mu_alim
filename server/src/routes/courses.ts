@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { asyncHandler } from '../lib/async-handler.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { fetchYoutubePlaylistVideos } from '../lib/youtube-playlist.js';
 
 export const coursesRouter = Router();
 
@@ -53,7 +54,8 @@ function toPublicCourse(course: {
     level: course.level,
     isPopular: course.isPopular,
     lessonCount: course._count?.lessons ?? course.lessons?.length ?? 0,
-    introVideoId: firstLesson?.youtubeVideoId ?? null,
+    introVideoId:
+      course.courseType === 'free' ? (firstLesson?.youtubeVideoId ?? null) : null,
     introDurationSeconds: firstLesson?.durationSeconds ?? null,
   };
 }
@@ -446,5 +448,77 @@ coursesRouter.get(
         isPublished: lesson.isPublished,
       })),
     );
+  }),
+);
+
+const importPlaylistSchema = z.object({
+  playlistUrl: z.string().trim().min(1).max(500),
+  replace: z.boolean().optional(),
+});
+
+coursesRouter.post(
+  '/admin/courses/:courseRef/lessons/from-playlist',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const parsed = importPlaylistSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Плейлист шилтемеси туура эмес' });
+      return;
+    }
+
+    const course = await resolveCourseRef(req.params.courseRef);
+    if (!course) {
+      res.status(404).json({ error: 'Курс табылган жок' });
+      return;
+    }
+
+    let videos;
+    try {
+      videos = await fetchYoutubePlaylistVideos(parsed.data.playlistUrl);
+    } catch (err) {
+      res.status(400).json({
+        error: err instanceof Error ? err.message : 'Плейлист жүктөлгөн жок',
+      });
+      return;
+    }
+    const replace = Boolean(parsed.data.replace);
+
+    const created = await prisma.$transaction(async (tx) => {
+      if (replace) {
+        await tx.lesson.deleteMany({ where: { courseId: course.id } });
+      }
+
+      const existing = await tx.lesson.findMany({
+        where: { courseId: course.id },
+        select: { youtubeVideoId: true, lessonOrder: true },
+      });
+      const existingIds = new Set(existing.map((lesson) => lesson.youtubeVideoId));
+      const startOrder = existing.reduce((max, lesson) => Math.max(max, lesson.lessonOrder), 0);
+
+      const toCreate = videos
+        .filter((video) => !existingIds.has(video.videoId))
+        .map((video, index) => ({
+          courseId: course.id,
+          title: video.title.slice(0, 255),
+          description: null as string | null,
+          youtubeUrl: video.youtubeUrl,
+          youtubeVideoId: video.videoId,
+          durationSeconds: video.durationSeconds,
+          lessonOrder: startOrder + index + 1,
+          isPublished: true,
+        }));
+
+      if (toCreate.length > 0) {
+        await tx.lesson.createMany({ data: toCreate });
+      }
+
+      return {
+        imported: toCreate.length,
+        skipped: videos.length - toCreate.length,
+        total: videos.length,
+      };
+    });
+
+    res.json(created);
   }),
 );

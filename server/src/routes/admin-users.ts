@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
@@ -15,6 +16,10 @@ const listQuerySchema = z.object({
 
 const statusSchema = z.object({
   isActive: z.boolean(),
+});
+
+const grantEnrollmentSchema = z.object({
+  courseId: z.string().uuid(),
 });
 
 function toPublicUser(user: {
@@ -221,6 +226,121 @@ adminUsersRouter.get(
   }),
 );
 
+adminUsersRouter.post(
+  '/:id/enrollments',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const parsed = grantEnrollmentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Курс тандоо керек' });
+      return;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: req.params.id, role: 'user' },
+    });
+    if (!user) {
+      res.status(404).json({ error: 'Колдонуучу табылган жок' });
+      return;
+    }
+
+    const course = await prisma.course.findUnique({
+      where: { id: parsed.data.courseId },
+    });
+    if (!course) {
+      res.status(404).json({ error: 'Курс табылган жок' });
+      return;
+    }
+    if (course.courseType !== 'paid') {
+      res.status(400).json({ error: 'Бекер курс үчүн төлөм талап кылынбайт' });
+      return;
+    }
+
+    const now = new Date();
+    const existing = await prisma.enrollment.findUnique({
+      where: {
+        userId_courseId: { userId: user.id, courseId: course.id },
+      },
+    });
+
+    if (existing?.status === 'active') {
+      res.json({
+        enrollment: {
+          id: existing.id,
+          status: existing.status,
+          enrolledAt: existing.enrolledAt.toISOString(),
+          completedAt: existing.completedAt?.toISOString() ?? null,
+          course: toCourseSummary(course),
+        },
+        alreadyActive: true,
+      });
+      return;
+    }
+
+    const enrollment = await prisma.$transaction(async (tx) => {
+      const record = existing
+        ? await tx.enrollment.update({
+            where: { id: existing.id },
+            data: {
+              status: 'active',
+              enrolledAt: existing.enrolledAt,
+              completedAt: existing.completedAt,
+            },
+          })
+        : await tx.enrollment.create({
+            data: {
+              userId: user.id,
+              courseId: course.id,
+              status: 'active',
+              enrolledAt: now,
+            },
+          });
+
+      await tx.payment.create({
+        data: {
+          userId: user.id,
+          courseId: course.id,
+          amount: course.price,
+          currency: course.currency,
+          paymentMethod: 'whatsapp',
+          transactionId: `whatsapp-${randomUUID()}`,
+          status: 'success',
+          paidAt: now,
+          providerResponse: { source: 'admin_grant' },
+        },
+      });
+
+      const existingCourseProgress = await tx.courseProgress.findUnique({
+        where: { userId_courseId: { userId: user.id, courseId: course.id } },
+        select: { id: true },
+      });
+      if (!existingCourseProgress) {
+        await tx.courseProgress.create({
+          data: {
+            userId: user.id,
+            courseId: course.id,
+            progressPercent: 0,
+            isCompleted: false,
+          },
+        });
+      }
+
+      return record;
+    });
+
+    res.status(201).json({
+      enrollment: {
+        id: enrollment.id,
+        status: enrollment.status,
+        enrolledAt: enrollment.enrolledAt.toISOString(),
+        completedAt: enrollment.completedAt?.toISOString() ?? null,
+        course: toCourseSummary(course),
+      },
+      alreadyActive: false,
+    });
+  }),
+);
+
 adminUsersRouter.patch(
   '/:id/status',
   requireAdmin,
@@ -246,5 +366,28 @@ adminUsersRouter.patch(
     });
 
     res.json({ user: toPublicUser(updated) });
+  }),
+);
+
+adminUsersRouter.delete(
+  '/:id',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.user.findFirst({
+      where: { id: req.params.id, role: 'user' },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: 'Колдонуучу табылган жок' });
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.deleteMany({ where: { userId: existing.id } });
+      await tx.certificate.deleteMany({ where: { userId: existing.id } });
+      await tx.user.delete({ where: { id: existing.id } });
+    });
+
+    res.json({ ok: true });
   }),
 );

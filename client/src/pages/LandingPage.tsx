@@ -8,13 +8,16 @@ import {
   STATS, QUICK_ACCESS,
   EVENTS, TEACHER,
 } from '../data/landing';
-import { fetchCourses, fetchFreeLessons, formatCourseDuration } from '../lib/course-api';
+import { fetchCourses, fetchFreeLessons, formatCourseDuration, paidCourseCover } from '../lib/course-api';
 import { fetchDailyQa, todayBishkek } from '../lib/qa-api';
 import { DEFAULT_HERO, fetchHeroBanner } from '../lib/hero-api';
 import { youtubeThumbnail } from '../lib/youtube';
 import { FaqAccordion } from '../components/FaqAccordion';
 import { ReviewsFeed } from '../components/ReviewsFeed';
+import { TeacherQuestionForm } from '../components/TeacherQuestionForm';
 import { UzorCorners } from '../components/UzorCorners';
+import { useSiteImages } from '../context/SiteImagesContext';
+import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
 
 const STAT_ICONS = [Mic, Video, Users, Calendar];
 
@@ -61,9 +64,15 @@ function VideoPanelLink({
   className: string;
   children: ReactNode;
 }) {
-  if (external) {
+  const isExternal = external || href.startsWith('http');
+  if (isExternal) {
+    const isYoutube = href.includes('youtube.com') || href.includes('youtu.be');
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+      <a
+        href={href}
+        className={className}
+        {...(isYoutube ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+      >
         {children}
       </a>
     );
@@ -173,7 +182,7 @@ function PaidCoursesSection() {
             >
               <div className="course-card-video">
                 <img
-                  src={course.coverImage || youtubeThumbnail(course.introVideoId ?? 'mtKKIbWbRWc')}
+                  src={paidCourseCover(course)}
                   alt={course.title}
                   className="course-card-img"
                 />
@@ -286,6 +295,7 @@ function VideoPanel({
 }
 
 export function LandingPage() {
+  const { image } = useSiteImages();
   const { data: hero } = useQuery({
     queryKey: ['hero-banner'],
     queryFn: fetchHeroBanner,
@@ -309,6 +319,7 @@ export function LandingPage() {
         duration: formatCourseDuration(lesson.durationSeconds),
         thumbnail: youtubeThumbnail(lesson.youtubeVideoId),
         href: `/courses/${lesson.courseSlug}/learn?lesson=${lesson.id}`,
+        external: false,
         date: dateMatch ? dateMatch[0] : undefined,
         badge: 'Бекер',
       };
@@ -424,10 +435,12 @@ export function LandingPage() {
           <div className="ustaz-teaser-card">
               <div className="ustaz-teaser-photo-wrap">
                 <img
-                  src="/ustaz-blue.png?v=3"
-                  alt={TEACHER.quote}
-                  className="ustaz-teaser-photo"
+                  src={image(SITE_IMAGE_KEYS.landingUstazBg)}
+                  alt=""
+                  className="ustaz-teaser-bg-photo"
+                  aria-hidden
                 />
+                <div className="ustaz-teaser-bg-wash" aria-hidden />
               </div>
 
               <div className="ustaz-teaser-wave" aria-hidden>
@@ -446,16 +459,38 @@ export function LandingPage() {
               </div>
 
               <div className="ustaz-teaser-body">
-                <p className="ustaz-teaser-label">Устаз жөнүндө</p>
-                <h2 className="ustaz-teaser-name">{TEACHER.name}</h2>
-                <p className="ustaz-teaser-text">{TEACHER.teaserBio}</p>
-                <Link to="/ustaz" className="btn-gold ustaz-teaser-btn">
-                  Кененирээк
-                </Link>
+                <div className="ustaz-teaser-banner-wrap">
+                  <img
+                    src={image(SITE_IMAGE_KEYS.landingUstazTeaser)}
+                    alt={TEACHER.name}
+                    className="ustaz-teaser-banner"
+                  />
+                </div>
+                <div className="ustaz-teaser-body-copy">
+                  <p className="ustaz-teaser-label">УСТАЗ ЖӨНҮНДӨ</p>
+                  <div className="ustaz-teaser-text">
+                    <p>
+                      Мухаммадалим Исаков — ислам билимин заманбап окутуу менен айкалыштырып,
+                      терең жана системалуу окутуу менен бирге адамдын руханий өсүшүнө жана
+                      үй-бүлөлөрдүн бекем болушуна салым кошуп келет.
+                    </p>
+                    <p>
+                      Ал Кыргызстандагы алгачкы «Үй-бүлө бактысы» курсун түптөп, үй-бүлө
+                      баалуулуктарын бекемдөө менен бирге, бул багытты мамлекеттик деңгээлде
+                      өнүктүрүүгө жана коомдун бекем пайдубалын түзүүгө умтулат.
+                    </p>
+
+                  </div>
+                  <Link to="/ustaz" className="btn-gold ustaz-teaser-btn">
+                    Кененирээк
+                  </Link>
+                </div>
               </div>
           </div>
         </div>
       </section>
+
+      <TeacherQuestionForm />
     </>
   );
 }

@@ -2,10 +2,11 @@ export type LessonDto = {
   id: string;
   title: string;
   description?: string | null;
-  youtubeVideoId: string;
+  youtubeVideoId: string | null;
   durationSeconds?: number | null;
   lessonOrder: number;
   isPublished: boolean;
+  locked?: boolean;
 };
 
 export type CreateLessonInput = {
@@ -30,8 +31,16 @@ async function parseApiError(res: Response, fallback: string) {
   }
 }
 
-export async function getLessonsByCourse(courseId: string): Promise<LessonDto[]> {
-  const res = await fetch(`${API_BASE}/api/courses/${encodeURIComponent(courseId)}/lessons`);
+export async function getLessonsByCourse(
+  courseId: string,
+  token?: string | null,
+): Promise<LessonDto[]> {
+  const headers: HeadersInit = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/api/courses/${encodeURIComponent(courseId)}/lessons`, {
+    headers,
+  });
   if (res.status === 404) throw new Error('Курс табылган жок');
   if (!res.ok) throw new Error(await parseApiError(res, 'Сабактар жүктөлбөдү'));
   return res.json();

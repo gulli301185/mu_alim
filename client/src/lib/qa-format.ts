@@ -5,10 +5,10 @@ export type { QuestionArticle, QuestionSort } from './qa-api';
 export const QUESTIONS_PER_PAGE = 10;
 
 export const QUESTION_SORT_OPTIONS: { value: QuestionSort; label: string }[] = [
-  { value: 'default', label: '№ боюнча (1, 2, 3…)' },
-  { value: 'newest', label: 'Алгач жаңылары' },
-  { value: 'oldest', label: 'Алгач эскилери' },
-  { value: 'popular', label: 'Алгач популярдуулары' },
+  { value: 'default', label: '№ боюнча' },
+  { value: 'newest', label: 'Жаңылары' },
+  { value: 'oldest', label: 'Эскилери' },
+  { value: 'popular', label: 'Популярдуусу' },
 ];
 
 export function formatQuestionDate(iso: string) {

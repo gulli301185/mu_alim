@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, ThumbsUp } from 'lucide-react';
-import type { CourseReview } from '../lib/reviews-api';
+import { isVideoReview, type CourseReview } from '../lib/reviews-api';
 import { ReviewPostCard } from './ReviewPostCard';
+import { useSiteImages } from '../context/SiteImagesContext';
+import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
 
 export function ReviewCoverSlide({ title }: { title: string }) {
+  const { image } = useSiteImages();
+
   return (
     <article className="otzyv-cover">
-      <img src="/sky-hero.jpg" alt="" className="otzyv-cover-photo" />
-      <img src="/oyu-hero.jpg" alt="" className="otzyv-cover-oyu" />
+      <img src={image(SITE_IMAGE_KEYS.reviewSky)} alt="" className="otzyv-cover-photo" />
+      <img src={image(SITE_IMAGE_KEYS.reviewOyu)} alt="" className="otzyv-cover-oyu" />
       <div className="otzyv-cover-wash" />
       <div className="otzyv-cover-logos">
         <div className="otzyv-cover-brand">
-          <img src="/logo-mualim.png" alt="" />
+          <img src={image(SITE_IMAGE_KEYS.logo)} alt="" />
         </div>
       </div>
       <div className="otzyv-cover-copy">
@@ -57,15 +61,16 @@ export function ReviewCarousel({
   items: CourseReview[];
 }) {
   const [index, setIndex] = useState(0);
-  const newestId = items[0]?.id ?? '';
+  const textItems = items.filter((item) => !isVideoReview(item));
+  const newestId = textItems[0]?.id ?? '';
 
   useEffect(() => {
     setIndex(0);
-  }, [newestId, items.length]);
+  }, [newestId, textItems.length]);
 
   const slides: ReactNode[] = [
     <ReviewCoverSlide key="cover" title={title} />,
-    ...items.map((item) => <ReviewPostCard key={item.id} review={item} />),
+    ...textItems.map((item) => <ReviewPostCard key={item.id} review={item} />),
   ];
   const last = slides.length - 1;
 

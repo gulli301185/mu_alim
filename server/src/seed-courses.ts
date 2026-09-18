@@ -98,6 +98,11 @@ async function seedPaidCourses(paidCategoryId: string) {
       },
     });
 
+    const existingLessonCount = await prisma.lesson.count({ where: { courseId: course.id } });
+    if (existingLessonCount > 1) {
+      continue;
+    }
+
     const introSeconds = parseDurationToSeconds(courseSeed.intro.duration);
     const introExisting = await prisma.lesson.findFirst({
       where: { courseId: course.id, lessonOrder: 1 },

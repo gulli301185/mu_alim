@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCourses } from '../lib/course-api';
-import { fetchPublicReviews, type CourseReview } from '../lib/reviews-api';
+import { fetchPublicReviews, isVideoReview, type CourseReview } from '../lib/reviews-api';
 import { ReviewCoverSlide, coverTitleForCourse } from './ReviewCarousel';
 import { ReviewModal } from './ReviewModal';
+import { VideoReviewFeed } from './ReviewPostCard';
 
 type ReviewRow = {
   slug: string;
@@ -28,9 +29,11 @@ export function ReviewsFeed() {
   const items = reviewsQuery.data?.items ?? [];
   const courses = coursesQuery.data?.items ?? [];
 
-  const rows = useMemo(() => {
-    const bySlug = new Map<string, typeof items>();
-    for (const item of items) {
+  const { rows, videoItems } = useMemo(() => {
+    const textItems = items.filter((item) => !isVideoReview(item));
+    const videos = items.filter(isVideoReview);
+    const bySlug = new Map<string, typeof textItems>();
+    for (const item of textItems) {
       const slug = item.courseSlug || 'other';
       const list = bySlug.get(slug) ?? [];
       list.push(item);
@@ -58,7 +61,7 @@ export function ReviewsFeed() {
       });
     }
 
-    return result;
+    return { rows: result, videoItems: videos };
   }, [courses, items]);
 
   const loading = reviewsQuery.isLoading || coursesQuery.isLoading;
@@ -68,18 +71,21 @@ export function ReviewsFeed() {
       {loading ? (
         <p className="otzyv-status">Жүктөлүүдө...</p>
       ) : (
-        <div className="otzyv-stack">
-          {rows.map((row) => (
-            <button
-              key={row.slug}
-              type="button"
-              className="otzyv-stage otzyv-card-open"
-              onClick={() => setOpenRow(row)}
-            >
-              <ReviewCoverSlide title={row.title} />
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="otzyv-stack">
+            {rows.map((row) => (
+              <button
+                key={row.slug}
+                type="button"
+                className="otzyv-stage otzyv-card-open"
+                onClick={() => setOpenRow(row)}
+              >
+                <ReviewCoverSlide title={row.title} />
+              </button>
+            ))}
+          </div>
+          {videoItems.length > 0 ? <VideoReviewFeed items={videoItems} /> : null}
+        </>
       )}
       {openRow ? (
         <ReviewModal

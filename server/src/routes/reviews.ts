@@ -1,8 +1,15 @@
-import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, extname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import express, { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { asyncHandler } from '../lib/async-handler.js';
 import { optionalAuth, requireAdmin, requireAuth } from '../middleware/auth.js';
+
+const VIDEO_UPLOAD_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../uploads/reviews');
+const VIDEO_EXTS = new Set(['.mp4', '.m4v', '.webm', '.mov']);
 
 export const reviewsRouter = Router();
 
@@ -21,6 +28,7 @@ function toReviewDto(review: {
   id: string;
   rating: number;
   comment: string | null;
+  videoUrl?: string | null;
   displayName?: string | null;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: Date;
@@ -33,6 +41,7 @@ function toReviewDto(review: {
     id: review.id,
     rating: review.rating,
     comment: review.comment,
+    videoUrl: review.videoUrl ?? null,
     status: review.status,
     createdAt: review.createdAt.toISOString(),
     updatedAt: review.updatedAt.toISOString(),
@@ -40,6 +49,10 @@ function toReviewDto(review: {
     courseTitle: review.course?.title,
     courseSlug: review.course?.slug,
   };
+}
+
+function hasPublicReviewContent(review: { comment: string | null; videoUrl?: string | null }) {
+  return Boolean(review.comment?.trim() || review.videoUrl?.trim());
 }
 
 const listQuerySchema = z.object({
@@ -60,17 +73,31 @@ const adminListQuerySchema = z.object({
   q: z.string().trim().optional(),
 });
 
-const adminCreateSchema = z.object({
-  courseRef: z.string().trim().min(1),
-  rating: z.coerce.number().int().min(1).max(5),
-  comment: z.string().trim().min(1).max(8000),
-  displayName: z.string().trim().min(1).max(150),
-  status: z.enum(['pending', 'approved', 'rejected']).optional(),
-});
+const adminCreateSchema = z
+  .object({
+    courseRef: z.string().trim().min(1),
+    rating: z.coerce.number().int().min(1).max(5),
+    comment: z.string().trim().max(8000).optional(),
+    videoUrl: z.string().trim().max(500).optional(),
+    displayName: z.string().trim().min(1).max(150),
+    status: z.enum(['pending', 'approved', 'rejected']).optional(),
+  })
+  .refine((data) => Boolean(data.comment?.trim() || data.videoUrl?.trim()), {
+    message: 'Текст же видео керек',
+  });
 
-const moderateSchema = z.object({
-  status: z.enum(['pending', 'approved', 'rejected']),
-});
+const adminUpdateSchema = z
+  .object({
+    courseRef: z.string().trim().min(1).optional(),
+    rating: z.coerce.number().int().min(1).max(5).optional(),
+    comment: z.string().trim().max(8000).optional(),
+    videoUrl: z.string().trim().max(500).optional(),
+    displayName: z.string().trim().min(1).max(150).optional(),
+    status: z.enum(['pending', 'approved', 'rejected']).optional(),
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    message: 'Өзгөртүү керек',
+  });
 
 reviewsRouter.get(
   '/reviews',
@@ -84,7 +111,7 @@ reviewsRouter.get(
     const skip = (page - 1) * limit;
     const where = {
       status: 'approved' as const,
-      comment: { not: null },
+      OR: [{ comment: { not: null } }, { videoUrl: { not: null } }],
     };
 
     const [items, total] = await Promise.all([
@@ -101,10 +128,10 @@ reviewsRouter.get(
       prisma.review.count({ where }),
     ]);
 
-    const withText = items.filter((item) => item.comment?.trim());
+    const visible = items.filter(hasPublicReviewContent);
 
     res.json({
-      items: withText.map(toReviewDto),
+      items: visible.map(toReviewDto),
       total,
       page,
       totalPages: Math.max(1, Math.ceil(total / limit)),
@@ -260,12 +287,37 @@ reviewsRouter.get(
 );
 
 reviewsRouter.post(
+  '/admin/reviews/upload-video',
+  requireAdmin,
+  express.raw({ type: '*/*', limit: '80mb' }),
+  asyncHandler(async (req, res) => {
+    const rawName = String(req.headers['x-file-name'] || 'review.mp4');
+    const ext = extname(rawName).toLowerCase();
+    if (!VIDEO_EXTS.has(ext)) {
+      res.status(400).json({ error: 'mp4, m4v, webm же mov видео керек' });
+      return;
+    }
+
+    const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from([]);
+    if (!buffer.length) {
+      res.status(400).json({ error: 'Видео файлы бош' });
+      return;
+    }
+
+    await mkdir(VIDEO_UPLOAD_DIR, { recursive: true });
+    const fileName = `${randomUUID()}${ext}`;
+    await writeFile(resolve(VIDEO_UPLOAD_DIR, fileName), buffer);
+    res.status(201).json({ url: `/uploads/reviews/${fileName}` });
+  }),
+);
+
+reviewsRouter.post(
   '/admin/reviews',
   requireAdmin,
   asyncHandler(async (req, res) => {
     const parsed = adminCreateSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Курс, отзыв жазган адамдын аты жана текст керек' });
+      res.status(400).json({ error: 'Курс, отзыв жазган адамдын аты жана текст же видео керек' });
       return;
     }
 
@@ -275,12 +327,15 @@ reviewsRouter.post(
       return;
     }
 
+    const comment = parsed.data.comment?.trim() || null;
+    const videoUrl = parsed.data.videoUrl?.trim() || null;
     const review = await prisma.review.create({
       data: {
         userId: req.user!.id,
         courseId: course.id,
         rating: parsed.data.rating,
-        comment: parsed.data.comment,
+        comment,
+        videoUrl,
         displayName: parsed.data.displayName.trim(),
         isAdminPosted: true,
         status: parsed.data.status ?? 'approved',
@@ -299,9 +354,9 @@ reviewsRouter.patch(
   '/admin/reviews/:id',
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const parsed = moderateSchema.safeParse(req.body);
+    const parsed = adminUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Статус туура эмес' });
+      res.status(400).json({ error: 'Маалымат туура эмес' });
       return;
     }
 
@@ -311,9 +366,27 @@ reviewsRouter.patch(
       return;
     }
 
+    const data = parsed.data;
+    let courseId = existing.courseId;
+    if (data.courseRef) {
+      const course = await resolveCourseRef(data.courseRef);
+      if (!course) {
+        res.status(404).json({ error: 'Курс табылган жок' });
+        return;
+      }
+      courseId = course.id;
+    }
+
     const review = await prisma.review.update({
       where: { id: existing.id },
-      data: { status: parsed.data.status },
+      data: {
+        courseId,
+        ...(data.rating !== undefined ? { rating: data.rating } : {}),
+        ...(data.comment !== undefined ? { comment: data.comment.trim() || null } : {}),
+        ...(data.videoUrl !== undefined ? { videoUrl: data.videoUrl.trim() || null } : {}),
+        ...(data.displayName !== undefined ? { displayName: data.displayName } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {}),
+      },
       include: {
         user: { select: { firstName: true, lastName: true } },
         course: { select: { title: true, slug: true } },

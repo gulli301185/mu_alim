@@ -74,7 +74,7 @@ export function AdminTestsPage() {
 
   const [courseSlug, setCourseSlug] = useState('');
   const [title, setTitle] = useState('');
-  const [passingScore, setPassingScore] = useState('80');
+  const [passingScore, setPassingScore] = useState('90');
   const [questions, setQuestions] = useState<CreateTestQuestionInput[]>([emptyChoiceQuestion()]);
 
   const coursesWithTest = useMemo(
@@ -120,7 +120,7 @@ export function AdminTestsPage() {
   const resetForm = () => {
     setCourseSlug(paidCourses.find((c) => !coursesWithTest.has(c.slug))?.slug ?? paidCourses[0]?.slug ?? '');
     setTitle('');
-    setPassingScore('80');
+    setPassingScore('90');
     setQuestions([emptyChoiceQuestion()]);
     setEditingId(null);
   };
@@ -188,7 +188,7 @@ export function AdminTestsPage() {
     try {
       const payload = {
         title: title.trim() || undefined,
-        passingScore: Number(passingScore) || 80,
+        passingScore: Number(passingScore) || 90,
         questions: prepared,
       };
 

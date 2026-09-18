@@ -3,6 +3,8 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LogOut, Menu, Moon, Sun, X } from 'lucide-react';
 import { ADMIN_NAV, findAdminNavItem } from '../../data/admin-nav';
 import { useAuth } from '../../context/AuthContext';
+import { useSiteImages } from '../../context/SiteImagesContext';
+import { SITE_IMAGE_KEYS } from '../../lib/site-images-api';
 import { getUserDisplayName } from '../../lib/auth-api';
 
 function getInitialDark(): boolean {
@@ -14,6 +16,7 @@ function getInitialDark(): boolean {
 
 export function AdminDashboardLayout() {
   const { user, logout, isLoggingOut } = useAuth();
+  const { image } = useSiteImages();
   const { pathname } = useLocation();
   const [dark, setDark] = useState(getInitialDark);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -39,7 +42,7 @@ export function AdminDashboardLayout() {
       <aside className={`admin-sidebar${sidebarOpen ? ' admin-sidebar-open' : ''}`}>
         <div className="admin-sidebar-head">
           <NavLink to="/admin" className="admin-sidebar-brand" onClick={() => setSidebarOpen(false)}>
-            <img src="/logo-mualim.png" alt="" className="admin-sidebar-logo" />
+            <img src={image(SITE_IMAGE_KEYS.logo)} alt="" className="admin-sidebar-logo" />
             <span>
               <strong>МУАЛИМ</strong>
               <small>Админ панель</small>

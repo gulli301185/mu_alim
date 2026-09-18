@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Maximize2, Minimize2, Play } from 'lucide-react';
 
 type CourseYoutubePlayerProps = {
@@ -6,6 +6,7 @@ type CourseYoutubePlayerProps = {
   title: string;
   onWatchComplete?: () => void;
   requireFullWatch?: boolean;
+  allowSpeedControl?: boolean;
 };
 
 type YtPlayer = {
@@ -18,6 +19,8 @@ type YtPlayer = {
   pauseVideo: () => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   loadVideoById: (options: string | { videoId: string; startSeconds?: number }) => void;
+  setPlaybackRate?: (rate: number) => void;
+  getPlaybackRate?: () => number;
 };
 
 declare global {
@@ -78,12 +81,33 @@ const PLAYING = 1;
 const PAUSED = 2;
 const SEEK_JUMP_SECONDS = 4;
 const PROGRESS_TICK_MS = 1000;
+const PLAYBACK_RATES = [1, 1.25, 1.5, 1.75, 2] as const;
+
+function formatVideoTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+  const total = Math.floor(seconds);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+const PROTECTED_PLAYER_VARS = {
+  rel: 0,
+  modestbranding: 1,
+  playsinline: 1,
+  fs: 0,
+  controls: 0,
+  disablekb: 1,
+  enablejsapi: 1,
+  iv_load_policy: 3,
+};
 
 export function CourseYoutubePlayer({
   videoId,
   title,
   onWatchComplete,
   requireFullWatch = true,
+  allowSpeedControl = !requireFullWatch,
 }: CourseYoutubePlayerProps) {
   const reactId = useId().replace(/:/g, '');
   const playerHostId = `yt-player-${reactId}`;
@@ -99,8 +123,55 @@ export function CourseYoutubePlayer({
   const [endedCover, setEndedCover] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [playbackRate, setPlaybackRateState] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const playbackRateRef = useRef(1);
+  const isSeekingRef = useRef(false);
   const videoIdRef = useRef(videoId);
   const embedRef = useRef<HTMLDivElement | null>(null);
+
+  const applyPlaybackRate = useCallback(
+    (player?: YtPlayer | null) => {
+      const target = player ?? playerRef.current;
+      if (!target?.setPlaybackRate || !allowSpeedControl) return;
+      try {
+        target.setPlaybackRate(playbackRateRef.current);
+      } catch {
+        /* player not ready */
+      }
+    },
+    [allowSpeedControl],
+  );
+
+  const handleSpeedChange = (rate: number) => {
+    playbackRateRef.current = rate;
+    setPlaybackRateState(rate);
+    applyPlaybackRate();
+  };
+
+  const handleSeek = useCallback(
+    (seconds: number) => {
+      const player = playerRef.current;
+      if (!player || !allowSpeedControl) return;
+      const dur = player.getDuration() || duration;
+      if (!dur || dur <= 0) return;
+      const clamped = Math.max(0, Math.min(seconds, dur));
+      player.seekTo(clamped, true);
+      lastKnownTimeRef.current = clamped;
+      setCurrentTime(clamped);
+      applyPlaybackRate(player);
+    },
+    [allowSpeedControl, duration, applyPlaybackRate],
+  );
+
+  useEffect(() => {
+    playbackRateRef.current = playbackRate;
+  }, [playbackRate]);
+
+  useEffect(() => {
+    applyPlaybackRate();
+  }, [playbackRate, allowSpeedControl, isPlaying, applyPlaybackRate]);
 
   useEffect(() => {
     onWatchCompleteRef.current = onWatchComplete;
@@ -151,6 +222,11 @@ export function CourseYoutubePlayer({
     setSeekNotice(false);
     setEndedCover(false);
     setIsPlaying(false);
+    setPlaybackRateState(1);
+    playbackRateRef.current = 1;
+    setCurrentTime(0);
+    setDuration(0);
+    isSeekingRef.current = false;
 
     if (!requireFullWatch) {
       onWatchCompleteRef.current?.();
@@ -193,14 +269,29 @@ export function CourseYoutubePlayer({
       return false;
     };
 
+    const trackPlaybackTime = (player: YtPlayer) => {
+      const current = player.getCurrentTime();
+      if (player.getPlayerState() === PLAYING && current >= lastKnownTimeRef.current) {
+        lastKnownTimeRef.current = current;
+      }
+    };
+
     const updateProgress = () => {
       const player = playerRef.current;
-      if (!player || completedRef.current || !requireFullWatch) {
-        if (player && requireFullWatch) keepAssignedVideo(player);
+      if (!player) return;
+
+      if (!keepAssignedVideo(player)) return;
+
+      if (!requireFullWatch) {
+        trackPlaybackTime(player);
+        const dur = player.getDuration();
+        const cur = player.getCurrentTime();
+        if (dur > 0) setDuration(dur);
+        if (!isSeekingRef.current && dur > 0) setCurrentTime(cur);
         return;
       }
 
-      if (!keepAssignedVideo(player)) return;
+      if (completedRef.current) return;
 
       const duration = player.getDuration();
       const current = player.getCurrentTime();
@@ -244,10 +335,7 @@ export function CourseYoutubePlayer({
         width: '100%',
         height: '100%',
         playerVars: {
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          fs: 0,
+          ...PROTECTED_PLAYER_VARS,
           origin: window.location.origin,
         },
         events: {
@@ -255,9 +343,10 @@ export function CourseYoutubePlayer({
             playerRef.current = event.target;
             const iframe = document.querySelector<HTMLIFrameElement>(`#${playerHostId} iframe`);
             if (iframe) iframe.style.pointerEvents = 'none';
-            if (requireFullWatch) {
-              progressTimer = window.setInterval(updateProgress, PROGRESS_TICK_MS);
+            if (allowSpeedControl && event.target.setPlaybackRate) {
+              applyPlaybackRate(event.target);
             }
+            progressTimer = window.setInterval(updateProgress, PROGRESS_TICK_MS);
           },
           onStateChange: (event) => {
             const player = event.target;
@@ -266,9 +355,19 @@ export function CourseYoutubePlayer({
             if (event.data === PLAYING) setIsPlaying(true);
             if (event.data === PAUSED || event.data === ENDED) setIsPlaying(false);
 
-            if (!requireFullWatch) return;
-
             keepAssignedVideo(player);
+
+            if (!requireFullWatch) {
+              if (event.data === PLAYING) {
+                applyPlaybackRate(player);
+              }
+              if (event.data === ENDED) {
+                player.seekTo(0, true);
+                player.pauseVideo();
+                lastKnownTimeRef.current = 0;
+              }
+              return;
+            }
 
             if (event.data === ENDED) {
               const duration = player.getDuration();
@@ -305,7 +404,7 @@ export function CourseYoutubePlayer({
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [videoId, requireFullWatch]);
+  }, [videoId, requireFullWatch, allowSpeedControl, applyPlaybackRate]);
 
   return (
     <div className="course-learn-youtube-wrap">
@@ -317,6 +416,8 @@ export function CourseYoutubePlayer({
         <div id={playerHostId} className="course-learn-youtube-host" title={title} />
         <div className="course-learn-yt-chrome-block" aria-hidden />
         <div className="course-learn-yt-chrome-block-bottom" aria-hidden />
+        <div className="course-learn-yt-chrome-block-side course-learn-yt-chrome-block-side-left" aria-hidden />
+        <div className="course-learn-yt-chrome-block-side course-learn-yt-chrome-block-side-right" aria-hidden />
         {!endedCover ? (
           <button
             type="button"
@@ -326,7 +427,10 @@ export function CourseYoutubePlayer({
               const player = playerRef.current;
               if (!player) return;
               if (player.getPlayerState() === PLAYING) player.pauseVideo();
-              else player.playVideo();
+              else {
+                applyPlaybackRate(player);
+                player.playVideo();
+              }
             }}
           >
             {!isPlaying ? (
@@ -347,15 +451,73 @@ export function CourseYoutubePlayer({
         >
           {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
         </button>
-        {requireFullWatch && seekNotice ? (
+        {seekNotice ? (
           <p className="course-learn-video-notice">
-            Бул сабакта башка видеого өтүүгө жана алдыга секирүүгө болбойт
+            {requireFullWatch
+              ? 'Бул сабакта башка видеого өтүүгө жана алдыга секирүүгө болбойт'
+              : 'Башка видеого же YouTube каналына өтүүгө болбойт'}
           </p>
         ) : null}
         {requireFullWatch && endedCover ? (
           <div className="course-learn-yt-end-cover">
             <p>Сабак аякталды</p>
             <span>Төмөнкү «Улантуу» баскычын басыңыз</span>
+          </div>
+        ) : null}
+        {allowSpeedControl ? (
+          <div className="course-learn-playback-controls-embed">
+            <div
+              className="course-learn-playback-speed course-learn-playback-speed-embed"
+              role="group"
+              aria-label="Видео ылдамдыгы"
+            >
+              <span className="course-learn-playback-speed-label">Ылдамдык:</span>
+              {PLAYBACK_RATES.map((rate) => (
+                <button
+                  key={rate}
+                  type="button"
+                  className={`course-learn-playback-speed-btn${
+                    playbackRate === rate ? ' course-learn-playback-speed-btn-active' : ''
+                  }`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleSpeedChange(rate);
+                  }}
+                >
+                  {rate === 1 ? '1×' : `${rate}×`}
+                </button>
+              ))}
+            </div>
+            <div className="course-learn-playback-seek-row">
+              <span className="course-learn-playback-time">{formatVideoTime(currentTime)}</span>
+              <input
+                type="range"
+                className="course-learn-playback-seek"
+                min={0}
+                max={Math.max(duration, 1)}
+                step={1}
+                value={Math.min(currentTime, Math.max(duration, 1))}
+                aria-label="Видео убакыты"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  isSeekingRef.current = true;
+                }}
+                onChange={(event) => {
+                  event.stopPropagation();
+                  const next = Number(event.target.value);
+                  setCurrentTime(next);
+                  handleSeek(next);
+                }}
+                onPointerUp={(event) => {
+                  event.stopPropagation();
+                  isSeekingRef.current = false;
+                }}
+                onPointerCancel={() => {
+                  isSeekingRef.current = false;
+                }}
+              />
+              <span className="course-learn-playback-time">{formatVideoTime(duration)}</span>
+            </div>
           </div>
         ) : null}
       </div>

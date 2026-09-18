@@ -130,6 +130,33 @@ export async function updateAdminUserStatus(
   return data.user;
 }
 
+export async function deleteAdminUser(token: string, userId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw await parseApiError(res, 'Колдонуучуну өчүрүү ийгиликсиз');
+}
+
+export type GrantEnrollmentResponse = {
+  enrollment: AdminUserEnrollment;
+  alreadyActive: boolean;
+};
+
+export async function grantAdminUserEnrollment(
+  token: string,
+  userId: string,
+  courseId: string,
+): Promise<GrantEnrollmentResponse> {
+  const res = await fetch(`${API_BASE}/api/admin/users/${userId}/enrollments`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ courseId }),
+  });
+  if (!res.ok) throw await parseApiError(res, 'Доступ берүү ийгиликсиз');
+  return res.json() as Promise<GrantEnrollmentResponse>;
+}
+
 export function getAdminUserDisplayName(user: Pick<AdminUser, 'firstName' | 'lastName' | 'email'>) {
   return `${user.firstName} ${user.lastName}`.trim() || user.email;
 }

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { getUserDisplayName } from '../lib/auth-api';
 import { getErrorMessage, toastError, toastSuccess } from '../lib/toast';
 import { PasswordField } from '../components/PasswordField';
+import { emailSchema, firstZodError, formatZodErrors, requiredPhoneSchema } from '../lib/auth-validation';
 
 export function ProfilePage() {
   const { user, loading, updateProfile, logout } = useAuth();
@@ -51,13 +52,25 @@ export function ProfilePage() {
       return;
     }
 
+    const emailParsed = emailSchema.safeParse(email);
+    if (!emailParsed.success) {
+      toastError(firstZodError(emailParsed.error));
+      return;
+    }
+
+    const phoneParsed = requiredPhoneSchema.safeParse(phone);
+    if (!phoneParsed.success) {
+      toastError(firstZodError(phoneParsed.error) || formatZodErrors(phoneParsed.error).phone);
+      return;
+    }
+
     setSaving(true);
     try {
       await updateProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: email.trim(),
-        phone: phone.trim() || null,
+        email: emailParsed.data,
+        phone: phoneParsed.data,
         ...(newPassword
           ? { currentPassword, newPassword }
           : {}),
@@ -164,6 +177,7 @@ export function ProfilePage() {
                     className="auth-modal-input"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+996 700 123 456"
                     autoComplete="tel"
                   />
                 </span>

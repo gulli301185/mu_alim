@@ -76,8 +76,14 @@ export async function fetchCourseByRef(courseRef: string): Promise<CourseSummary
   return data.course;
 }
 
-export function isFreeCourse(course: Pick<CourseSummary, 'courseType'>) {
-  return course.courseType === 'free';
+export const PAID_COURSE_COVER = '/ustaz-teaser.jpg';
+
+export function paidCourseCover(course: Pick<CourseSummary, 'coverImage'>) {
+  return course.coverImage || PAID_COURSE_COVER;
+}
+
+export function isFreeCourse(course: Pick<CourseSummary, 'courseType' | 'slug'>) {
+  return course.courseType === 'free' || course.slug === 'free-bayanlar';
 }
 
 export const FREE_COURSE_LEARN_PATH = '/courses/free-bayanlar/learn';

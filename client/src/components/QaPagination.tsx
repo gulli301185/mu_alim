@@ -29,9 +29,10 @@ export function QaPagination({ currentPage, totalPages, onPageChange }: QaPagina
         className="qa-page-nav-btn qa-page-nav-btn-prev"
         disabled={currentPage <= 1}
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        aria-label="Алдыңкы"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
-        Алдыңкы
+        <span className="qa-page-nav-label">Алдыңкы</span>
       </button>
 
       <div className="qa-pagination-nums-wrap">
@@ -70,8 +71,9 @@ export function QaPagination({ currentPage, totalPages, onPageChange }: QaPagina
         className="qa-page-nav-btn qa-page-nav-btn-next"
         disabled={currentPage >= totalPages}
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        aria-label="Кийинки"
       >
-        Кийинки
+        <span className="qa-page-nav-label">Кийинки</span>
         <ChevronRight className="h-4 w-4" aria-hidden />
       </button>
     </nav>

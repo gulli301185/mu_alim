@@ -4,6 +4,8 @@ import { Plus, Search, X } from 'lucide-react';
 import { QaPagination } from '../components/QaPagination';
 import { QaTelegramCard } from '../components/QaTelegramCard';
 import { QaAdminForm } from '../components/QaAdminForm';
+import { TeacherQuestionPendingSection } from '../components/TeacherQuestionPendingSection';
+import { TeacherQuestionForm } from '../components/TeacherQuestionForm';
 import { useAuth } from '../context/AuthContext';
 import { QUESTIONS_PER_PAGE, QUESTION_SORT_OPTIONS } from '../lib/qa-format';
 import { highlightText } from '../lib/search-highlight';
@@ -15,6 +17,8 @@ import {
   type QuestionSort,
 } from '../lib/qa-api';
 import { getErrorMessage, toastError } from '../lib/toast';
+import { useSiteImages } from '../context/SiteImagesContext';
+import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
 
 const SORT_VALUES = new Set<QuestionSort>(['default', 'newest', 'oldest', 'popular']);
 
@@ -101,6 +105,7 @@ function QaAdminList({
 }
 
 export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
+  const { image } = useSiteImages();
   const { isAdmin, token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [queryInput, setQueryInput] = useState(() => searchParams.get('q') ?? '');
@@ -236,6 +241,8 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
             </button>
           </header>
 
+          <TeacherQuestionPendingSection onPublished={() => void load()} />
+
           {showCreate ? (
             <div className="auth-modal-overlay" role="presentation" onClick={() => setShowCreate(false)}>
               <div
@@ -315,62 +322,63 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   }
 
   return (
-    <section className="qa-page">
+    <>
+      <section className="qa-page">
       <div className="wrap qa-page-wrap">
+        <div className="qa-sort-row" role="group" aria-label="Сорттоо">
+          {QUESTION_SORT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`qa-sort-btn${sort === option.value ? ' qa-sort-btn-active' : ''}`}
+              onClick={() => updateParams({ sort: option.value, page: '1' })}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <header className="qa-page-header">
           <div>
-            <p className="qa-page-kicker">Жаңы бөлүм · 2025-жылдан тартып толукталат</p>
             <h1 className="qa-page-title">Суроо-жооп</h1>
             <p className="qa-page-subtitle">Диний суроолорго жооптор — Муалим академиясы</p>
           </div>
         </header>
 
-        <div className="qa-toolbar ui-card">
-          <label className="qa-search">
-            <Search className="h-4 w-4 qa-search-icon" aria-hidden />
-            <input
-              type="search"
-              className="qa-search-input"
-              placeholder="Сөз же номер менен издөө (мисалы: 153)"
-              value={queryInput}
-              onChange={(e) => setQueryInput(e.target.value)}
-            />
-          </label>
-
-          <div className="qa-sort-row" role="group" aria-label="Сорттоо">
-            {QUESTION_SORT_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`qa-sort-btn${sort === option.value ? ' qa-sort-btn-active' : ''}`}
-                onClick={() => updateParams({ sort: option.value, page: '1' })}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          {!loading && sort !== 'default' && sortLabel ? (
-            <p className="qa-sort-note">
-              Бардык {total} суроонун ичинен иреттелди · {sortLabel.toLowerCase()} · {currentPage}-бет
-            </p>
-          ) : null}
+        <div className="qa-toolbar">
+            <label className="qa-search">
+              <Search className="h-4 w-4 qa-search-icon" aria-hidden />
+              <input
+                type="search"
+                className="qa-search-input"
+                placeholder="Сөз же номер менен издөө (мисалы: 153)"
+                value={queryInput}
+                onChange={(e) => setQueryInput(e.target.value)}
+              />
+            </label>
+            {!loading && sort !== 'default' && sortLabel ? (
+              <p className="qa-sort-note">
+                Бардык {total} суроонун ичинен иреттелди · {sortLabel.toLowerCase()} · {currentPage}-бет
+              </p>
+            ) : null}
         </div>
 
-        {error ? (
-          <div className="qa-empty ui-card">
-            <p>{error}</p>
-            <button type="button" className="btn-primary qa-back-btn" onClick={() => void load()}>
-              Кайра аракет кылуу
-            </button>
-          </div>
-        ) : null}
-
         <div className="qa-main">
-          {loading ? (
+          {error ? (
+            <div className="qa-empty ui-card">
+              <p>{error}</p>
+              <button type="button" className="btn-primary qa-back-btn" onClick={() => void load()}>
+                Кайра аракет кылуу
+              </button>
+            </div>
+          ) : null}
+
+          {!error && loading ? (
             <div className="qa-empty ui-card">
               <p>Жүктөлүүдө...</p>
             </div>
-          ) : (
+          ) : null}
+
+          {!error && !loading ? (
             <ul className="qa-articles">
               {items.map((article) => (
                 <li key={article.slug ?? article.id}>
@@ -384,7 +392,7 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
 
           {!loading && !error && items.length === 0 && (
             <div className="qa-empty ui-card">
@@ -400,7 +408,21 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
             />
           )}
         </div>
+
+        <aside className="qa-page-visual">
+          <img
+            src={image(SITE_IMAGE_KEYS.qaScene)}
+            alt=""
+            className="qa-page-visual-bg"
+            loading="lazy"
+            decoding="async"
+            aria-hidden
+          />
+        </aside>
       </div>
     </section>
+
+      <TeacherQuestionForm />
+    </>
   );
 }

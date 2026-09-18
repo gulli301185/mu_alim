@@ -17,6 +17,10 @@ export type CourseTestPayload = {
   title: string;
   passingScore: number;
   questions: PublicTestQuestion[];
+  locked?: boolean;
+  lockedUntil?: string | null;
+  remainingAttempts?: number;
+  failedInWindow?: number;
 };
 
 export type GradeTestAnswer = {
@@ -44,12 +48,27 @@ export type GradeTestResult = {
   total: number;
   passingScore: number;
   details: GradeTestDetail[];
+  locked?: boolean;
+  lockedUntil?: string | null;
+  remainingAttempts?: number;
+  failedInWindow?: number;
 };
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
-export async function fetchCourseFinalTest(courseRef: string): Promise<CourseTestPayload | null> {
-  const res = await fetch(`${API_BASE}/api/courses/${encodeURIComponent(courseRef)}/final-test`);
+function authHeaders(token?: string | null): HeadersInit {
+  return token
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    : { 'Content-Type': 'application/json' };
+}
+
+export async function fetchCourseFinalTest(
+  courseRef: string,
+  token?: string | null,
+): Promise<CourseTestPayload | null> {
+  const res = await fetch(`${API_BASE}/api/courses/${encodeURIComponent(courseRef)}/final-test`, {
+    headers: authHeaders(token),
+  });
   if (res.status === 404) return null;
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -58,21 +77,40 @@ export async function fetchCourseFinalTest(courseRef: string): Promise<CourseTes
   return res.json() as Promise<CourseTestPayload>;
 }
 
+export class TestLockedError extends Error {
+  lockedUntil: string | null;
+
+  constructor(message: string, lockedUntil: string | null) {
+    super(message);
+    this.name = 'TestLockedError';
+    this.lockedUntil = lockedUntil;
+  }
+}
+
 export async function gradeCourseFinalTest(
   courseRef: string,
   answers: GradeTestAnswer[],
+  token?: string | null,
 ): Promise<GradeTestResult> {
   const res = await fetch(
     `${API_BASE}/api/courses/${encodeURIComponent(courseRef)}/final-test/grade`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(token),
       body: JSON.stringify({ answers }),
     },
   );
+  const data = (await res.json().catch(() => null)) as
+    | (GradeTestResult & { error?: string })
+    | null;
+  if (res.status === 423) {
+    throw new TestLockedError(
+      data?.error ?? 'Тесттен 3 жолу өтпөдүңүз. Даярданып, кайрадан тест тапшырыңыз.',
+      data?.lockedUntil ?? null,
+    );
+  }
   if (!res.ok) {
-    const data = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new Error(data?.error ?? 'Тест тапшырылган жок');
   }
-  return res.json() as Promise<GradeTestResult>;
+  return data as GradeTestResult;
 }

@@ -2,25 +2,49 @@ import { useState, useRef, useEffect, type RefObject } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Moon, Sun, Globe, Menu, X, ChevronDown, User, LogOut, Shield } from 'lucide-react';
 import { NAV_PRIMARY, NAV_MENU, LANG_OPTIONS, type LangCode } from '../data/landing';
-import { UserAuthModal } from './UserAuthModal';
+import { useAuthModal } from '../context/AuthModalContext';
+import { useContactPanel } from '../context/ContactPanelContext';
 import { useAuth } from '../context/AuthContext';
+import { useSiteImages } from '../context/SiteImagesContext';
+import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
 import { getUserDisplayName, type AuthUser } from '../lib/auth-api';
 
 function navClass(isActive: boolean) {
   return isActive ? 'nav-active nav-link' : 'nav-link';
 }
 
+const CONTACT_HREF = '/#contact';
+
 function HeaderNavLink({
   href,
   label,
   onClick,
   isHashActive,
+  onOpenContact,
+  contactOpen,
 }: {
   href: string;
   label: string;
   onClick?: () => void;
   isHashActive?: (href: string) => boolean;
+  onOpenContact?: () => void;
+  contactOpen?: boolean;
 }) {
+  if (href === CONTACT_HREF) {
+    return (
+      <button
+        type="button"
+        className={navClass(contactOpen ?? false)}
+        onClick={() => {
+          onOpenContact?.();
+          onClick?.();
+        }}
+      >
+        {label}
+      </button>
+    );
+  }
+
   if (href.startsWith('/#')) {
     return (
       <a
@@ -45,12 +69,16 @@ function MenuDropdown({
   onClose,
   menuRef,
   isHashActive,
+  onOpenContact,
+  contactOpen,
 }: {
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
   menuRef: RefObject<HTMLDivElement | null>;
   isHashActive: (href: string) => boolean;
+  onOpenContact?: () => void;
+  contactOpen?: boolean;
 }) {
   return (
     <div className="header-menu-wrap" ref={menuRef}>
@@ -67,7 +95,19 @@ function MenuDropdown({
       {open && (
         <div className="header-dropdown">
           {NAV_MENU.map((item) =>
-            item.href.startsWith('/#') ? (
+            item.href === CONTACT_HREF ? (
+              <button
+                key={item.label}
+                type="button"
+                className={`header-dropdown-link${contactOpen ? ' header-dropdown-link-active' : ''}`}
+                onClick={() => {
+                  onOpenContact?.();
+                  onClose();
+                }}
+              >
+                {item.label}
+              </button>
+            ) : item.href.startsWith('/#') ? (
               <a
                 key={item.label}
                 href={item.href}
@@ -235,14 +275,15 @@ export function Header({
   adminSimple?: boolean;
 }) {
   const { user, loading, logout, isLoggingOut, isAdmin } = useAuth();
+  const { openAuth } = useAuthModal();
+  const { contactOpen, openContact, closeContact } = useContactPanel();
+  const { image } = useSiteImages();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lang, setLang] = useState<LangCode>(() => {
     const saved = localStorage.getItem('lang');
     return saved === 'ru' || saved === 'en' || saved === 'kg' ? saved : 'kg';
   });
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
   const menuRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
 
@@ -262,7 +303,8 @@ export function Header({
   useEffect(() => {
     setMobileOpen(false);
     setMenuOpen(false);
-  }, [pathname]);
+    closeContact();
+  }, [pathname, closeContact]);
 
   useEffect(() => {
     localStorage.setItem('lang', lang);
@@ -274,10 +316,14 @@ export function Header({
     setMenuOpen(false);
   };
 
-  const openAuth = (tab: 'login' | 'register' = 'login') => {
+  const openAuthModal = (tab: 'login' | 'register' = 'login') => {
     if (adminArea || isAdmin) return;
-    setAuthTab(tab);
-    setAuthOpen(true);
+    openAuth(tab);
+    closeAll();
+  };
+
+  const openContactPanel = () => {
+    openContact();
     closeAll();
   };
 
@@ -289,6 +335,8 @@ export function Header({
         label={item.label}
         onClick={onClick}
         isHashActive={isHashActive}
+        onOpenContact={openContactPanel}
+        contactOpen={contactOpen}
       />
     ));
 
@@ -301,7 +349,7 @@ export function Header({
             to={adminArea || isAdmin ? '/admin/questions' : '/'}
             className="header-logo no-underline shrink-0"
           >
-            <img src="/logo-mualim.png" alt="" className="header-logo-img" aria-hidden />
+            <img src={image(SITE_IMAGE_KEYS.logo)} alt="" className="header-logo-img" aria-hidden />
             <span className="header-brand-wordmark" aria-label="Mualim Academy">
               <span className="header-brand-wordmark-text">
                 <span className="header-brand-wordmark-gold">Mu</span>
@@ -326,6 +374,8 @@ export function Header({
                 onClose={() => setMenuOpen(false)}
                 menuRef={menuRef}
                 isHashActive={isHashActive}
+                onOpenContact={openContactPanel}
+                contactOpen={contactOpen}
               />
             </nav>
           ) : (
@@ -335,12 +385,12 @@ export function Header({
           <div className="header-actions">
             {!adminSimple ? (
               <>
-                <button type="button" onClick={onToggle} className="theme-btn hidden sm:flex" aria-label="Тема">
+                <button type="button" onClick={onToggle} className="theme-btn hidden lg:flex" aria-label="Тема">
                   {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
                   <span className="hidden md:inline">{dark ? 'Жарык' : 'Караңгы'}</span>
                 </button>
 
-                <div className="header-lang-wrap hidden sm:inline-flex">
+                <div className="header-lang-wrap hidden lg:inline-flex">
                   <Globe className="h-4 w-4 header-lang-icon" aria-hidden />
                   <select
                     className="header-lang-select"
@@ -365,8 +415,8 @@ export function Header({
                   user={user}
                   isAdmin={isAdmin}
                   isLoggingOut={isLoggingOut}
-                  onLogin={() => openAuth('login')}
-                  onRegister={() => openAuth('register')}
+                  onLogin={() => openAuthModal('login')}
+                  onRegister={() => openAuthModal('register')}
                   onLogout={logout}
                 />
               ) : isAdmin ? (
@@ -375,8 +425,8 @@ export function Header({
                   user={user}
                   isAdmin={isAdmin}
                   isLoggingOut={isLoggingOut}
-                  onLogin={() => openAuth('login')}
-                  onRegister={() => openAuth('register')}
+                  onLogin={() => openAuthModal('login')}
+                  onRegister={() => openAuthModal('register')}
                   onLogout={logout}
                 />
               ) : null}
@@ -409,15 +459,32 @@ export function Header({
             </div>
             <p className="header-mobile-label">Меню</p>
             <div className="header-mobile-group">{renderMenuLinks(closeAll)}</div>
-            <button
-              type="button"
-              onClick={() => { onToggle(); closeAll(); }}
-              className="theme-btn theme-btn-mobile w-full justify-center mt-3"
-              aria-label="Тема"
-            >
-              {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-              {dark ? 'Жарык' : 'Караңгы'}
-            </button>
+            <div className="header-mobile-tools">
+              <div className="header-lang-wrap header-lang-wrap-mobile">
+                <Globe className="h-4 w-4 header-lang-icon" aria-hidden />
+                <select
+                  className="header-lang-select"
+                  value={lang}
+                  aria-label="Тил тандоо"
+                  onChange={(e) => setLang(e.target.value as LangCode)}
+                >
+                  {LANG_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => { onToggle(); closeAll(); }}
+                className="theme-btn theme-btn-mobile"
+                aria-label="Тема"
+              >
+                {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                {dark ? 'Жарык' : 'Караңгы'}
+              </button>
+            </div>
             {!loading && user && !isAdmin ? (
               <div className="header-mobile-user">
                 <UserMenu onCloseMobile={closeAll} />
@@ -435,13 +502,25 @@ export function Header({
                   {isLoggingOut ? 'Чыгууда...' : 'Logout'}
                 </button>
               </div>
+            ) : !loading && user && isAdmin ? (
+              <div className="header-mobile-auth">
+                <button
+                  type="button"
+                  className="header-logout-btn header-login-btn-mobile"
+                  onClick={() => { logout(); closeAll(); }}
+                  disabled={isLoggingOut}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoggingOut ? 'Чыгууда...' : 'Чыгуу'}
+                </button>
+              </div>
             ) : (
               <div className="header-mobile-auth">
-                <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuth('login')}>
+                <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuthModal('login')}>
                   <User className="h-4 w-4" />
                   Кирүү
                 </button>
-                <button type="button" className="header-register-btn header-login-btn-mobile" onClick={() => openAuth('register')}>
+                <button type="button" className="header-register-btn header-login-btn-mobile" onClick={() => openAuthModal('register')}>
                   Катталуу
                 </button>
               </div>
@@ -465,9 +544,6 @@ export function Header({
         </div>
       </div>
 
-      {!adminArea ? (
-        <UserAuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab={authTab} />
-      ) : null}
     </header>
   );
 }

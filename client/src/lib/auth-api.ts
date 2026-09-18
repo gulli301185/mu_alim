@@ -32,7 +32,7 @@ export type RegisterInput = {
   firstName: string;
   lastName: string;
   email: string;
-  phone?: string;
+  phone: string;
   password: string;
 };
 
@@ -151,29 +151,49 @@ export async function adminLoginRequest(input: LoginInput): Promise<AuthSession>
   return res.json() as Promise<AuthSession>;
 }
 
-export async function registerRequest(input: RegisterInput): Promise<AuthSession> {
+export type RegisterPending = {
+  needsConfirmation: true;
+  email: string;
+  message: string;
+};
+
+export function isRegisterPending(value: AuthSession | RegisterPending): value is RegisterPending {
+  return 'needsConfirmation' in value && value.needsConfirmation;
+}
+
+export async function registerRequest(input: RegisterInput): Promise<AuthSession | RegisterPending> {
   const res = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw await parseApiError(res, 'Каттоо ийгиликсиз');
+  return res.json() as Promise<AuthSession | RegisterPending>;
+}
+
+export async function confirmCodeRequest(input: { email: string; code: string }): Promise<AuthSession> {
+  const res = await fetch(`${API_BASE}/api/auth/confirm-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw await parseApiError(res, 'Код туура эмес');
   return res.json() as Promise<AuthSession>;
 }
 
-export async function forgotPasswordRequest(email: string): Promise<{ message: string; code?: string }> {
+export async function forgotPasswordRequest(input: { email: string }): Promise<{ message: string }> {
   const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify(input),
   });
   if (!res.ok) throw await parseApiError(res, 'Сурам ийгиликсиз');
-  return res.json() as Promise<{ message: string; code?: string }>;
+  return res.json() as Promise<{ message: string }>;
 }
 
 export async function resetPasswordRequest(input: {
   token: string;
-  email?: string;
+  email: string;
   password: string;
   confirmPassword: string;
 }): Promise<{ message: string }> {

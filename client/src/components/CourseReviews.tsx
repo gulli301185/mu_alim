@@ -5,9 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import {
   fetchCourseReviews,
   submitCourseReview,
+  isVideoReview,
   type CourseReview,
 } from '../lib/reviews-api';
 import { ReviewCarousel, coverTitleForCourse } from './ReviewCarousel';
+import { VideoReviewFeed } from './ReviewPostCard';
 import { getErrorMessage, toastError, toastSuccess } from '../lib/toast';
 
 function Stars({
@@ -50,11 +52,13 @@ export function CourseReviewsSection({
   courseTitle,
   courseSlug,
   hideCards = false,
+  compact = false,
 }: {
   courseRef: string;
   courseTitle?: string;
   courseSlug?: string;
   hideCards?: boolean;
+  compact?: boolean;
 }) {
   const { token, user } = useAuth();
   const queryClient = useQueryClient();
@@ -66,6 +70,7 @@ export function CourseReviewsSection({
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [ratingError, setRatingError] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -94,6 +99,13 @@ export function CourseReviewsSection({
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!token) return;
+
+    if (rating < 1) {
+      setRatingError('Жылдызча менен баа бериңиз');
+      return;
+    }
+
+    setRatingError('');
     setSaving(true);
     try {
       const result = await submitCourseReview(token, courseRef, {
@@ -114,7 +126,7 @@ export function CourseReviewsSection({
   };
 
   return (
-    <section className="course-reviews ui-card">
+    <section className={`course-reviews ui-card${compact ? ' course-reviews-compact' : ''}`}>
       <div className="course-reviews-head">
         <h2 className="course-reviews-title">Пикирлер</h2>
         <p className="course-reviews-avg">
@@ -122,56 +134,72 @@ export function CourseReviewsSection({
         </p>
       </div>
 
-      {user ? (
-        <form className="course-review-form" onSubmit={(event) => void onSubmit(event)}>
-          <p className="course-review-form-label">Сиздин бааңыз</p>
-          <Stars value={rating} onChange={setRating} />
-          <label className="course-review-form-label" htmlFor="course-review-name">
-            Отзыв жазган адам
-          </label>
-          <input
-            id="course-review-name"
-            className="course-review-input"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            placeholder="Атыңыз"
-            maxLength={150}
-            required
-          />
-          <label className="course-review-form-label" htmlFor="course-review-text">
-            Отзыв тексти
-          </label>
-          <textarea
-            id="course-review-text"
-            className="course-review-textarea"
-            rows={8}
-            maxLength={8000}
-            placeholder="Пикириңизди жазыңыз"
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            required
-          />
-          <button type="submit" className="btn-primary" disabled={saving || !displayName.trim() || rating < 1}>
-            {saving ? 'Жөнөтүлүүдө...' : 'Пикир калтыруу'}
-          </button>
-        </form>
-      ) : (
-        <p className="course-review-note">Пикир калтыруу үчүн аккаунтка кириңиз.</p>
-      )}
-
-      {hideCards ? null : loading ? (
-        <p className="course-review-note">Жүктөлүүдө...</p>
-      ) : (
-        <div className="ig-reviews-list">
-          <ReviewCarousel
-            title={coverTitleForCourse(
-              items[0]?.courseSlug || courseSlug || courseRef,
-              items[0]?.courseTitle || courseTitle,
-            )}
-            items={items}
-          />
+      <div className={compact ? 'course-reviews-compact-row' : undefined}>
+        <div className={compact ? 'course-reviews-compact-form' : undefined}>
+          {user ? (
+            <form className="course-review-form" onSubmit={(event) => void onSubmit(event)}>
+              <p className="course-review-form-label">Сиздин бааңыз</p>
+              <Stars
+                value={rating}
+                onChange={(value) => {
+                  setRating(value);
+                  if (ratingError) setRatingError('');
+                }}
+              />
+              {ratingError ? <p className="course-review-field-error">{ratingError}</p> : null}
+              <label className="course-review-form-label" htmlFor="course-review-name">
+                Отзыв жазган адам
+              </label>
+              <input
+                id="course-review-name"
+                className="course-review-input"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="Атыңыз"
+                maxLength={150}
+                required
+              />
+              <label className="course-review-form-label" htmlFor="course-review-text">
+                Отзыв тексти
+              </label>
+              <textarea
+                id="course-review-text"
+                className="course-review-textarea"
+                rows={compact ? 3 : 8}
+                maxLength={8000}
+                placeholder="Пикириңизди жазыңыз"
+                value={comment}
+                onChange={(event) => setComment(event.target.value)}
+                required
+              />
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Жөнөтүлүүдө...' : 'Пикир калтыруу'}
+              </button>
+            </form>
+          ) : (
+            <p className="course-review-note">Пикир калтыруу үчүн аккаунтка кириңиз.</p>
+          )}
         </div>
-      )}
+
+        {hideCards ? null : loading ? (
+          <div className="course-reviews-compact-carousel course-review-note-wrap">
+            <p className="course-review-note">Жүктөлүүдө...</p>
+          </div>
+        ) : (
+          <div className={`ig-reviews-list${compact ? ' course-reviews-compact-carousel' : ''}`}>
+            <ReviewCarousel
+              title={coverTitleForCourse(
+                items[0]?.courseSlug || courseSlug || courseRef,
+                items[0]?.courseTitle || courseTitle,
+              )}
+              items={items.filter((item) => !isVideoReview(item))}
+            />
+          </div>
+        )}
+      </div>
+      {!hideCards && !loading && items.some(isVideoReview) ? (
+        <VideoReviewFeed items={items.filter(isVideoReview)} />
+      ) : null}
     </section>
   );
 }

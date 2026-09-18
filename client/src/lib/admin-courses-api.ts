@@ -117,6 +117,23 @@ export async function fetchAdminCourseLessons(token: string, courseRef: string):
   return res.json() as Promise<LessonDto[]>;
 }
 
+export async function importAdminLessonsFromPlaylist(
+  token: string,
+  courseRef: string,
+  input: { playlistUrl: string; replace?: boolean },
+) {
+  const res = await fetch(
+    `${API_BASE}/api/admin/courses/${encodeURIComponent(courseRef)}/lessons/from-playlist`,
+    {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(input),
+    },
+  );
+  if (!res.ok) throw await parseApiError(res, 'Плейлист импорттолгон жок');
+  return res.json() as Promise<{ imported: number; skipped: number; total: number }>;
+}
+
 export async function createAdminLesson(
   token: string,
   courseRef: string,

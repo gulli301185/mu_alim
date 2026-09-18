@@ -3,3 +3,11 @@ dist/
 .env
 *.log
 .DS_Store
+
+# Unused review processing copies — not served on the site
+server/uploads/reviews/*-flower-tmp.mp4
+server/uploads/reviews/*-src.mp4
+server/uploads/reviews/*-faces.mp4
+server/uploads/reviews/*-private.mp4
+server/uploads/reviews/*-h264.mp4
+server/uploads/reviews/*-audio.m4a

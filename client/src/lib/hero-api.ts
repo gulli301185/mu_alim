@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? '';
+import { API_BASE, assetUrl } from './asset-url';
 
 export type HeroBanner = {
   title: string;
@@ -13,8 +13,8 @@ export const DEFAULT_HERO: HeroBanner = {
   title: 'Бийиктикке умтул!',
   subtitle: 'Билим эркиндикке жол ачат, амал ийгиликке жеткирет.',
   name: 'Мухаммадалим',
-  skyImageUrl: '/sky-hero.jpg',
-  bannerImageUrl: '/tunduk-hero.jpg',
+  skyImageUrl: '/uploads/sky-hero.jpg',
+  bannerImageUrl: '/uploads/tunduk-hero.jpg',
 };
 
 async function readError(res: Response, fallback: string) {
@@ -25,7 +25,12 @@ async function readError(res: Response, fallback: string) {
 export async function fetchHeroBanner(): Promise<HeroBanner> {
   const res = await fetch(`${API_BASE}/api/hero`);
   if (!res.ok) throw new Error(await readError(res, 'Баннер жүктөлгөн жок'));
-  return res.json() as Promise<HeroBanner>;
+  const data = (await res.json()) as HeroBanner;
+  return {
+    ...data,
+    skyImageUrl: assetUrl(data.skyImageUrl, DEFAULT_HERO.skyImageUrl),
+    bannerImageUrl: assetUrl(data.bannerImageUrl, DEFAULT_HERO.bannerImageUrl),
+  };
 }
 
 export async function updateHeroBanner(
@@ -43,3 +48,5 @@ export async function updateHeroBanner(
   if (!res.ok) throw new Error(await readError(res, 'Баннер сакталган жок'));
   return res.json() as Promise<HeroBanner>;
 }
+
+export { assetUrl };

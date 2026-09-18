@@ -2,28 +2,34 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { asyncHandler } from '../lib/async-handler.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { optionalAuth, requireAdmin } from '../middleware/auth.js';
 import { parseYoutubeVideoId } from '../lib/youtube-parse.js';
+import { userCanWatchPaidCourse } from '../lib/course-access.js';
 
 export const lessonsRouter = Router();
 
-function toDto(lesson: {
-  id: string;
-  title: string;
-  description: string | null;
-  youtubeVideoId: string;
-  durationSeconds: number | null;
-  lessonOrder: number;
-  isPublished: boolean;
-}) {
+function toDto(
+  lesson: {
+    id: string;
+    title: string;
+    description: string | null;
+    youtubeVideoId: string;
+    durationSeconds: number | null;
+    lessonOrder: number;
+    isPublished: boolean;
+  },
+  options?: { hideVideo?: boolean },
+) {
+  const hideVideo = Boolean(options?.hideVideo);
   return {
     id: lesson.id,
     title: lesson.title,
     description: lesson.description,
-    youtubeVideoId: lesson.youtubeVideoId,
+    youtubeVideoId: hideVideo ? null : lesson.youtubeVideoId,
     durationSeconds: lesson.durationSeconds,
     lessonOrder: lesson.lessonOrder,
     isPublished: lesson.isPublished,
+    locked: hideVideo,
   };
 }
 
@@ -60,6 +66,7 @@ const updateSchema = z.object({
 
 lessonsRouter.get(
   '/courses/:courseId/lessons',
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const resolvedCourseId = await resolveCourseId(req.params.courseId);
     if (!resolvedCourseId) {
@@ -67,12 +74,24 @@ lessonsRouter.get(
       return;
     }
 
+    const course = await prisma.course.findUnique({
+      where: { id: resolvedCourseId },
+      select: { id: true, courseType: true },
+    });
+    if (!course) {
+      res.status(404).json({ error: 'Курс табылган жок' });
+      return;
+    }
+
     const lessons = await prisma.lesson.findMany({
-      where: { courseId: resolvedCourseId, isPublished: true },
+      where: { courseId: course.id, isPublished: true },
       orderBy: { lessonOrder: 'asc' },
     });
 
-    res.json(lessons.map(toDto));
+    const canWatch =
+      course.courseType === 'free' || (await userCanWatchPaidCourse(req.user, course.id));
+
+    res.json(lessons.map((lesson) => toDto(lesson, { hideVideo: !canWatch })));
   }),
 );
 

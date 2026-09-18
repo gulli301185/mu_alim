@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -12,18 +12,23 @@ import {
   CERTIFICATE_THRESHOLD,
   ensureCertificateMeta,
   isCertificateEligible,
-  isCoursePaid,
   loadCourseProgress,
   markFinalTestResult,
   markLessonComplete,
   PASS_THRESHOLD,
+  saveCourseProgress,
   type CourseProgress,
 } from '../lib/courseAccess';
+import { useAuth } from '../context/AuthContext';
+import { useCourseEnrollment } from '../hooks/useMyEnrollments';
+import { completeCourseLesson, fetchCourseProgress, syncCourseProgress } from '../lib/course-progress-api';
 import { fetchCourseByRef, isFreeCourse } from '../lib/course-api';
 import { CourseYoutubePlayer } from '../components/CourseYoutubeLink';
 import {
   isLessonUnlocked,
   mapLessonsToCourseLessons,
+  getFirstUnlockedLessonId,
+  resolveCompletedLessonIds,
   type CourseLesson,
 } from '../data/courseLessons';
 import { SITE } from '../data/landing';
@@ -31,6 +36,7 @@ import { getLessonsByCourse } from '../lib/lesson-api';
 import {
   fetchCourseFinalTest,
   gradeCourseFinalTest,
+  TestLockedError,
   type CourseTestPayload,
   type GradeTestResult,
 } from '../lib/test-api';
@@ -41,22 +47,68 @@ import {
   saveCertificateName,
   SITE_LOGO_URL,
 } from '../lib/certificatePdf';
+import { youtubeThumbnail, youtubeWatchUrl } from '../lib/youtube';
 import { toastError } from '../lib/toast';
 import { CourseReviewsSection } from '../components/CourseReviews';
 
-type LessonPhase = 'video' | 'review';
 type ViewMode = 'lesson' | 'final-test';
 
+function formatTestLockUntil(iso: string) {
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function canAccessLesson(
-  isFree: boolean,
-  paid: boolean,
   lessons: CourseLesson[],
   lessonId: string,
   completedLessonIds: string[],
 ) {
-  if (!isFree && !paid) return false;
   if (completedLessonIds.includes(lessonId)) return true;
   return isLessonUnlocked(lessons, lessonId, completedLessonIds);
+}
+
+function openYoutubeLesson(videoId: string) {
+  window.open(youtubeWatchUrl(videoId), '_blank', 'noopener,noreferrer');
+}
+
+function FreeYoutubeEmbed({ videoId, title }: { videoId: string; title: string }) {
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    setPlaying(false);
+  }, [videoId]);
+
+  if (!playing) {
+    return (
+      <button
+        type="button"
+        className="course-learn-embed course-learn-free-embed courses-free-watch course-learn-free-preview"
+        onClick={() => setPlaying(true)}
+        aria-label={`${title} — сайтта ойнотуу`}
+      >
+        <img src={youtubeThumbnail(videoId)} alt="" className="course-learn-free-preview-img" />
+        <span className="course-learn-free-preview-play" aria-hidden>
+          <PlayCircle className="h-16 w-16" fill="currentColor" />
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="course-learn-embed course-learn-free-embed courses-free-watch">
+      <iframe
+        key={`${videoId}-playing`}
+        src={`https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1`}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+    </div>
+  );
 }
 
 export function CourseLearnPage() {
@@ -73,15 +125,30 @@ export function CourseLearnPage() {
 
   const isFree = course ? isFreeCourse(course) : false;
 
+  const { token, user } = useAuth();
+  const { enrolled, isLoading: enrollmentLoading } = useCourseEnrollment(
+    course ? { id: course.id, slug: course.slug, recordId: course.recordId } : null,
+  );
+  const hasAccess = isFree || enrolled;
+  const progressUserId = user?.id ?? null;
+  const progressAliases = useMemo(
+    () =>
+      course
+        ? [course.id, course.slug, course.recordId].filter((value): value is string => Boolean(value))
+        : [],
+    [course],
+  );
+  const syncedProgressRef = useRef<string>('');
+
   const {
     data: apiLessons,
     isLoading: lessonsLoading,
     isError: lessonsIsError,
     error: lessonsQueryError,
   } = useQuery({
-    queryKey: ['course-lessons', courseId],
-    queryFn: () => getLessonsByCourse(courseId!),
-    enabled: Boolean(courseId && course),
+    queryKey: ['course-lessons', courseId, hasAccess ? 'open' : 'locked'],
+    queryFn: () => getLessonsByCourse(courseId!, token),
+    enabled: Boolean(courseId && course && hasAccess),
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
@@ -94,14 +161,19 @@ export function CourseLearnPage() {
     [apiLessons, course?.title],
   );
 
+  const { data: serverProgress } = useQuery({
+    queryKey: ['course-progress', courseId, progressUserId],
+    queryFn: () => fetchCourseProgress(courseId!, token!),
+    enabled: Boolean(courseId && token && progressUserId && hasAccess && !isFree),
+    staleTime: 10_000,
+  });
+
   const lessonIdsKey = useMemo(() => lessons.map((lesson) => lesson.id).join(','), [lessons]);
 
-  const [paid, setPaid] = useState(() => (courseId ? isCoursePaid(courseId) : false));
   const [progress, setProgress] = useState<CourseProgress>(() =>
-    courseId ? loadCourseProgress(courseId) : { completedLessonIds: [] },
+    courseId ? loadCourseProgress(courseId, progressUserId) : { completedLessonIds: [] },
   );
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
-  const [phase, setPhase] = useState<LessonPhase>('video');
   const [videoWatched, setVideoWatched] = useState(false);
   const [choiceAnswers, setChoiceAnswers] = useState<Record<string, string>>({});
   const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
@@ -113,57 +185,96 @@ export function CourseLearnPage() {
   const [certificateName, setCertificateName] = useState(() => loadCertificateName());
 
   useEffect(() => {
-    if (!courseId || courseLoading) return;
+    if (!courseId || courseLoading || enrollmentLoading) return;
     if (!course) {
       navigate('/courses', { replace: true });
       return;
     }
-    const hasAccess = isFree || isCoursePaid(courseId);
     if (!hasAccess) {
       navigate(`/courses/${courseId}`, { replace: true });
       return;
     }
-    setPaid(hasAccess && !isFree);
-    setProgress((prev) => {
-      const loaded = loadCourseProgress(courseId);
-      if (
-        prev.completedLessonIds.length === loaded.completedLessonIds.length &&
-        prev.completedLessonIds.every((id, index) => id === loaded.completedLessonIds[index])
-      ) {
-        return prev;
-      }
-      return loaded;
+    const local = loadCourseProgress(courseId, progressUserId, {
+      aliases: progressAliases,
+      adoptLegacy: !isFree,
     });
-  }, [courseId, course, courseLoading, isFree, navigate]);
+    const storedIds = [
+      ...local.completedLessonIds,
+      ...(serverProgress?.completedLessonIds ?? []),
+    ];
+    const completedLessonIds = lessons.length
+      ? resolveCompletedLessonIds(lessons, storedIds)
+      : [...new Set(storedIds)];
+    const next = { ...local, completedLessonIds };
+    saveCourseProgress(courseId, next, progressUserId);
+    setProgress(next);
+
+    if (
+      !isFree &&
+      token &&
+      serverProgress &&
+      lessons.length &&
+      completedLessonIds.length > serverProgress.completedLessonIds.length
+    ) {
+      const syncKey = `${progressUserId}:${courseId}:${completedLessonIds.join(',')}`;
+      if (syncedProgressRef.current !== syncKey) {
+        syncedProgressRef.current = syncKey;
+        void syncCourseProgress(courseId, completedLessonIds, token).catch(() => {
+          syncedProgressRef.current = '';
+        });
+      }
+    }
+  }, [
+    courseId,
+    course,
+    courseLoading,
+    enrollmentLoading,
+    hasAccess,
+    navigate,
+    progressUserId,
+    progressAliases,
+    serverProgress,
+    isFree,
+    token,
+    lessons,
+  ]);
 
   useEffect(() => {
     if (!lessons.length) return;
 
+    if (isFree) {
+      const selected =
+        lessonFromQuery && lessons.some((l) => l.id === lessonFromQuery)
+          ? lessonFromQuery
+          : lessons[0].id;
+      setActiveLessonId(selected);
+      return;
+    }
+
+    const completedIds = progress.completedLessonIds;
+    const firstOpenId = getFirstUnlockedLessonId(lessons, completedIds) ?? lessons[0].id;
+
     if (
       lessonFromQuery &&
       lessons.some((l) => l.id === lessonFromQuery) &&
-      canAccessLesson(isFree, paid, lessons, lessonFromQuery, progress.completedLessonIds)
+      canAccessLesson(lessons, lessonFromQuery, completedIds)
     ) {
       setActiveLessonId(lessonFromQuery);
       return;
     }
 
-    if (!paid && !isFree) {
-      setActiveLessonId(lessons[0].id);
-      return;
+    if (lessonFromQuery && !canAccessLesson(lessons, lessonFromQuery, completedIds)) {
+      navigate(`/courses/${courseId}/learn`, { replace: true });
     }
 
-    const firstOpen =
-      lessons.find((l) => canAccessLesson(isFree, paid, lessons, l.id, progress.completedLessonIds)) ??
-      lessons[0];
-
     setActiveLessonId((prev) => {
-      if (prev && canAccessLesson(isFree, paid, lessons, prev, progress.completedLessonIds)) return prev;
-      return firstOpen.id;
+      if (prev && canAccessLesson(lessons, prev, completedIds)) return prev;
+      return firstOpenId;
     });
-  }, [lessonIdsKey, lessons, progress.completedLessonIds, paid, isFree, lessonFromQuery]);
+  }, [lessonIdsKey, lessons, progress.completedLessonIds, lessonFromQuery, courseId, navigate, isFree]);
 
   useEffect(() => {
+    if (isFree) return;
     setTestSubmitted(false);
     setVideoWatched(false);
     setChoiceAnswers({});
@@ -176,18 +287,17 @@ export function CourseLearnPage() {
     const lesson = lessons.find((l) => l.id === activeLessonId);
     if (!lesson) return;
 
-    if (!canAccessLesson(isFree, paid, lessons, lesson.id, progress.completedLessonIds)) {
-      setPhase('video');
+    if (!canAccessLesson(lessons, lesson.id, progress.completedLessonIds)) {
       return;
     }
 
     if (progress.completedLessonIds.includes(lesson.id)) {
-      setPhase('review');
+      setVideoWatched(true);
       return;
     }
 
-    setPhase('video');
-  }, [activeLessonId, lessonIdsKey, lessons, progress.completedLessonIds, paid, isFree]);
+    setVideoWatched(false);
+  }, [activeLessonId, lessonIdsKey, lessons, progress.completedLessonIds, isFree]);
 
   const handleWatchComplete = useCallback(() => {
     setVideoWatched(true);
@@ -195,14 +305,17 @@ export function CourseLearnPage() {
 
   const activeLesson = lessons.find((l) => l.id === activeLessonId);
   const completedCount = progress.completedLessonIds.length;
+  const isActiveLessonCompleted = activeLesson
+    ? progress.completedLessonIds.includes(activeLesson.id)
+    : false;
   const activeAccessible = activeLesson
-    ? canAccessLesson(isFree, paid, lessons, activeLesson.id, progress.completedLessonIds)
+    ? canAccessLesson(lessons, activeLesson.id, progress.completedLessonIds)
     : false;
 
-  const { data: courseFinalTest, isLoading: courseFinalTestLoading } = useQuery({
-    queryKey: ['course-final-test', courseId],
-    queryFn: () => fetchCourseFinalTest(courseId!),
-    enabled: Boolean(courseId && !isFree && paid),
+  const { data: courseFinalTest, isLoading: courseFinalTestLoading, refetch: refetchFinalTest } = useQuery({
+    queryKey: ['course-final-test', courseId, progressUserId],
+    queryFn: () => fetchCourseFinalTest(courseId!, token),
+    enabled: Boolean(courseId && course && !isFree),
   });
 
   const allTestQuestionsAnswered = useMemo(() => {
@@ -216,14 +329,17 @@ export function CourseLearnPage() {
   }, [courseFinalTest, choiceAnswers, textAnswers]);
 
   const handleVideoComplete = () => {
-    if (!videoWatched || !activeAccessible || !activeLesson || !courseId) return;
+    if (!videoWatched || !activeAccessible || !activeLesson || !courseId || isActiveLessonCompleted) return;
 
-    const next = markLessonComplete(courseId, activeLesson.id);
+    const next = markLessonComplete(courseId, activeLesson.id, undefined, progressUserId);
     setProgress(next);
-    setPhase('review');
+    setVideoWatched(true);
+    if (token && !isFree) {
+      void completeCourseLesson(courseId, activeLesson.id, token).catch(() => {});
+    }
 
     const allDone = next.completedLessonIds.length >= lessons.length;
-    if (!isFree && allDone && courseFinalTest && !next.finalTestPassed) {
+    if (allDone && courseFinalTest && !next.finalTestPassed) {
       setViewMode('final-test');
       setChoiceAnswers({});
       setTextAnswers({});
@@ -245,15 +361,29 @@ export function CourseLearnPage() {
         textAnswer: question.questionType === 'text' ? textAnswers[question.id]?.trim() : undefined,
       }));
 
-      const result = await gradeCourseFinalTest(courseId, payload);
+      const result = await gradeCourseFinalTest(courseId, payload, token);
       setGradeResult(result);
       setTestSubmitted(true);
       setLastTestScore(result.scorePercent);
 
-      const next = markFinalTestResult(courseId, result.passed, result.scorePercent);
+      const next = markFinalTestResult(courseId, result.passed, result.scorePercent, progressUserId);
       setProgress(next);
-    } catch {
-      toastError('Тест тапшырылган жок. Кайра аракет кылыңыз.');
+      void refetchFinalTest();
+
+      if (!result.passed) {
+        toastError(
+          result.locked
+            ? 'Тесттен 3 жолу өтпөдүңүз. Даярданып, кайрадан тест тапшырыңыз.'
+            : 'Тесттен өтпөдүңүз',
+        );
+      }
+    } catch (error) {
+      if (error instanceof TestLockedError) {
+        toastError(error.message);
+        void refetchFinalTest();
+      } else {
+        toastError('Тест тапшырылган жок. Кайра аракет кылыңыз.');
+      }
     } finally {
       setTestSubmitting(false);
     }
@@ -272,7 +402,7 @@ export function CourseLearnPage() {
       progress.certificateNumber ?? generateCertificateNumber(courseId);
 
     if (!progress.certificateNumber) {
-      const next = ensureCertificateMeta(courseId, certificateNumber);
+      const next = ensureCertificateMeta(courseId, certificateNumber, progressUserId);
       setProgress(next);
     }
 
@@ -358,18 +488,151 @@ export function CourseLearnPage() {
     );
   }
 
-  const testPassed = Boolean(gradeResult?.passed ?? progress.finalTestPassed);
-  const passingScoreLabel = courseFinalTest?.passingScore ?? PASS_THRESHOLD * 100;
+  const testPassed = Boolean(progress.finalTestPassed);
+  const passingScoreLabel = Math.max(
+    courseFinalTest?.passingScore ?? PASS_THRESHOLD * 100,
+    CERTIFICATE_THRESHOLD * 100,
+  );
 
-  const renderFinalTestPanel = (test: CourseTestPayload) => (
+  if (isFree) {
+    return (
+      <section className="course-learn-page course-learn-page-free">
+        <div className="wrap course-learn-inner">
+          <div className="course-learn-head">
+            <Link to="/courses/free" className="course-learn-back">
+              <ArrowLeft className="h-4 w-4" />
+              Бекер курстарга кайтуу
+            </Link>
+            <div>
+              <p className="course-learn-label">Бекер курс</p>
+              <h1 className="course-learn-title">{course.title}</h1>
+              <p className="course-learn-stats">{lessonCount} видео-баян · YouTube'да ачык көрүү</p>
+            </div>
+          </div>
+
+          <div className="course-learn-grid">
+            <aside className="course-learn-sidebar ui-card">
+              <h2 className="course-learn-sidebar-title">Видеолор ({lessonCount})</h2>
+              <ul className="course-learn-lessons">
+                {lessons.map((lesson) => {
+                  const active = lesson.id === activeLessonId;
+                  return (
+                    <li key={lesson.id}>
+                      <button
+                        type="button"
+                        className={`course-learn-lesson-btn${
+                          active ? ' course-learn-lesson-active' : ''
+                        }`}
+                        onClick={() => setActiveLessonId(lesson.id)}
+                      >
+                        <span className="course-learn-lesson-icon" aria-hidden>
+                          <PlayCircle className="h-4 w-4" />
+                        </span>
+                        <span className="course-learn-lesson-text">
+                          <span className="course-learn-lesson-name">{lesson.title}</span>
+                          <span className="course-learn-lesson-meta">{lesson.duration}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <Link to="/courses/free" className="course-learn-back-courses">
+                Бекер курстарга өтүү
+              </Link>
+            </aside>
+
+            <article className="course-learn-main ui-card">
+              <div className="course-learn-main-head">
+                <div className="course-learn-main-heading">
+                  <h2 className="course-learn-main-title">{activeLesson.title}</h2>
+                  <p className="course-learn-main-author">Сабактын автору Мухаммадалим Халил</p>
+                </div>
+                <span className="course-learn-main-step">
+                  {activeLesson.order} / {lessonCount}
+                </span>
+              </div>
+
+              <div className="course-learn-video-block">
+                {activeLesson.videoId ? (
+                  <FreeYoutubeEmbed videoId={activeLesson.videoId} title={activeLesson.title} />
+                ) : null}
+                <p className="course-learn-video-hint">
+                  Видеону бассаңыз сайтта ойнотулат. Толук YouTube'да ачуу үчүн төмөнкү баскычты колдонуңуз.
+                </p>
+                <button
+                  type="button"
+                  className="btn-gold course-learn-free-youtube-btn"
+                  onClick={() => {
+                    if (activeLesson.videoId) openYoutubeLesson(activeLesson.videoId);
+                  }}
+                >
+                  <PlayCircle className="h-5 w-5" aria-hidden />
+                  YouTube'да ачуу
+                </button>
+              </div>
+            </article>
+          </div>
+
+          {courseId ? (
+            <CourseReviewsSection
+              courseRef={courseId}
+              courseTitle={course.title}
+              courseSlug={course.slug}
+              compact
+            />
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
+  const renderFinalTestPanel = (test: CourseTestPayload) => {
+    const testLocked = Boolean(gradeResult?.locked || test.locked);
+    const lockedUntil = gradeResult?.lockedUntil ?? test.lockedUntil ?? null;
+    const remainingAttempts = gradeResult?.remainingAttempts ?? test.remainingAttempts;
+
+    if (testLocked) {
+      return (
+        <div className="course-learn-test">
+          <h3 className="course-learn-test-title">{test.title}</h3>
+          <div className="course-learn-test-lock" role="alert">
+            <p className="course-learn-test-lock-title">Тест 1 суткага жабылды</p>
+            <p className="course-learn-test-fail">
+              Тесттен 3 жолу өтпөдүңүз. Даярданып, кайрадан тест тапшырыңыз.
+            </p>
+            {lockedUntil ? (
+              <p className="course-learn-test-lock-until">Кайра аракет: {formatTestLockUntil(lockedUntil)}</p>
+            ) : (
+              <p className="course-learn-test-lock-until">Кайра аракет 1 суткадан кийин.</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="course-learn-test">
       <h3 className="course-learn-test-title">{test.title}</h3>
       <p className="course-learn-video-hint">
-        Бардык сабактар аяктады. Курстук финалдык тестти тапшырыңыз — ийгиликтүү болсо сертификат аласыз.
+        Бардык сабактар аяктады. {test.questions.length} суроолук финалдык тестти тапшырыңыз — {CERTIFICATE_THRESHOLD * 100}% жана андан жогору болсо PDF сертификат берилет.
+        {typeof remainingAttempts === 'number' && !testPassed ? (
+          <> · Калып {remainingAttempts} аракет</>
+        ) : null}
       </p>
       <div className="course-learn-test-scroll">
-        {test.questions.map((question, qIndex) => (
-          <fieldset key={question.id} className="course-learn-test-q">
+        {test.questions.map((question, qIndex) => {
+          const questionResult =
+            testSubmitted && gradeResult && !gradeResult.passed
+              ? gradeResult.details.find((item) => item.questionId === question.id)
+              : undefined;
+          const isWrong = questionResult?.isCorrect === false;
+
+          return (
+            <fieldset
+              key={question.id}
+              className={`course-learn-test-q${isWrong ? ' course-learn-test-q-wrong' : ''}`}
+            >
             <legend>
               {qIndex + 1}. {question.questionText}
             </legend>
@@ -404,14 +667,20 @@ export function CourseLearnPage() {
                 disabled={testSubmitted && testPassed}
               />
             )}
+            {isWrong ? (
+              <p className="course-learn-test-wrong-hint" role="alert">
+                Туура эмес жооп
+              </p>
+            ) : null}
           </fieldset>
-        ))}
+          );
+        })}
       </div>
 
       {testSubmitted && !testPassed && (
         <>
           <p className="course-learn-test-fail">
-            {passingScoreLabel}% дан жогору топтоңуз ({lastTestScore ?? 0}%). Кайра аракет кылыңыз.
+            {passingScoreLabel}% дан жогору топтоңуз ({lastTestScore ?? gradeResult?.scorePercent ?? 0}%). Кайра аракет кылыңыз.
           </p>
           <button
             type="button"
@@ -469,7 +738,8 @@ export function CourseLearnPage() {
         </button>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <section className="course-learn-page">
@@ -497,8 +767,6 @@ export function CourseLearnPage() {
             <ul className="course-learn-lessons">
               {lessons.map((lesson) => {
                 const unlocked = canAccessLesson(
-                  isFree,
-                  paid,
                   lessons,
                   lesson.id,
                   progress.completedLessonIds,
@@ -509,50 +777,84 @@ export function CourseLearnPage() {
                 return (
                   <li
                     key={lesson.id}
-                    className={!unlocked ? 'course-learn-lesson-item-locked' : undefined}
+                    className={`course-learn-lesson-block${!unlocked ? ' course-learn-lesson-item-locked' : ''}`}
                   >
-                    <button
-                      type="button"
-                      className={`course-learn-lesson-btn${
-                        active ? ' course-learn-lesson-active' : ''
-                      }${completed ? ' course-learn-lesson-done' : ''}${
-                        !unlocked ? ' course-learn-lesson-locked' : ''
+                    <div
+                      className={`course-learn-lesson-video-row${
+                        completed ? ' course-learn-lesson-video-row-done' : ''
                       }`}
-                      disabled={!unlocked}
-                      onClick={() => {
-                        if (!unlocked) return;
-                        if (
-                          !completed &&
-                          activeLessonId &&
-                          activeLessonId !== lesson.id &&
-                          !progress.completedLessonIds.includes(activeLessonId)
-                        ) {
-                          return;
-                        }
-                        setActiveLessonId(lesson.id);
-                      }}
                     >
-                      <span className="course-learn-lesson-icon" aria-hidden>
-                        {completed ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : unlocked ? (
-                          <PlayCircle className="h-4 w-4" />
-                        ) : (
-                          <Lock className="h-4 w-4" />
-                        )}
-                      </span>
-                      <span className="course-learn-lesson-text">
-                        <span className="course-learn-lesson-name">{lesson.title}</span>
-                        <span className="course-learn-lesson-meta">{lesson.duration}</span>
-                      </span>
-                      {!unlocked && <span className="course-learn-lock-label">Кулуп</span>}
-                    </button>
+                      <button
+                        type="button"
+                        className={`course-learn-lesson-btn${
+                          active ? ' course-learn-lesson-active' : ''
+                        }${completed ? ' course-learn-lesson-done' : ''}${
+                          !unlocked ? ' course-learn-lesson-locked' : ''
+                        }`}
+                        disabled={!unlocked}
+                        onClick={() => {
+                          if (!unlocked) return;
+                          if (
+                            !completed &&
+                            activeLessonId &&
+                            activeLessonId !== lesson.id &&
+                            !progress.completedLessonIds.includes(activeLessonId)
+                          ) {
+                            return;
+                          }
+                          setActiveLessonId(lesson.id);
+                        }}
+                      >
+                        <span className="course-learn-lesson-icon" aria-hidden>
+                          {completed ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : unlocked ? (
+                            <PlayCircle className="h-4 w-4" />
+                          ) : (
+                            <Lock className="h-4 w-4" />
+                          )}
+                        </span>
+                        <span className="course-learn-lesson-text">
+                          <span className="course-learn-lesson-name">{lesson.title}</span>
+                          <span className="course-learn-lesson-meta">
+                            {lesson.duration}
+                            <span
+                              className={`course-learn-lesson-watch${
+                                completed
+                                  ? ' course-learn-lesson-watch-done'
+                                  : unlocked
+                                    ? ' course-learn-lesson-watch-open'
+                                    : ' course-learn-lesson-watch-locked'
+                              }`}
+                            >
+                              {completed ? 'Көрүлүп бүттү' : unlocked ? 'Бүтө элек' : 'Кулуп'}
+                            </span>
+                          </span>
+                        </span>
+                      </button>
+                      <div
+                        className={`course-learn-lesson-mini-video${
+                          completed ? ' course-learn-lesson-mini-video-done' : ''
+                        }`}
+                      >
+                        {lesson.videoId ? (
+                          <img src={youtubeThumbnail(lesson.videoId)} alt="" />
+                        ) : null}
+                        <span className="course-learn-lesson-mini-play" aria-hidden>
+                          {completed ? (
+                            <CheckCircle2 className="h-6 w-6" />
+                          ) : (
+                            <PlayCircle className="h-6 w-6" fill="currentColor" />
+                          )}
+                        </span>
+                      </div>
+                    </div>
                   </li>
                 );
               })}
             </ul>
 
-            {!isFree && allLessonsDone && courseFinalTest && !finalTestPassed ? (
+            {allLessonsDone && courseFinalTest && !finalTestPassed ? (
               <div className="course-learn-sidebar-final-test">
                 <button
                   type="button"
@@ -614,117 +916,125 @@ export function CourseLearnPage() {
                     <Lock className="h-8 w-8" aria-hidden />
                     <p>Бул видео кулуп. Мурунку сабакты аяктаңыз.</p>
                   </div>
-                ) : phase === 'video' ? (
-                  <div className="course-learn-video-block">
-                    <CourseYoutubePlayer
-                      key={activeLesson.id}
-                      videoId={activeLesson.videoId}
-                      title={activeLesson.title}
-                      onWatchComplete={handleWatchComplete}
-                      requireFullWatch
-                    />
-                    <p className="course-learn-video-hint">Видеону аягына чейин көрүңүз.</p>
-                    <button
-                      type="button"
-                      className="btn-primary course-learn-video-btn"
-                      disabled={!videoWatched}
-                      onClick={handleVideoComplete}
-                    >
-                      {!videoWatched ? 'Видеону аягына чейин көрүңүз...' : 'Көрүү аяктады — улантуу'}
-                    </button>
-                  </div>
                 ) : (
-                  <div className="course-learn-review">
-                    <div className="course-learn-review-success">
-                      <CheckCircle2 className="h-5 w-5" aria-hidden />
-                      <span>Сабак аякталды — кайра көрө аласыз</span>
-                    </div>
+                  <div className="course-learn-video-block">
+                    {isActiveLessonCompleted ? (
+                      <div className="course-learn-review-success">
+                        <CheckCircle2 className="h-5 w-5" aria-hidden />
+                        <span>Сабак аякталды — кайра көрө аласыз</span>
+                      </div>
+                    ) : null}
 
-                    <div className="course-learn-video-block">
+                    {activeLesson.videoId ? (
                       <CourseYoutubePlayer
-                        key={`review-${activeLesson.id}`}
+                        key={`${activeLesson.id}-${isActiveLessonCompleted ? 'rewatch' : 'watch'}`}
                         videoId={activeLesson.videoId}
                         title={activeLesson.title}
-                        requireFullWatch={false}
+                        onWatchComplete={handleWatchComplete}
+                        requireFullWatch={!isActiveLessonCompleted}
+                        allowSpeedControl={isActiveLessonCompleted}
                       />
-                      <p className="course-learn-video-hint">Видеону каалаган убакта кайра көрүңүз.</p>
-                    </div>
+                    ) : (
+                      <div className="course-learn-locked-msg">
+                        <Lock className="h-8 w-8" aria-hidden />
+                        <p>Сабак шилтемеси ачыла элек. Доступ берилгенде көрө аласыз.</p>
+                      </div>
+                    )}
 
-                    {(() => {
-                      const next = lessons.find(
-                        (l) =>
-                          canAccessLesson(isFree, paid, lessons, l.id, progress.completedLessonIds) &&
-                          !progress.completedLessonIds.includes(l.id),
-                      );
-                      if (!next) {
-                        return (
-                          <div className="course-learn-done">
-                            <img
-                              src={SITE_LOGO_URL}
-                              alt={SITE.name}
-                              className="course-learn-done-logo"
-                            />
-                            <p className="course-learn-done-all">Бардык видеолор аякталды!</p>
-                            {!isFree && courseFinalTest && !finalTestPassed ? (
-                              <>
-                                <p className="course-learn-done-text">
-                                  Сертификат алуу үчүн курстук финалдык тестти тапшырыңыз.
-                                </p>
-                                <button
-                                  type="button"
-                                  className="btn-gold course-learn-next-btn"
-                                  onClick={() => setViewMode('final-test')}
-                                >
-                                  Курстук тестке өтүү
-                                </button>
-                              </>
-                            ) : certificateReady ? (
-                              <>
-                                <p className="course-learn-done-title">Сертификатка укук ачылды!</p>
-                                <p className="course-learn-done-text">
-                                  Курстук тест: {progress.finalTestScore ?? 0}% (минимум{' '}
-                                  {CERTIFICATE_THRESHOLD * 100}%)
-                                </p>
-                                <label className="course-learn-cert-name-field">
-                                  <span className="course-learn-cert-name-label">Атыңыз</span>
-                                  <input
-                                    type="text"
-                                    className="course-learn-cert-name-input"
-                                    value={certificateName}
-                                    onChange={(e) => setCertificateName(e.target.value)}
-                                    placeholder="Сертификатка жазылуу"
-                                  />
-                                </label>
-                                <button
-                                  type="button"
-                                  className="btn-gold course-learn-cert-btn"
-                                  onClick={() => void handleCertificateDownload()}
-                                  disabled={!certificateName.trim()}
-                                >
-                                  <Download className="h-4 w-4" aria-hidden />
-                                  ПДФ сертификатты жүктөө
-                                </button>
-                              </>
-                            ) : isFree ? (
-                              <p className="course-learn-done-text">Курс ийгиликтүү аяктады!</p>
-                            ) : (
-                              <p className="course-learn-done-text">
-                                Сертификат үчүн курстук тестти ийгиликтүү тапшыруу керек.
-                              </p>
-                            )}
-                          </div>
-                        );
-                      }
-                      return (
+                    {isActiveLessonCompleted ? (
+                      <>
+                        <p className="course-learn-video-hint">
+                          Видеону каалаган убакта кайра көрүңүз · ылдамдыкты өзгөртүүгө болот
+                        </p>
+                        {(() => {
+                          const next = lessons.find(
+                            (l) =>
+                              canAccessLesson(lessons, l.id, progress.completedLessonIds) &&
+                              !progress.completedLessonIds.includes(l.id),
+                          );
+                          if (!next) {
+                            return (
+                              <div className="course-learn-done">
+                                <img
+                                  src={SITE_LOGO_URL}
+                                  alt={SITE.name}
+                                  className="course-learn-done-logo"
+                                />
+                                <p className="course-learn-done-all">Бардык видеолор аякталды!</p>
+                                {!courseFinalTest ? (
+                                  <p className="course-learn-done-text">Курс ийгиликтүү аяктады!</p>
+                                ) : !finalTestPassed ? (
+                                  <>
+                                    <p className="course-learn-done-text">
+                                      Сертификат алуу үчүн курстук финалдык тестти {CERTIFICATE_THRESHOLD * 100}% жана андан жогору топтоңуз.
+                                    </p>
+                                    <button
+                                      type="button"
+                                      className="btn-gold course-learn-next-btn"
+                                      onClick={() => setViewMode('final-test')}
+                                    >
+                                      Курстук тестке өтүү
+                                    </button>
+                                  </>
+                                ) : certificateReady ? (
+                                  <>
+                                    <p className="course-learn-done-title">Сертификатка укук ачылды!</p>
+                                    <p className="course-learn-done-text">
+                                      Курстук тест: {progress.finalTestScore ?? 0}% (минимум{' '}
+                                      {CERTIFICATE_THRESHOLD * 100}%)
+                                    </p>
+                                    <label className="course-learn-cert-name-field">
+                                      <span className="course-learn-cert-name-label">Атыңыз</span>
+                                      <input
+                                        type="text"
+                                        className="course-learn-cert-name-input"
+                                        value={certificateName}
+                                        onChange={(e) => setCertificateName(e.target.value)}
+                                        placeholder="Сертификатка жазылуу"
+                                      />
+                                    </label>
+                                    <button
+                                      type="button"
+                                      className="btn-gold course-learn-cert-btn"
+                                      onClick={() => void handleCertificateDownload()}
+                                      disabled={!certificateName.trim()}
+                                    >
+                                      <Download className="h-4 w-4" aria-hidden />
+                                      ПДФ сертификатты жүктөө
+                                    </button>
+                                  </>
+                                ) : (
+                                  <p className="course-learn-done-text">
+                                    Сертификат үчүн курстук тестти {CERTIFICATE_THRESHOLD * 100}% жана андан жогору топтоңуз.
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          }
+                          return (
+                            <button
+                              type="button"
+                              className="btn-gold course-learn-next-btn"
+                              onClick={() => setActiveLessonId(next.id)}
+                            >
+                              Кийинки видео: {next.order}-сабак
+                            </button>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      <>
+                        <p className="course-learn-video-hint">Видеону аягына чейин көрүңүз.</p>
                         <button
                           type="button"
-                          className="btn-gold course-learn-next-btn"
-                          onClick={() => setActiveLessonId(next.id)}
+                          className="btn-primary course-learn-video-btn"
+                          disabled={!videoWatched}
+                          onClick={handleVideoComplete}
                         >
-                          Кийинки видео: {next.order}-сабак
+                          {!videoWatched ? 'Видеону аягына чейин көрүңүз...' : 'Көрүү аяктады — улантуу'}
                         </button>
-                      );
-                    })()}
+                      </>
+                    )}
                   </div>
                 )}
               </>
@@ -736,6 +1046,7 @@ export function CourseLearnPage() {
             courseRef={courseId}
             courseTitle={course?.title}
             courseSlug={course?.slug}
+            compact
           />
         ) : null}
       </div>

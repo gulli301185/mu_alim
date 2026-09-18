@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, Users } from 'lucide-react';
+import { Search, Trash2, Users } from 'lucide-react';
 import { QaPagination } from '../../components/QaPagination';
 import { useAuth } from '../../context/AuthContext';
 import {
+  deleteAdminUser,
   fetchAdminUsers,
   formatAdminDate,
   getAdminUserDisplayName,
   type AdminUserListItem,
 } from '../../lib/admin-users-api';
-import { getErrorMessage, toastError } from '../../lib/toast';
+import { getErrorMessage, toastError, toastSuccess } from '../../lib/toast';
 
 const USERS_PER_PAGE = 20;
 
@@ -22,6 +23,7 @@ export function AdminUsersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const query = searchParams.get('q') ?? '';
@@ -70,6 +72,22 @@ export function AdminUsersPage() {
 
   const currentPage = Math.min(page, totalPages);
 
+  const handleDeleteUser = async (user: AdminUserListItem) => {
+    if (!token) return;
+    const name = getAdminUserDisplayName(user);
+    if (!window.confirm(`"${name}" колдонуучусун чын эле өчүрөсүзбү? Бул аракет кайтарылбайт.`)) return;
+    setBusyId(user.id);
+    try {
+      await deleteAdminUser(token, user.id);
+      toastSuccess('Колдонуучу өчүрүлдү');
+      await load();
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Колдонуучуну өчүрүү ийгиликсиз'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <section className="admin-users-page">
       <header className="admin-section-header">
@@ -115,6 +133,7 @@ export function AdminUsersPage() {
               <tr>
                 <th>Колдонуучу</th>
                 <th>Электрондук почта</th>
+                <th>Телефон</th>
                 <th>Курстар</th>
                 <th>Сертификат</th>
                 <th>Акыркы кирүү</th>
@@ -132,6 +151,7 @@ export function AdminUsersPage() {
                     </div>
                   </td>
                   <td>{user.email}</td>
+                  <td>{user.phone || '—'}</td>
                   <td>{user.enrollmentsCount}</td>
                   <td>{user.certificatesCount}</td>
                   <td>{formatAdminDate(user.lastLoginAt)}</td>
@@ -143,9 +163,20 @@ export function AdminUsersPage() {
                     </span>
                   </td>
                   <td>
-                    <Link to={`/admin/users/${user.id}`} className="qa-admin-btn qa-admin-btn-muted">
-                      Көрүү
-                    </Link>
+                    <div className="admin-users-row-actions">
+                      <Link to={`/admin/users/${user.id}`} className="qa-admin-btn qa-admin-btn-muted">
+                        Көрүү
+                      </Link>
+                      <button
+                        type="button"
+                        className="qa-admin-btn qa-admin-btn-danger"
+                        disabled={busyId === user.id}
+                        onClick={() => void handleDeleteUser(user)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {busyId === user.id ? '...' : 'Өчүрүү'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

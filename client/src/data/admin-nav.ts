@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   ScrollText,
   Star,
-  UserCircle,
   Users,
 } from 'lucide-react';
 
@@ -76,22 +75,22 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         description: 'Булут, баннер жана тексттер',
       },
       {
+        to: '/admin/ustaz-images',
+        label: 'Устаз сүрөттөрү',
+        icon: ImageIcon,
+        description: 'Башкы бет устаз блогу жана баннер',
+      },
+      {
         to: '/admin/questions',
         label: '100 суроо-жооп',
         icon: HelpCircle,
-        description: 'Суроо-жооп бөлүмүн башкаруу',
+        description: 'Суроо-жооп жана устазга келген суроолор',
       },
       {
         to: '/admin/hadiths',
         label: 'Хадис күнү',
         icon: ScrollText,
         description: 'Хадистерди башкаруу',
-      },
-      {
-        to: '/admin/teacher',
-        label: 'Мугалим',
-        icon: UserCircle,
-        description: 'Мугалим жөнүндө маалымат',
       },
       {
         to: '/admin/reviews',
@@ -133,17 +132,20 @@ export const ADMIN_SECTION_META: Record<
     tzRef: 'ТЗ §20, §25',
   },
   teacher: {
-    title: 'Мугалим',
-    subtitle: 'Мугалимдин биографиясы, билими жана соцтармактар',
-    tzRef: 'ТЗ §21, §25',
+    title: 'Устазга келген суроолор',
+    subtitle: 'Жооп жазылганда автоматтык түрдө «Суроо-жооп» бөлүмүнө жарияланат',
   },
   hero: {
     title: 'Башкы баннер',
     subtitle: 'Булут сүрөтү, баннер жана тексттер',
   },
+  'ustaz-images': {
+    title: 'Устаз сүрөттөрү',
+    subtitle: 'Башкы беттеги устаз блогу, портрет жана /ustaz баннери',
+  },
   reviews: {
     title: 'Пикирлер',
-    subtitle: 'Курс пикирлерин модерациялоо',
+    subtitle: 'Курс пикирлерин кошуу, өзгөртүү жана модерациялоо',
     tzRef: 'ТЗ §17, §25',
   },
 };

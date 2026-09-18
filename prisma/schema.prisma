@@ -81,7 +81,7 @@ model User {
   passwordHash String    @map("password_hash") @db.VarChar(255)
   firstName    String    @map("first_name") @db.VarChar(100)
   lastName     String    @map("last_name") @db.VarChar(100)
-  phone        String?   @db.VarChar(30)
+  phone        String?   @unique @db.VarChar(30)
   role         UserRole  @default(user)
   isActive     Boolean   @default(true) @map("is_active")
   isVerified   Boolean   @default(false) @map("is_verified")
@@ -434,6 +434,7 @@ model Review {
   courseId      String       @map("course_id") @db.Uuid
   rating        Int          @db.SmallInt
   comment       String?      @db.Text
+  videoUrl      String?      @map("video_url") @db.VarChar(500)
   displayName   String?      @map("display_name") @db.VarChar(150)
   isAdminPosted Boolean      @default(false) @map("is_admin_posted")
   status        ReviewStatus
@@ -526,6 +527,7 @@ model QaArticle {
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  teacherSubmission TeacherQuestionSubmission?
 
   @@index([isPublished, publishedAt(sort: Desc)])
   @@index([isPublished, questionNumber(sort: Asc)])
@@ -558,4 +560,31 @@ model HeroBanner {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("hero_banners")
+}
+
+model SiteImage {
+  key       String   @id @db.VarChar(64)
+  url       String   @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("site_images")
+}
+
+model TeacherQuestionSubmission {
+  id             String    @id @default(uuid()) @db.Uuid
+  questionNumber Int?      @map("question_number")
+  name           String    @db.VarChar(200)
+  question       String    @db.Text
+  answer         String?   @db.Text
+  qaArticleId    String?   @unique @map("qa_article_id") @db.Uuid
+  answeredAt     DateTime? @map("answered_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  qaArticle QaArticle? @relation(fields: [qaArticleId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([questionNumber(sort: Desc)])
+  @@index([answeredAt(sort: Desc)])
+  @@map("teacher_question_submissions")
 }

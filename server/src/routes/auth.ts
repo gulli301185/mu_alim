@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { asyncHandler } from '../lib/async-handler.js';
 import { requireAuth, signToken } from '../middleware/auth.js';
 import {
+  confirmCodeSchema,
   forgotPasswordSchema,
   formatZodError,
   loginSchema,
@@ -12,10 +13,74 @@ import {
   resetPasswordSchema,
   updateProfileSchema,
 } from '../lib/auth-validation.js';
+import { isMailConfigured, sendAuthCode } from '../lib/mail.js';
+import { isSmsConfigured, sendPasswordResetSms } from '../lib/sms.js';
+import { findUserByKgPhone } from '../lib/user-phone.js';
 
 export const authRouter = Router();
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+async function issueAuthCode(userId: string) {
+  await prisma.passwordResetToken.updateMany({
+    where: { userId, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  let code = String(randomInt(100000, 1000000));
+  let tokenId: string | null = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const created = await prisma.passwordResetToken.create({
+        data: {
+          userId,
+          token: code,
+          expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+        },
+      });
+      tokenId = created.id;
+      break;
+    } catch {
+      code = String(randomInt(100000, 1000000));
+      if (attempt === 4) throw new Error('Код түзүлгөн жок');
+    }
+  }
+  return { code, tokenId };
+}
+
+async function deliverAuthCode(
+  email: string,
+  phone: string | null,
+  code: string,
+  kind: 'reset' | 'register',
+) {
+  if (isMailConfigured()) {
+    try {
+      await sendAuthCode(email, code, kind);
+      return 'email' as const;
+    }     catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[auth-code] mail failed', message);
+    }
+  }
+
+  if (isSmsConfigured() && phone) {
+    try {
+      await sendPasswordResetSms(phone, code);
+      return 'sms' as const;
+    } catch (err) {
+      console.error('[auth-code] sms failed', err);
+    }
+  }
+
+  return null;
+}
+
+function deliveryMessage(delivered: 'email' | 'sms') {
+  return delivered === 'sms'
+    ? 'Код телефонуңузга SMS менен жөнөтүлдү.'
+    : 'Код почтаңызга жөнөтүлдү. Почтаңызды текшериңиз.';
+}
 
 function toPublicUser(user: {
   id: string;
@@ -123,9 +188,51 @@ authRouter.post(
     }
 
     const email = parsed.data.email.trim().toLowerCase();
+    const phone = parsed.data.phone;
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) {
-      res.status(409).json({ error: 'Бул электрондук почта менен аккаунт бар', fields: { email: 'Бул электрондук почта менен аккаунт бар' } });
+      if (exists.role === 'admin' || !exists.isActive) {
+        res.status(409).json({
+          error: 'Бул электрондук почта менен аккаунт бар',
+          fields: { email: 'Бул электрондук почта менен аккаунт бар' },
+        });
+        return;
+      }
+      if (!exists.isVerified) {
+        const { code, tokenId } = await issueAuthCode(exists.id);
+        const delivered = await deliverAuthCode(email, exists.phone, code, 'register');
+        if (!delivered) {
+          if (tokenId) {
+            await prisma.passwordResetToken.update({
+              where: { id: tokenId },
+              data: { usedAt: new Date() },
+            });
+          }
+          res.status(503).json({
+            error: 'Код почтага жөнөтүлгөн жок. Кийинчерээк кайра кайталап көрүңүз.',
+          });
+          return;
+        }
+        res.status(200).json({
+          needsConfirmation: true,
+          email,
+          message: deliveryMessage(delivered),
+        });
+        return;
+      }
+      res.status(409).json({
+        error: 'Бул электрондук почта менен аккаунт бар',
+        fields: { email: 'Бул электрондук почта менен аккаунт бар' },
+      });
+      return;
+    }
+
+    const phoneTaken = await findUserByKgPhone(phone);
+    if (phoneTaken) {
+      res.status(409).json({
+        error: 'Бул телефон менен аккаунт бар',
+        fields: { phone: 'Бул телефон менен аккаунт бар' },
+      });
       return;
     }
 
@@ -136,16 +243,28 @@ authRouter.post(
         passwordHash,
         firstName: parsed.data.firstName.trim(),
         lastName: parsed.data.lastName.trim(),
-        phone: parsed.data.phone?.trim() || null,
+        phone,
         role: 'user',
         isActive: true,
+        isVerified: false,
         profile: { create: {} },
       },
     });
 
+    const { code } = await issueAuthCode(user.id);
+    const delivered = await deliverAuthCode(email, phone, code, 'register');
+    if (!delivered) {
+      await prisma.user.delete({ where: { id: user.id } });
+      res.status(503).json({
+        error: 'Код почтага жөнөтүлгөн жок. Кийинчерээк кайра кайталап көрүңүз.',
+      });
+      return;
+    }
+
     res.status(201).json({
-      token: signToken({ id: user.id, role: user.role }),
-      user: toPublicUser(user),
+      needsConfirmation: true,
+      email,
+      message: deliveryMessage(delivered),
     });
   }),
 );
@@ -159,46 +278,93 @@ authRouter.post(
       return;
     }
 
-    const email = parsed.data.email.trim().toLowerCase();
-    const user = await prisma.user.findUnique({ where: { email } });
-
-    const genericMessage =
-      'Эгер бул электрондук почта менен аккаунт бар болсо, код түзүлдү';
+    const email = parsed.data.email;
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
 
     if (!user || !user.isActive || user.role === 'admin') {
-      res.json({ message: genericMessage });
+      res.status(400).json({
+        error: 'Бул почта менен аккаунт жок',
+        fields: { email: 'Бул почта менен аккаунт жок' },
+      });
       return;
     }
 
-    await prisma.passwordResetToken.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { usedAt: new Date() },
+    const { code, tokenId } = await issueAuthCode(user.id);
+    const delivered = await deliverAuthCode(email, user.phone, code, 'reset');
+    if (!delivered) {
+      if (tokenId) {
+        await prisma.passwordResetToken.update({
+          where: { id: tokenId },
+          data: { usedAt: new Date() },
+        });
+      }
+      res.status(503).json({
+        error: isMailConfigured()
+          ? 'Код почтага жөнөтүлгөн жок. Кийинчерээк кайра кайталап көрүңүз.'
+          : 'Код почтага жөнөтүлгөн жок. Почта сервиси туташа элек.',
+      });
+      return;
+    }
+
+    res.json({ message: deliveryMessage(delivered) });
+  }),
+);
+
+authRouter.post(
+  '/confirm-code',
+  asyncHandler(async (req, res) => {
+    const parsed = confirmCodeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      validationResponse(res, parsed);
+      return;
+    }
+
+    const email = parsed.data.email;
+    const code = parsed.data.code.trim();
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
     });
 
-    let code = String(randomInt(100000, 1000000));
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        await prisma.passwordResetToken.create({
-          data: {
-            userId: user.id,
-            token: code,
-            expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
-          },
-        });
-        break;
-      } catch {
-        code = String(randomInt(100000, 1000000));
-        if (attempt === 4) throw new Error('Код түзүлгөн жок');
-      }
+    if (!user || !user.isActive || user.role === 'admin') {
+      res.status(400).json({
+        error: 'Код жараксыз же мөөнөтү өткөн',
+        fields: { code: 'Код жараксыз же мөөнөтү өткөн' },
+      });
+      return;
     }
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[password-reset] ${email}: code ${code}`);
+    const record = await prisma.passwordResetToken.findFirst({
+      where: {
+        token: code,
+        usedAt: null,
+        userId: user.id,
+      },
+    });
+
+    if (!record || record.expiresAt < new Date()) {
+      res.status(400).json({
+        error: 'Код жараксыз же мөөнөтү өткөн',
+        fields: { code: 'Код жараксыз же мөөнөтү өткөн' },
+      });
+      return;
     }
+
+    const [updated] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { isVerified: true, lastLoginAt: new Date() },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
 
     res.json({
-      message: 'Код түзүлдү. Аны жазып, жаңы сыр сөздү коюңуз',
-      code,
+      token: signToken({ id: updated.id, role: updated.role }),
+      user: toPublicUser(updated),
     });
   }),
 );
@@ -213,21 +379,27 @@ authRouter.post(
     }
 
     const token = parsed.data.token.trim();
-    const email = parsed.data.email?.trim().toLowerCase();
+    const email = parsed.data.email;
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
 
-    const record = email
-      ? await prisma.passwordResetToken.findFirst({
-          where: {
-            token,
-            usedAt: null,
-            user: { email, isActive: true },
-          },
-          include: { user: true },
-        })
-      : await prisma.passwordResetToken.findUnique({
-          where: { token },
-          include: { user: true },
-        });
+    if (!user || !user.isActive || user.role === 'admin') {
+      res.status(400).json({
+        error: 'Код жараксыз же мөөнөтү өткөн',
+        fields: { token: 'Код жараксыз же мөөнөтү өткөн' },
+      });
+      return;
+    }
+
+    const record = await prisma.passwordResetToken.findFirst({
+      where: {
+        token,
+        usedAt: null,
+        userId: user.id,
+      },
+      include: { user: true },
+    });
 
     if (!record || record.usedAt || record.expiresAt < new Date() || !record.user.isActive) {
       res.status(400).json({
@@ -242,7 +414,7 @@ authRouter.post(
     await prisma.$transaction([
       prisma.user.update({
         where: { id: record.userId },
-        data: { passwordHash },
+        data: { passwordHash, isVerified: true },
       }),
       prisma.passwordResetToken.update({
         where: { id: record.id },
@@ -294,6 +466,17 @@ authRouter.put(
       }
     }
 
+    if (parsed.data.phone && parsed.data.phone !== user.phone) {
+      const phoneTaken = await findUserByKgPhone(parsed.data.phone, user.id);
+      if (phoneTaken) {
+        res.status(409).json({
+          error: 'Бул телефон менен аккаунт бар',
+          fields: { phone: 'Бул телефон менен аккаунт бар' },
+        });
+        return;
+      }
+    }
+
     let passwordHash = user.passwordHash;
     if (parsed.data.currentPassword && parsed.data.newPassword) {
       const ok = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
@@ -313,7 +496,7 @@ authRouter.put(
         ...(parsed.data.firstName !== undefined ? { firstName: parsed.data.firstName.trim() } : {}),
         ...(parsed.data.lastName !== undefined ? { lastName: parsed.data.lastName.trim() } : {}),
         ...(parsed.data.email !== undefined ? { email: parsed.data.email.trim().toLowerCase() } : {}),
-        ...(parsed.data.phone !== undefined ? { phone: parsed.data.phone?.trim() || null } : {}),
+        ...(parsed.data.phone !== undefined ? { phone: parsed.data.phone } : {}),
         ...(parsed.data.newPassword ? { passwordHash } : {}),
       },
     });

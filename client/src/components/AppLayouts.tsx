@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Footer } from './Footer';
+import { AuthModalProvider } from '../context/AuthModalContext';
+import { ContactPanelProvider } from '../context/ContactPanelContext';
 import { useAuth } from '../context/AuthContext';
 
 function AuthLoading() {
@@ -32,11 +34,15 @@ function PublicThemeShell() {
   }, [dark]);
 
   return (
-    <div className={dark ? 'dark' : ''}>
-      <Header dark={dark} onToggle={() => setDark(!dark)} />
-      <Outlet />
-      <Footer />
-    </div>
+    <AuthModalProvider>
+      <ContactPanelProvider>
+        <div className={dark ? 'dark' : ''}>
+          <Header dark={dark} onToggle={() => setDark(!dark)} />
+          <Outlet />
+          <Footer />
+        </div>
+      </ContactPanelProvider>
+    </AuthModalProvider>
   );
 }
 

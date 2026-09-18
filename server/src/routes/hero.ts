@@ -8,12 +8,14 @@ export const heroRouter = Router();
 
 const HERO_ID = 'default';
 
+import { DEFAULT_SITE_IMAGES } from '../data/site-images.js';
+
 export const DEFAULT_HERO = {
   title: 'Бийиктикке умтул!',
   subtitle: 'Билим эркиндикке жол ачат, амал ийгиликке жеткирет.',
   name: 'Мухаммадалим',
-  skyImageUrl: '/sky-hero.jpg',
-  bannerImageUrl: '/tunduk-hero.jpg',
+  skyImageUrl: DEFAULT_SITE_IMAGES['hero.sky'],
+  bannerImageUrl: DEFAULT_SITE_IMAGES['hero.banner'],
 };
 
 const updateSchema = z.object({
