@@ -1,6 +1,5 @@
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import {
@@ -9,10 +8,10 @@ import {
   type SiteImageKey,
 } from './data/site-images.js';
 
-dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../.env') });
+dotenv.config({ path: resolve(__dirname, '../../.env') });
 
 const prisma = new PrismaClient();
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = resolve(__dirname, '../..');
 const publicDir = resolve(root, 'client/public');
 const uploadsDir = resolve(root, 'server/uploads');
 

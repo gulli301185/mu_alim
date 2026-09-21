@@ -18,10 +18,9 @@ ENV PORT=3001
 
 COPY --from=builder /app/server/node_modules ./node_modules
 COPY --from=builder /app/server/dist ./dist
-COPY --from=builder /app/server/src/openapi.json ./src/openapi.json
 COPY --from=builder /app/server/uploads ./uploads
 COPY --from=builder /app/prisma ./../prisma
 
 EXPOSE 3001
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/main.js"]

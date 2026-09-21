@@ -20,7 +20,7 @@
     "db:import:qa": "node scripts/parse-telegram-qa.mjs",
     "db:import:telegram-html": "tsx server/src/import-telegram-html.ts",
     "db:import:aqida": "tsx server/src/import-aqida-lessons.ts",
-    "dev:server": "tsx watch server/src/index.ts",
+    "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "dev": "npx --yes concurrently -k -n server,client -c blue,green \"npm run dev:server\" \"npm run dev:client\"",
     "build:client": "npm run build --prefix client",

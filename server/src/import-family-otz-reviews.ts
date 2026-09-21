@@ -1,13 +1,12 @@
 import dotenv from 'dotenv';
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
-dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../.env') });
+dotenv.config({ path: resolve(__dirname, '../../.env') });
 
 const prisma = new PrismaClient();
-const uploads = resolve(dirname(fileURLToPath(import.meta.url)), '../uploads/reviews');
+const uploads = resolve(__dirname, '../uploads/reviews');
 
 async function main() {
   const course = await prisma.course.findUnique({ where: { slug: 'family' } });

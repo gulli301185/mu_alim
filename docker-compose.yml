@@ -1,0 +1,8 @@
+# Local Redis for the API cache:  docker compose up -d redis
+# (PostgreSQL is expected on localhost:5432 — see DATABASE_URL in .env.example.)
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]

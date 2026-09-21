@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
-dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../.env') });
+/** Loads the repo-root `.env` (works from both `src/` and `dist/`). */
+dotenv.config({ path: resolve(__dirname, '../../.env') });

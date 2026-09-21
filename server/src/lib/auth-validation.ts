@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { normalizeKgPhone } from './phone.js';
+import { normalizeKgPhone } from './phone';
 
 const nameRegex = /^[\p{L}\s'-]+$/u;
 

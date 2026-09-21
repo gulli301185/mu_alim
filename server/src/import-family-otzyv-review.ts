@@ -1,14 +1,13 @@
 import dotenv from 'dotenv';
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
-dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../.env') });
+dotenv.config({ path: resolve(__dirname, '../../.env') });
 
 const prisma = new PrismaClient();
 const VIDEO_URL = '/uploads/reviews/family-otzyv.mp4';
-const VIDEO_FILE = resolve(dirname(fileURLToPath(import.meta.url)), '../uploads/reviews/family-otzyv.mp4');
+const VIDEO_FILE = resolve(__dirname, '../uploads/reviews/family-otzyv.mp4');
 
 async function main() {
   if (!existsSync(VIDEO_FILE)) {

@@ -1,5 +1,5 @@
-import { prisma } from './prisma.js';
-import { normalizeKgPhone } from './phone.js';
+import type { PrismaClient } from '@prisma/client';
+import { normalizeKgPhone } from './phone';
 
 export function kgPhoneDigitKeys(normalized: string): string[] {
   const local = normalized.replace(/^\+996/, '');
@@ -16,7 +16,11 @@ export function phonesMatch(storedPhone: string | null | undefined, normalized: 
   return kgPhoneDigitKeys(normalized).includes(storedDigits);
 }
 
-export async function findUserByKgPhone(normalizedPhone: string, excludeId?: string) {
+export async function findUserByKgPhone(
+  prisma: PrismaClient,
+  normalizedPhone: string,
+  excludeId?: string,
+) {
   const keys = kgPhoneDigitKeys(normalizedPhone);
   const rows = excludeId
     ? await prisma.$queryRawUnsafe<Array<{ id: string }>>(

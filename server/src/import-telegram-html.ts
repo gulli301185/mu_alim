@@ -1,12 +1,11 @@
 import dotenv from 'dotenv';
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { parseTelegramHtmlExport } from './lib/telegram-html-parser.js';
 import { importQaArticles } from './lib/qa-import-service.js';
 
-dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../.env') });
+dotenv.config({ path: resolve(__dirname, '../../.env') });
 
 const prisma = new PrismaClient();
 
