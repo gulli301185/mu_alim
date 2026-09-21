@@ -23,7 +23,6 @@ function createTransport() {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: { user, pass },
-      family: 4,
       connectionTimeout: 20_000,
       greetingTimeout: 20_000,
       socketTimeout: 20_000,
@@ -36,7 +35,6 @@ function createTransport() {
     secure: process.env.SMTP_SECURE === 'true' || port === 465,
     requireTLS: port === 587,
     auth: { user, pass },
-    family: 4,
     connectionTimeout: 20_000,
     greetingTimeout: 20_000,
     socketTimeout: 20_000,

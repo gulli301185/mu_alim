@@ -2,26 +2,25 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+COPY prisma ./prisma
+COPY server ./server
 
-COPY tsconfig.json ./
-COPY src ./src
+WORKDIR /app/server
+RUN npm ci
 RUN npm run build
 
 FROM node:22-alpine
 
-WORKDIR /app
+WORKDIR /app/server
 
 ENV NODE_ENV=production
 ENV PORT=3001
 
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src/openapi.json ./src/openapi.json
-COPY uploads ./uploads
+COPY --from=builder /app/server/node_modules ./node_modules
+COPY --from=builder /app/server/dist ./dist
+COPY --from=builder /app/server/src/openapi.json ./src/openapi.json
+COPY --from=builder /app/server/uploads ./uploads
+COPY --from=builder /app/prisma ./../prisma
 
 EXPOSE 3001
 

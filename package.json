@@ -2,6 +2,9 @@
   "name": "mu-alim",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "server"
+  ],
   "scripts": {
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
