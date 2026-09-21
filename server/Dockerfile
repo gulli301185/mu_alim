@@ -22,6 +22,7 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/uploads ./uploads
+COPY --from=builder /app/db ./db
 
 EXPOSE 3001
 

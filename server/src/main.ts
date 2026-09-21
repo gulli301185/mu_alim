@@ -6,8 +6,10 @@ import { json } from 'express';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import swaggerUi from 'swagger-ui-express';
+import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { ensureSchema } from './database/bootstrap-schema';
 import { MailService } from './mail/mail.service';
 import { SmsService } from './mail/sms.service';
 
@@ -30,6 +32,7 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();
 
+  await ensureSchema(app.get(DataSource));
   await app.listen(port);
 
   console.log(`API server: http://localhost:${port}`);
