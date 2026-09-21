@@ -1,15 +1,14 @@
-import dotenv from 'dotenv';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { PrismaClient } from '@prisma/client';
+import type { DataSource } from 'typeorm';
+import { connectScriptDb } from './database/data-source';
 import { parseTelegramHtmlExport } from './lib/telegram-html-parser.js';
 import { importQaArticles } from './lib/qa-import-service.js';
 
-dotenv.config({ path: resolve(__dirname, '../../.env') });
-
-const prisma = new PrismaClient();
+let ds: DataSource;
 
 async function main() {
+  ds = await connectScriptDb();
   const args = process.argv.slice(2);
   const replaceAll = args.includes('--replace');
   const htmlPath = args.find((arg) => !arg.startsWith('--'));
@@ -27,7 +26,7 @@ async function main() {
 
   console.log(`✓ Parser: ${items.length} суроо-жооп табылды`);
 
-  const result = await importQaArticles(prisma, items, { replaceAll });
+  const result = await importQaArticles(ds, items, { replaceAll });
 
   console.log(`✓ Импорт аяктады:`);
   console.log(`  - Жаңы: ${result.created}`);
@@ -42,5 +41,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await ds?.destroy();
   });

@@ -1,22 +1,22 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AuthUser, CurrentUser, JwtAuthGuard, assertUserRole } from '../common/auth';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Enrollment } from '../database/entities';
 
 @Controller()
 export class EnrollmentsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@InjectRepository(Enrollment) private readonly enrollments: Repository<Enrollment>) {}
 
   @Get('me/enrollments')
   @UseGuards(JwtAuthGuard)
   async mine(@CurrentUser() user: AuthUser | undefined) {
     assertUserRole(user);
 
-    const enrollments = await this.prisma.enrollment.findMany({
+    const enrollments = await this.enrollments.find({
       where: { userId: user.id, status: 'active' },
-      orderBy: { enrolledAt: 'desc' },
-      include: {
-        course: { select: { id: true, slug: true, title: true, courseType: true } },
-      },
+      order: { enrolledAt: 'DESC' },
+      relations: { course: true },
     });
 
     return {

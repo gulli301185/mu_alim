@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { z } from 'zod';
 import { AppError } from '../common/app-error';
 import { AuthUser } from '../common/auth';
 import { UUID_RE } from '../common/uuid';
 import { CacheService } from '../cache/cache.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { Category, Course, Enrollment, Lesson } from '../database/entities';
 import { fetchYoutubePlaylistVideos } from '../lib/youtube-playlist';
 
 const CACHE_TTL = 300;
@@ -47,7 +48,7 @@ function toPublicCourse(course: {
   description: string;
   coverImage: string | null;
   courseType: 'free' | 'paid';
-  price: Prisma.Decimal;
+  price: number;
   currency: string;
   level: string | null;
   isPopular: boolean;
@@ -87,26 +88,19 @@ function slugify(title: string) {
     .slice(0, 280);
 }
 
-const publishedIntro = {
-  _count: { select: { lessons: { where: { isPublished: true } } } },
-  lessons: {
-    where: { isPublished: true },
-    orderBy: { lessonOrder: 'asc' },
-    take: 1,
-    select: { youtubeVideoId: true, durationSeconds: true },
-  },
-} satisfies Prisma.CourseInclude;
-
-const firstLessonIntro = {
-  orderBy: { lessonOrder: 'asc' },
-  take: 1,
-  select: { youtubeVideoId: true, durationSeconds: true },
-} satisfies Prisma.Course$lessonsArgs;
+type CourseWithIntro<T> = T & {
+  _count: { lessons: number };
+  lessons: { youtubeVideoId: string; durationSeconds: number | null }[];
+};
 
 @Injectable()
 export class CoursesService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Course) private readonly courseRepo: Repository<Course>,
+    @InjectRepository(Category) private readonly categories: Repository<Category>,
+    @InjectRepository(Lesson) private readonly lessonRepo: Repository<Lesson>,
+    @InjectRepository(Enrollment) private readonly enrollments: Repository<Enrollment>,
+    private readonly ds: DataSource,
     private readonly cache: CacheService,
   ) {}
 
@@ -117,18 +111,18 @@ export class CoursesService {
 
   async resolveRef(ref: string) {
     if (UUID_RE.test(ref)) {
-      const byId = await this.prisma.course.findUnique({ where: { id: ref } });
+      const byId = await this.courseRepo.findOneBy({ id: ref });
       if (byId) return byId;
     }
-    return this.prisma.course.findUnique({ where: { slug: ref } });
+    return this.courseRepo.findOneBy({ slug: ref });
   }
 
   async resolveId(ref: string) {
     if (UUID_RE.test(ref)) {
-      const byId = await this.prisma.course.findUnique({ where: { id: ref }, select: { id: true } });
+      const byId = await this.courseRepo.findOne({ where: { id: ref }, select: { id: true } });
       if (byId) return byId.id;
     }
-    const bySlug = await this.prisma.course.findUnique({ where: { slug: ref }, select: { id: true } });
+    const bySlug = await this.courseRepo.findOne({ where: { slug: ref }, select: { id: true } });
     return bySlug?.id ?? null;
   }
 
@@ -142,35 +136,75 @@ export class CoursesService {
     if (!user) return false;
     if (user.role === 'admin') return true;
 
-    const enrollment = await this.prisma.enrollment.findUnique({
-      where: { userId_courseId: { userId: user.id, courseId } },
+    const enrollment = await this.enrollments.findOne({
+      where: { userId: user.id, courseId },
       select: { status: true },
     });
 
     return enrollment?.status === 'active';
   }
 
+  /** Attaches the lesson count and the first lesson (for the intro video) to each course. */
+  private async withIntro<T extends { id: string }>(
+    courses: T[],
+    publishedOnly: boolean,
+  ): Promise<CourseWithIntro<T>[]> {
+    if (courses.length === 0) return [];
+    const ids = courses.map((course) => course.id);
+    const filter = publishedOnly ? 'AND is_published = true' : '';
+
+    const [counts, firsts] = await Promise.all([
+      this.ds.query(
+        `SELECT course_id AS "courseId", COUNT(*)::int AS n FROM lessons
+         WHERE course_id = ANY($1::uuid[]) ${filter} GROUP BY course_id`,
+        [ids],
+      ) as Promise<{ courseId: string; n: number }[]>,
+      this.ds.query(
+        `SELECT DISTINCT ON (course_id) course_id AS "courseId",
+                youtube_video_id AS "youtubeVideoId", duration_seconds AS "durationSeconds"
+         FROM lessons WHERE course_id = ANY($1::uuid[]) ${filter}
+         ORDER BY course_id, lesson_order`,
+        [ids],
+      ) as Promise<{ courseId: string; youtubeVideoId: string; durationSeconds: number | null }[]>,
+    ]);
+
+    const countBy = new Map(counts.map((row) => [row.courseId, row.n]));
+    const firstBy = new Map(firsts.map((row) => [row.courseId, row]));
+    return courses.map((course) => {
+      const first = firstBy.get(course.id);
+      return {
+        ...course,
+        _count: { lessons: countBy.get(course.id) ?? 0 },
+        lessons: first
+          ? [{ youtubeVideoId: first.youtubeVideoId, durationSeconds: first.durationSeconds }]
+          : [],
+      };
+    });
+  }
+
+  private async enrollmentCounts(courseIds: string[]) {
+    if (courseIds.length === 0) return new Map<string, number>();
+    const rows: { courseId: string; n: number }[] = await this.ds.query(
+      `SELECT course_id AS "courseId", COUNT(*)::int AS n FROM enrollments
+       WHERE course_id = ANY($1::uuid[]) GROUP BY course_id`,
+      [courseIds],
+    );
+    return new Map(rows.map((row) => [row.courseId, row.n]));
+  }
+
   // ─── Public ────────────────────────────────────────────────────────────────
 
   freeLessons() {
     return this.cache.wrap('courses:free-lessons', CACHE_TTL, async () => {
-      const lessons = await this.prisma.lesson.findMany({
-        where: {
-          isPublished: true,
-          course: { courseType: 'free', isPublished: true },
-        },
-        orderBy: [{ course: { title: 'asc' } }, { lessonOrder: 'asc' }],
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          youtubeUrl: true,
-          youtubeVideoId: true,
-          durationSeconds: true,
-          lessonOrder: true,
-          course: { select: { id: true, slug: true, title: true } },
-        },
-      });
+      const lessons = await this.lessonRepo
+        .createQueryBuilder('l')
+        .innerJoinAndSelect('l.course', 'c')
+        .where('l.isPublished = true')
+        .andWhere("c.courseType = 'free'")
+        .andWhere('c.isPublished = true')
+        .orderBy('c.title', 'ASC')
+        .addOrderBy('l.lessonOrder', 'ASC')
+        .getMany();
 
       return {
         items: lessons.map((lesson) => ({
@@ -191,24 +225,20 @@ export class CoursesService {
 
   listPublic({ type, page, limit }: ListQuery) {
     return this.cache.wrap(`courses:list:${type ?? 'all'}:${page}:${limit}`, CACHE_TTL, async () => {
-      const where: Prisma.CourseWhereInput = {
-        isPublished: true,
-        ...(type ? { courseType: type } : {}),
-      };
+      const where = { isPublished: true, ...(type ? { courseType: type } : {}) };
 
       const [total, courses] = await Promise.all([
-        this.prisma.course.count({ where }),
-        this.prisma.course.findMany({
+        this.courseRepo.countBy(where),
+        this.courseRepo.find({
           where,
-          orderBy: [{ isPopular: 'desc' }, { title: 'asc' }],
+          order: { isPopular: 'DESC', title: 'ASC' },
           skip: (page - 1) * limit,
           take: limit,
-          include: publishedIntro,
         }),
       ]);
 
       return {
-        items: courses.map(toPublicCourse),
+        items: (await this.withIntro(courses, true)).map(toPublicCourse),
         total,
         page,
         totalPages: Math.max(1, Math.ceil(total / limit)),
@@ -221,11 +251,8 @@ export class CoursesService {
       const course = await this.resolveRef(ref);
       if (!course || !course.isPublished) return null;
 
-      const full = await this.prisma.course.findUnique({
-        where: { id: course.id },
-        include: publishedIntro,
-      });
-      return full ? { course: toPublicCourse(full) } : null;
+      const [full] = await this.withIntro([course], true);
+      return { course: toPublicCourse(full) };
     });
 
     if (!result) throw new AppError(404, NOT_FOUND);
@@ -235,24 +262,28 @@ export class CoursesService {
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
   async adminList({ type, page, limit }: ListQuery) {
-    const where: Prisma.CourseWhereInput = type ? { courseType: type } : {};
+    const where = type ? { courseType: type } : {};
 
     const [total, courses] = await Promise.all([
-      this.prisma.course.count({ where }),
-      this.prisma.course.findMany({
+      this.courseRepo.countBy(where),
+      this.courseRepo.find({
         where,
-        orderBy: [{ courseType: 'asc' }, { title: 'asc' }],
+        order: { courseType: 'ASC', title: 'ASC' },
         skip: (page - 1) * limit,
         take: limit,
-        include: { _count: { select: { lessons: true, enrollments: true } } },
       }),
     ]);
 
+    const [enriched, enrollments] = await Promise.all([
+      this.withIntro(courses, false),
+      this.enrollmentCounts(courses.map((course) => course.id)),
+    ]);
+
     return {
-      items: courses.map((course) => ({
+      items: enriched.map((course) => ({
         ...toPublicCourse({ ...course, lessons: [] }),
         isPublished: course.isPublished,
-        enrollmentsCount: course._count.enrollments,
+        enrollmentsCount: enrollments.get(course.id) ?? 0,
         lessonsCount: course._count.lessons,
         createdAt: course.createdAt.toISOString(),
         updatedAt: course.updatedAt.toISOString(),
@@ -265,69 +296,66 @@ export class CoursesService {
 
   private async defaultCategoryId(courseType: 'free' | 'paid') {
     const slug = courseType === 'free' ? 'free-courses' : 'paid-courses';
-    const category = await this.prisma.category.findUnique({ where: { slug } });
+    const category = await this.categories.findOneBy({ slug });
     if (category) return category.id;
-    const created = await this.prisma.category.create({
-      data: {
+    const created = await this.categories.save(
+      this.categories.create({
         slug,
         name: courseType === 'free' ? 'Бекер курстар' : 'Акы төлөнүүчү курстар',
+        description: null,
         isActive: true,
-      },
-    });
+      }),
+    );
     return created.id;
   }
 
   async adminCreate(data: z.infer<typeof createCourseSchema>) {
     const slug = data.slug?.trim() || slugify(data.title);
-    const exists = await this.prisma.course.findUnique({ where: { slug } });
+    const exists = await this.courseRepo.findOneBy({ slug });
     if (exists) throw new AppError(409, 'Бул slug эле бар');
 
     const courseType = data.courseType;
-    const course = await this.prisma.course.create({
-      data: {
+    const course = await this.courseRepo.save(
+      this.courseRepo.create({
         categoryId: await this.defaultCategoryId(courseType),
         title: data.title,
         slug,
         description: data.description,
         shortDescription: data.shortDescription ?? null,
+        coverImage: null,
         courseType,
         price: courseType === 'free' ? 0 : (data.price ?? 0),
         currency: data.currency ?? 'KGS',
         level: data.level ?? null,
+        durationMinutes: null,
+        passingScore: 80,
         isPublished: data.isPublished ?? false,
         isPopular: data.isPopular ?? false,
         publishedAt: data.isPublished ? new Date() : null,
-      },
-      include: { _count: { select: { lessons: true } } },
-    });
+      }),
+    );
 
     await this.invalidate();
     return {
       course: {
         ...toPublicCourse({ ...course, lessons: [] }),
         isPublished: course.isPublished,
-        lessonsCount: course._count.lessons,
+        lessonsCount: 0,
       },
     };
   }
 
   async adminGet(ref: string) {
     const course = await this.requireRef(ref);
-    const full = await this.prisma.course.findUnique({
-      where: { id: course.id },
-      include: {
-        _count: { select: { lessons: true, enrollments: true } },
-        lessons: firstLessonIntro,
-      },
-    });
-    if (!full) throw new AppError(404, NOT_FOUND);
+    const [full] = await this.withIntro([course], false);
+    const enrollments = await this.enrollmentCounts([course.id]);
 
     return {
       course: {
         ...toPublicCourse(full),
         isPublished: full.isPublished,
         lessonsCount: full._count.lessons,
-        enrollmentsCount: full._count.enrollments,
+        enrollmentsCount: enrollments.get(course.id) ?? 0,
       },
     };
   }
@@ -336,32 +364,26 @@ export class CoursesService {
     const existing = await this.requireRef(ref);
 
     if (data.slug && data.slug !== existing.slug) {
-      const slugTaken = await this.prisma.course.findUnique({ where: { slug: data.slug } });
+      const slugTaken = await this.courseRepo.findOneBy({ slug: data.slug });
       if (slugTaken) throw new AppError(409, 'Бул slug эле бар');
     }
 
     const nextType = data.courseType ?? existing.courseType;
-    const course = await this.prisma.course.update({
-      where: { id: existing.id },
-      data: {
-        ...(data.title !== undefined ? { title: data.title } : {}),
-        ...(data.slug !== undefined ? { slug: data.slug } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.shortDescription !== undefined ? { shortDescription: data.shortDescription } : {}),
-        ...(data.courseType !== undefined ? { courseType: data.courseType } : {}),
-        ...(data.price !== undefined ? { price: nextType === 'free' ? 0 : data.price } : {}),
-        ...(data.currency !== undefined ? { currency: data.currency } : {}),
-        ...(data.level !== undefined ? { level: data.level } : {}),
-        ...(data.isPopular !== undefined ? { isPopular: data.isPopular } : {}),
-        ...(data.isPublished !== undefined
-          ? { isPublished: data.isPublished, publishedAt: data.isPublished ? new Date() : null }
-          : {}),
-      },
-      include: {
-        _count: { select: { lessons: true } },
-        lessons: firstLessonIntro,
-      },
-    });
+    if (data.title !== undefined) existing.title = data.title;
+    if (data.slug !== undefined) existing.slug = data.slug;
+    if (data.description !== undefined) existing.description = data.description;
+    if (data.shortDescription !== undefined) existing.shortDescription = data.shortDescription;
+    if (data.courseType !== undefined) existing.courseType = data.courseType;
+    if (data.price !== undefined) existing.price = nextType === 'free' ? 0 : data.price;
+    if (data.currency !== undefined) existing.currency = data.currency;
+    if (data.level !== undefined) existing.level = data.level;
+    if (data.isPopular !== undefined) existing.isPopular = data.isPopular;
+    if (data.isPublished !== undefined) {
+      existing.isPublished = data.isPublished;
+      existing.publishedAt = data.isPublished ? new Date() : null;
+    }
+    const saved = await this.courseRepo.save(existing);
+    const [course] = await this.withIntro([saved], false);
 
     await this.invalidate();
     return {
@@ -375,15 +397,15 @@ export class CoursesService {
 
   async adminDelete(ref: string) {
     const existing = await this.requireRef(ref);
-    await this.prisma.course.delete({ where: { id: existing.id } });
+    await this.courseRepo.delete({ id: existing.id });
     await this.invalidate();
   }
 
   async adminLessons(ref: string) {
     const course = await this.requireRef(ref);
-    const lessons = await this.prisma.lesson.findMany({
+    const lessons = await this.lessonRepo.find({
       where: { courseId: course.id },
-      orderBy: { lessonOrder: 'asc' },
+      order: { lessonOrder: 'ASC' },
     });
 
     return lessons.map((lesson) => ({
@@ -409,12 +431,12 @@ export class CoursesService {
     }
     const replace = Boolean(data.replace);
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.ds.transaction(async (em) => {
       if (replace) {
-        await tx.lesson.deleteMany({ where: { courseId: course.id } });
+        await em.delete(Lesson, { courseId: course.id });
       }
 
-      const existing = await tx.lesson.findMany({
+      const existing = await em.find(Lesson, {
         where: { courseId: course.id },
         select: { youtubeVideoId: true, lessonOrder: true },
       });
@@ -423,19 +445,21 @@ export class CoursesService {
 
       const toCreate = videos
         .filter((video) => !existingIds.has(video.videoId))
-        .map((video, index) => ({
-          courseId: course.id,
-          title: video.title.slice(0, 255),
-          description: null as string | null,
-          youtubeUrl: video.youtubeUrl,
-          youtubeVideoId: video.videoId,
-          durationSeconds: video.durationSeconds,
-          lessonOrder: startOrder + index + 1,
-          isPublished: true,
-        }));
+        .map((video, index) =>
+          em.create(Lesson, {
+            courseId: course.id,
+            title: video.title.slice(0, 255),
+            description: null,
+            youtubeUrl: video.youtubeUrl,
+            youtubeVideoId: video.videoId,
+            durationSeconds: video.durationSeconds,
+            lessonOrder: startOrder + index + 1,
+            isPublished: true,
+          }),
+        );
 
       if (toCreate.length > 0) {
-        await tx.lesson.createMany({ data: toCreate });
+        await em.save(toCreate);
       }
 
       return {

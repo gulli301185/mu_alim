@@ -1,4 +1,3 @@
-import type { Prisma } from '@prisma/client';
 import type { GradeAnswers, QuestionInput } from './tests.schemas';
 
 export const CHOICE_LABELS = ['А', 'Б', 'В', 'Г'] as const;
@@ -52,7 +51,7 @@ export function toPublicQuestion(question: {
 
 export function gradeTestAnswers(
   test: {
-    passingScore: Prisma.Decimal;
+    passingScore: number;
     testQuestions: {
       question: {
         id: string;

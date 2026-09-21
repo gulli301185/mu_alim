@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { CacheService } from '../cache/cache.service';
 import { DEFAULT_SITE_IMAGES } from '../data/site-images';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { HeroBanner } from '../database/entities';
 
 const HERO_ID = 'default';
 const CACHE_KEY = 'site:hero';
@@ -45,27 +47,30 @@ function toDto(row: {
 @Injectable()
 export class HeroService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(HeroBanner) private readonly heroes: Repository<HeroBanner>,
     private readonly cache: CacheService,
   ) {}
 
+  /** Atomic insert-or-update of the single banner row; `overwrite` lists the columns to refresh on conflict. */
+  private upsert(values: z.infer<typeof updateHeroSchema>, overwrite: string[]) {
+    const now = new Date();
+    const insert = this.heroes
+      .createQueryBuilder()
+      .insert()
+      .values({ id: HERO_ID, ...values, createdAt: now, updatedAt: now });
+    return overwrite.length > 0 ? insert.orUpdate(overwrite, ['id']).execute() : insert.orIgnore().execute();
+  }
+
   get() {
     return this.cache.wrap(CACHE_KEY, CACHE_TTL, async () => {
-      const hero = await this.prisma.heroBanner.upsert({
-        where: { id: HERO_ID },
-        update: {},
-        create: { id: HERO_ID, ...DEFAULT_HERO },
-      });
-      return toDto(hero);
+      await this.upsert(DEFAULT_HERO, []);
+      return toDto(await this.heroes.findOneByOrFail({ id: HERO_ID }));
     });
   }
 
   async update(data: z.infer<typeof updateHeroSchema>) {
-    const hero = await this.prisma.heroBanner.upsert({
-      where: { id: HERO_ID },
-      update: data,
-      create: { id: HERO_ID, ...data },
-    });
+    await this.upsert(data, ['title', 'subtitle', 'name', 'sky_image_url', 'banner_image_url', 'updated_at']);
+    const hero = await this.heroes.findOneByOrFail({ id: HERO_ID });
 
     await this.cache.del(CACHE_KEY);
     return toDto(hero);

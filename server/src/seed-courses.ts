@@ -1,6 +1,6 @@
-import dotenv from 'dotenv';
-import { resolve } from 'node:path';
-import { PrismaClient } from '@prisma/client';
+import type { DataSource } from 'typeorm';
+import { connectScriptDb, upsertBy } from './database/data-source';
+import { Category, Course, Lesson } from './database/entities';
 import {
   AKHLAQ_LESSONS,
   DEMO_PAID_LESSONS,
@@ -10,22 +10,39 @@ import {
   parseDurationToSeconds,
 } from './data/course-seed-data.js';
 
-dotenv.config({ path: resolve(__dirname, '../../.env') });
+let ds: DataSource;
 
-const prisma = new PrismaClient();
+/** Insert or update the lesson at `lessonOrder` of a course. */
+async function upsertLesson(
+  courseId: string,
+  lessonOrder: number,
+  data: Partial<Lesson> & Pick<Lesson, 'title' | 'youtubeUrl' | 'youtubeVideoId'>,
+) {
+  const repo = ds.getRepository(Lesson);
+  const existing = await repo.findOneBy({ courseId, lessonOrder });
+  if (existing) {
+    await repo.save(Object.assign(existing, data));
+  } else {
+    await repo.save(repo.create({ description: null, durationSeconds: null, courseId, lessonOrder, ...data }));
+  }
+}
 
 async function upsertCategory(slug: string, name: string, description: string) {
-  return prisma.category.upsert({
-    where: { slug },
-    update: { name, description, isActive: true },
-    create: { slug, name, description, isActive: true },
-  });
+  return upsertBy(
+    ds,
+    Category,
+    { slug },
+    { name, description, isActive: true },
+    { slug, name, description, isActive: true },
+  );
 }
 
 async function seedFreeCourse(freeCategoryId: string) {
-  const course = await prisma.course.upsert({
-    where: { slug: FREE_COURSE.slug },
-    update: {
+  const course = await upsertBy(
+    ds,
+    Course,
+    { slug: FREE_COURSE.slug },
+    {
       title: FREE_COURSE.title,
       description: FREE_COURSE.description,
       courseType: 'free',
@@ -33,7 +50,7 @@ async function seedFreeCourse(freeCategoryId: string) {
       isPublished: true,
       publishedAt: new Date(),
     },
-    create: {
+    {
       categoryId: freeCategoryId,
       title: FREE_COURSE.title,
       slug: FREE_COURSE.slug,
@@ -44,31 +61,20 @@ async function seedFreeCourse(freeCategoryId: string) {
       isPublished: true,
       publishedAt: new Date(),
     },
-  });
+  );
 
   for (const [index, video] of FREE_VIDEOS_SEED.entries()) {
     const lessonOrder = index + 1;
-    const existing = await prisma.lesson.findFirst({
-      where: { courseId: course.id, lessonOrder },
-    });
     const durationSeconds = parseDurationToSeconds(video.duration);
 
-    const data = {
+    await upsertLesson(course.id, lessonOrder, {
       title: video.title,
       description: `Бекер баян · ${video.date ?? ''}`.trim(),
       youtubeUrl: video.url,
       youtubeVideoId: video.videoId,
       durationSeconds,
       isPublished: true,
-    };
-
-    if (existing) {
-      await prisma.lesson.update({ where: { id: existing.id }, data });
-    } else {
-      await prisma.lesson.create({
-        data: { courseId: course.id, lessonOrder, ...data },
-      });
-    }
+    });
   }
 
   console.log(`✓ Free course: ${course.title} (${FREE_VIDEOS_SEED.length} lessons)`);
@@ -76,15 +82,17 @@ async function seedFreeCourse(freeCategoryId: string) {
 
 async function seedPaidCourses(paidCategoryId: string) {
   for (const courseSeed of PAID_COURSES_SEED) {
-    const course = await prisma.course.upsert({
-      where: { slug: courseSeed.slug },
-      update: {
+    const course = await upsertBy(
+      ds,
+      Course,
+      { slug: courseSeed.slug },
+      {
         title: courseSeed.title,
         price: courseSeed.price,
         isPublished: true,
         publishedAt: new Date(),
       },
-      create: {
+      {
         categoryId: paidCategoryId,
         title: courseSeed.title,
         slug: courseSeed.slug,
@@ -95,63 +103,42 @@ async function seedPaidCourses(paidCategoryId: string) {
         isPublished: true,
         publishedAt: new Date(),
       },
-    });
+    );
 
-    const existingLessonCount = await prisma.lesson.count({ where: { courseId: course.id } });
+    const existingLessonCount = await ds.getRepository(Lesson).countBy({ courseId: course.id });
     if (existingLessonCount > 1) {
       continue;
     }
 
     const introSeconds = parseDurationToSeconds(courseSeed.intro.duration);
-    const introExisting = await prisma.lesson.findFirst({
-      where: { courseId: course.id, lessonOrder: 1 },
-    });
 
-    const introData = {
+    await upsertLesson(course.id, 1, {
       title: courseSeed.intro.title,
       description: `${courseSeed.title} — киришүү`,
       youtubeUrl: courseSeed.intro.url,
       youtubeVideoId: courseSeed.intro.videoId,
       durationSeconds: introSeconds,
       isPublished: true,
-    };
-
-    if (introExisting) {
-      await prisma.lesson.update({ where: { id: introExisting.id }, data: introData });
-    } else {
-      await prisma.lesson.create({
-        data: { courseId: course.id, lessonOrder: 1, ...introData },
-      });
-    }
+    });
   }
 
   console.log(`✓ Paid courses: ${PAID_COURSES_SEED.length}`);
 }
 
 async function seedAkhlaqLessons() {
-  const course = await prisma.course.findUnique({ where: { slug: 'akhlaq' } });
+  const course = await ds.getRepository(Course).findOneBy({ slug: 'akhlaq' });
   if (!course) return;
 
   for (const [index, lesson] of AKHLAQ_LESSONS.entries()) {
     const lessonOrder = index + 1;
-    const existing = await prisma.lesson.findFirst({
-      where: { courseId: course.id, lessonOrder },
-    });
-    const data = {
+    await upsertLesson(course.id, lessonOrder, {
       title: lesson.title,
       description: 'Адеп-ахлак курсу · видео сабак',
       youtubeUrl: `https://www.youtube.com/watch?v=${lesson.videoId}`,
       youtubeVideoId: lesson.videoId,
       durationSeconds: parseDurationToSeconds(lesson.duration),
       isPublished: true,
-    };
-    if (existing) {
-      await prisma.lesson.update({ where: { id: existing.id }, data });
-    } else {
-      await prisma.lesson.create({
-        data: { courseId: course.id, lessonOrder, ...data },
-      });
-    }
+    });
   }
 
   console.log(`✓ Akhlaq lessons: ${AKHLAQ_LESSONS.length}`);
@@ -159,33 +146,22 @@ async function seedAkhlaqLessons() {
 
 async function seedDemoPaidLessons() {
   for (const lesson of DEMO_PAID_LESSONS) {
-    const course = await prisma.course.findUnique({ where: { slug: lesson.slug } });
+    const course = await ds.getRepository(Course).findOneBy({ slug: lesson.slug });
     if (!course) continue;
 
-    const existing = await prisma.lesson.findFirst({
-      where: { courseId: course.id, lessonOrder: lesson.lessonOrder },
-    });
-
-    const data = {
+    await upsertLesson(course.id, lesson.lessonOrder, {
       title: lesson.title,
       description: lesson.description,
       youtubeUrl: lesson.youtubeUrl,
       youtubeVideoId: lesson.youtubeVideoId,
       durationSeconds: lesson.durationSeconds,
       isPublished: true,
-    };
-
-    if (existing) {
-      await prisma.lesson.update({ where: { id: existing.id }, data });
-    } else {
-      await prisma.lesson.create({
-        data: { courseId: course.id, lessonOrder: lesson.lessonOrder, ...data },
-      });
-    }
+    });
   }
 }
 
 async function main() {
+  ds = await connectScriptDb();
   const freeCategory = await upsertCategory(
     'free-courses',
     'Бекер курстар',
@@ -202,8 +178,8 @@ async function main() {
   await seedAkhlaqLessons();
   await seedDemoPaidLessons();
 
-  const courseCount = await prisma.course.count();
-  const lessonCount = await prisma.lesson.count();
+  const courseCount = await ds.getRepository(Course).count();
+  const lessonCount = await ds.getRepository(Lesson).count();
   console.log(`Courses seeded: ${courseCount}, lessons: ${lessonCount}`);
 }
 
@@ -213,5 +189,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await ds?.destroy();
   });

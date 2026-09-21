@@ -6,7 +6,9 @@ import { AppError } from '../common/app-error';
 import { AuthUser } from '../common/auth';
 import { MailService } from '../mail/mail.service';
 import { SmsService } from '../mail/sms.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
+import { PasswordResetToken, User, UserProfile } from '../database/entities';
 import { findUserByKgPhone } from '../lib/user-phone';
 import type {
   confirmCodeSchema,
@@ -53,7 +55,9 @@ export class AuthService {
   private readonly logger = new Logger('Auth');
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(PasswordResetToken) private readonly tokens: Repository<PasswordResetToken>,
+    private readonly ds: DataSource,
     private readonly jwt: JwtService,
     private readonly mail: MailService,
     private readonly sms: SmsService,
@@ -64,22 +68,20 @@ export class AuthService {
   }
 
   private async issueAuthCode(userId: string) {
-    await this.prisma.passwordResetToken.updateMany({
-      where: { userId, usedAt: null },
-      data: { usedAt: new Date() },
-    });
+    await this.tokens.update({ userId, usedAt: IsNull() }, { usedAt: new Date() });
 
     let code = String(randomInt(100000, 1000000));
     let tokenId: string | null = null;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
-        const created = await this.prisma.passwordResetToken.create({
-          data: {
+        const created = await this.tokens.save(
+          this.tokens.create({
             userId,
             token: code,
             expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
-          },
-        });
+            usedAt: null,
+          }),
+        );
         tokenId = created.id;
         break;
       } catch {
@@ -120,25 +122,24 @@ export class AuthService {
 
   private async revokeToken(tokenId: string | null) {
     if (!tokenId) return;
-    await this.prisma.passwordResetToken.update({
-      where: { id: tokenId },
-      data: { usedAt: new Date() },
-    });
+    await this.tokens.update({ id: tokenId }, { usedAt: new Date() });
+  }
+
+  private findByEmailInsensitive(email: string) {
+    return this.users
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = LOWER(:email)', { email })
+      .getOne();
   }
 
   private async authenticateUser(email: string, password: string) {
-    const user = await this.prisma.user.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
-    });
+    const user = await this.findByEmailInsensitive(email);
     if (!user || !user.isActive) return null;
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return null;
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.users.update({ id: user.id }, { lastLoginAt: new Date(), updatedAt: new Date() });
 
     return user;
   }
@@ -173,7 +174,7 @@ export class AuthService {
     const codeNotSent = () =>
       new AppError(503, 'Код почтага жөнөтүлгөн жок. Кийинчерээк кайра кайталап көрүңүз.');
 
-    const exists = await this.prisma.user.findUnique({ where: { email } });
+    const exists = await this.users.findOneBy({ email });
     if (exists) {
       if (exists.role === 'admin' || !exists.isActive || exists.isVerified) throw emailTaken;
 
@@ -189,7 +190,7 @@ export class AuthService {
       };
     }
 
-    const phoneTaken = await findUserByKgPhone(this.prisma, phone);
+    const phoneTaken = await findUserByKgPhone(this.ds, phone);
     if (phoneTaken) {
       throw new AppError(409, 'Бул телефон менен аккаунт бар', {
         fields: { phone: 'Бул телефон менен аккаунт бар' },
@@ -197,24 +198,28 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        firstName: data.firstName.trim(),
-        lastName: data.lastName.trim(),
-        phone,
-        role: 'user',
-        isActive: true,
-        isVerified: false,
-        profile: { create: {} },
-      },
+    const user = await this.ds.transaction(async (em) => {
+      const created = await em.save(
+        em.create(User, {
+          email,
+          passwordHash,
+          firstName: data.firstName.trim(),
+          lastName: data.lastName.trim(),
+          phone,
+          role: 'user',
+          isActive: true,
+          isVerified: false,
+          lastLoginAt: null,
+        }),
+      );
+      await em.save(em.create(UserProfile, { userId: created.id }));
+      return created;
     });
 
     const { code } = await this.issueAuthCode(user.id);
     const delivered = await this.deliverAuthCode(email, phone, code, 'register');
     if (!delivered) {
-      await this.prisma.user.delete({ where: { id: user.id } });
+      await this.users.delete({ id: user.id });
       throw codeNotSent();
     }
 
@@ -226,9 +231,7 @@ export class AuthService {
 
   async forgotPassword(data: z.infer<typeof forgotPasswordSchema>) {
     const email = data.email;
-    const user = await this.prisma.user.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
-    });
+    const user = await this.findByEmailInsensitive(email);
 
     if (!user || !user.isActive || user.role === 'admin') {
       throw new AppError(400, 'Бул почта менен аккаунт жок', {
@@ -254,26 +257,19 @@ export class AuthService {
   async confirmCode(data: z.infer<typeof confirmCodeSchema>) {
     const invalid = () => new AppError(400, CODE_INVALID, { fields: { code: CODE_INVALID } });
     const code = data.code.trim();
-    const user = await this.prisma.user.findFirst({
-      where: { email: { equals: data.email, mode: 'insensitive' } },
-    });
+    const user = await this.findByEmailInsensitive(data.email);
     if (!user || !user.isActive || user.role === 'admin') throw invalid();
 
-    const record = await this.prisma.passwordResetToken.findFirst({
-      where: { token: code, usedAt: null, userId: user.id },
-    });
+    const record = await this.tokens.findOneBy({ token: code, usedAt: IsNull(), userId: user.id });
     if (!record || record.expiresAt < new Date()) throw invalid();
 
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: { isVerified: true, lastLoginAt: new Date() },
-      }),
-      this.prisma.passwordResetToken.update({
-        where: { id: record.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+    const updated = await this.ds.transaction(async (em) => {
+      user.isVerified = true;
+      user.lastLoginAt = new Date();
+      const saved = await em.save(user);
+      await em.update(PasswordResetToken, { id: record.id }, { usedAt: new Date() });
+      return saved;
+    });
 
     return { token: this.signToken({ id: updated.id, role: updated.role }), user: toPublicUser(updated) };
   }
@@ -281,49 +277,36 @@ export class AuthService {
   async resetPassword(data: z.infer<typeof resetPasswordSchema>) {
     const invalid = () => new AppError(400, CODE_INVALID, { fields: { token: CODE_INVALID } });
     const token = data.token.trim();
-    const user = await this.prisma.user.findFirst({
-      where: { email: { equals: data.email, mode: 'insensitive' } },
-    });
+    const user = await this.findByEmailInsensitive(data.email);
     if (!user || !user.isActive || user.role === 'admin') throw invalid();
 
-    const record = await this.prisma.passwordResetToken.findFirst({
-      where: { token, usedAt: null, userId: user.id },
-      include: { user: true },
-    });
-    if (!record || record.usedAt || record.expiresAt < new Date() || !record.user.isActive) {
+    const record = await this.tokens.findOneBy({ token, usedAt: IsNull(), userId: user.id });
+    if (!record || record.usedAt || record.expiresAt < new Date() || !user.isActive) {
       throw invalid();
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: record.userId },
-        data: { passwordHash, isVerified: true },
-      }),
-      this.prisma.passwordResetToken.update({
-        where: { id: record.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+    await this.ds.transaction(async (em) => {
+      await em.update(User, { id: user.id }, { passwordHash, isVerified: true, updatedAt: new Date() });
+      await em.update(PasswordResetToken, { id: record.id }, { usedAt: new Date() });
+    });
 
     return { message: 'Сыр сөз ийгиликтүү өзгөртүлдү' };
   }
 
   async me(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.users.findOneBy({ id: userId });
     if (!user || !user.isActive) throw new AppError(401, 'Колдонуучу табылган жок');
     return { user: toPublicUser(user) };
   }
 
   async updateMe(userId: string, data: z.infer<typeof updateProfileSchema>) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.users.findOneBy({ id: userId });
     if (!user || !user.isActive) throw new AppError(401, 'Колдонуучу табылган жок');
 
     if (data.email && data.email.trim().toLowerCase() !== user.email) {
-      const emailTaken = await this.prisma.user.findUnique({
-        where: { email: data.email.trim().toLowerCase() },
-      });
+      const emailTaken = await this.users.findOneBy({ email: data.email.trim().toLowerCase() });
       if (emailTaken) {
         throw new AppError(409, 'Бул электрондук почта ээсе болгон', {
           fields: { email: 'Бул электрондук почта ээсе болгон' },
@@ -332,7 +315,7 @@ export class AuthService {
     }
 
     if (data.phone && data.phone !== user.phone) {
-      const phoneTaken = await findUserByKgPhone(this.prisma, data.phone, user.id);
+      const phoneTaken = await findUserByKgPhone(this.ds, data.phone, user.id);
       if (phoneTaken) {
         throw new AppError(409, 'Бул телефон менен аккаунт бар', {
           fields: { phone: 'Бул телефон менен аккаунт бар' },
@@ -351,16 +334,12 @@ export class AuthService {
       passwordHash = await bcrypt.hash(data.newPassword, 10);
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        ...(data.firstName !== undefined ? { firstName: data.firstName.trim() } : {}),
-        ...(data.lastName !== undefined ? { lastName: data.lastName.trim() } : {}),
-        ...(data.email !== undefined ? { email: data.email.trim().toLowerCase() } : {}),
-        ...(data.phone !== undefined ? { phone: data.phone } : {}),
-        ...(data.newPassword ? { passwordHash } : {}),
-      },
-    });
+    if (data.firstName !== undefined) user.firstName = data.firstName.trim();
+    if (data.lastName !== undefined) user.lastName = data.lastName.trim();
+    if (data.email !== undefined) user.email = data.email.trim().toLowerCase();
+    if (data.phone !== undefined) user.phone = data.phone;
+    if (data.newPassword) user.passwordHash = passwordHash;
+    const updated = await this.users.save(user);
 
     return { user: toPublicUser(updated) };
   }

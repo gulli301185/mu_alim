@@ -1,18 +1,18 @@
-import dotenv from 'dotenv';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { PrismaClient } from '@prisma/client';
+import type { DataSource } from 'typeorm';
+import { connectScriptDb } from './database/data-source';
+import { Course, Review, User } from './database/entities';
 
-dotenv.config({ path: resolve(__dirname, '../../.env') });
-
-const prisma = new PrismaClient();
+let ds: DataSource;
 const uploads = resolve(__dirname, '../uploads/reviews');
 
 async function main() {
-  const course = await prisma.course.findUnique({ where: { slug: 'family' } });
+  ds = await connectScriptDb();
+  const course = await ds.getRepository(Course).findOneBy({ slug: 'family' });
   if (!course) throw new Error('Үй-бүлө курсу (family) табылган жок');
 
-  const admin = await prisma.user.findFirst({ where: { role: 'admin' } });
+  const admin = await ds.getRepository(User).findOneBy({ role: 'admin' });
   if (!admin) throw new Error('Админ колдонуучу табылган жок');
 
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
@@ -22,14 +22,14 @@ async function main() {
       throw new Error(`Видео табылган жок: ${videoFile}`);
     }
 
-    const existing = await prisma.review.findFirst({ where: { videoUrl } });
+    const existing = await ds.getRepository(Review).findOneBy({ videoUrl });
     if (existing) {
       console.log(`otz${n} already exists: ${existing.id}`);
       continue;
     }
 
-    const review = await prisma.review.create({
-      data: {
+    const review = await ds.getRepository(Review).save(
+      ds.getRepository(Review).create({
         userId: admin.id,
         courseId: course.id,
         rating: 5,
@@ -38,8 +38,8 @@ async function main() {
         displayName: null,
         isAdminPosted: true,
         status: 'approved',
-      },
-    });
+      }),
+    );
     console.log(`Created otz${n}: ${review.id}`);
   }
 }
@@ -50,5 +50,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await ds?.destroy();
   });

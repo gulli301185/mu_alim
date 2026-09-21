@@ -1,35 +1,39 @@
-import dotenv from 'dotenv';
 import { resolve } from 'node:path';
-import { PrismaClient } from '@prisma/client';
+import type { DataSource } from 'typeorm';
+import { connectScriptDb } from './database/data-source';
+import { QaArticle } from './database/entities';
 
-dotenv.config({ path: resolve(__dirname, '../../.env') });
-
-const prisma = new PrismaClient();
+let ds: DataSource;
 
 async function main() {
-  const articles = await prisma.qaArticle.findMany({
-    select: { id: true, siteViews: true },
-  });
+  ds = await connectScriptDb();
+  const repo = ds.getRepository(QaArticle);
+  const articles = await repo.find({ select: { id: true, siteViews: true } });
 
   for (const article of articles) {
     const telegramViews = Math.floor(Math.random() * 200) + 1;
-    await prisma.qaArticle.update({
-      where: { id: article.id },
-      data: {
-        telegramViews,
-        views: telegramViews + article.siteViews,
-      },
-    });
+    await repo.update(
+      { id: article.id },
+      { telegramViews, views: telegramViews + article.siteViews, updatedAt: new Date() },
+    );
   }
 
-  const top = await prisma.qaArticle.findMany({
+  const top = await repo.find({
     take: 5,
-    orderBy: { views: 'desc' },
+    order: { views: 'DESC' },
     select: { questionNumber: true, telegramViews: true, siteViews: true, views: true },
   });
 
   console.log(`✓ ${articles.length} суроого Телеграм көрүүлөрү кошулду (1–200)`);
-  console.log('Мисал (топ 5):', top);
+  console.log(
+    'Мисал (топ 5):',
+    top.map(({ questionNumber, telegramViews, siteViews, views }) => ({
+      questionNumber,
+      telegramViews,
+      siteViews,
+      views,
+    })),
+  );
 }
 
 main()
@@ -38,5 +42,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await ds?.destroy();
   });

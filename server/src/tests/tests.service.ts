@@ -1,10 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Brackets, DataSource, EntityManager, In, IsNull, Not, Repository } from 'typeorm';
 import type { z } from 'zod';
 import { AppError } from '../common/app-error';
 import { AuthUser } from '../common/auth';
 import { CoursesService } from '../courses/courses.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { UUID_RE } from '../common/uuid';
+import {
+  Question,
+  QuestionOption,
+  Test,
+  TestAttempt,
+  TestQuestion,
+} from '../database/entities';
 import {
   CHOICE_LABELS,
   FINAL_TEST_FAIL_LIMIT,
@@ -18,35 +26,50 @@ import type { GradeAnswers, QuestionInput, createTestSchema, updateTestSchema } 
 
 const TEST_NOT_FOUND = 'Тест табылган жок';
 
-const questionsInclude = {
-  testQuestions: {
-    orderBy: { questionOrder: 'asc' },
-    include: {
-      question: {
-        include: { options: { orderBy: { optionOrder: 'asc' } } },
-      },
-    },
-  },
-} satisfies Prisma.TestInclude;
+const graphRelations = { testQuestions: { question: { options: true } } } as const;
+
+const courseSummary = (course: { id: string; title: string; slug: string; courseType: string }) => ({
+  id: course.id,
+  title: course.title,
+  slug: course.slug,
+  courseType: course.courseType,
+});
+
+const lessonSummary = (lesson: { id: string; title: string; lessonOrder: number } | null) =>
+  lesson ? { id: lesson.id, title: lesson.title, lessonOrder: lesson.lessonOrder } : null;
+
+/** Orders questions and their options the way the API exposes them. */
+function sortGraph<T extends Test>(test: T | null): T | null {
+  if (!test) return test;
+  test.testQuestions = [...(test.testQuestions ?? [])].sort(
+    (a, b) => (a.questionOrder ?? 0) - (b.questionOrder ?? 0),
+  );
+  for (const item of test.testQuestions) {
+    item.question.options = [...(item.question.options ?? [])].sort(
+      (a, b) => a.optionOrder - b.optionOrder,
+    );
+  }
+  return test;
+}
 
 type FullTest = NonNullable<Awaited<ReturnType<TestsService['getTestWithQuestions']>>>;
 
 @Injectable()
 export class TestsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Test) private readonly testRepo: Repository<Test>,
+    @InjectRepository(TestAttempt) private readonly attempts: Repository<TestAttempt>,
+    private readonly ds: DataSource,
     private readonly courses: CoursesService,
   ) {}
 
-  private getTestWithQuestions(testId: string) {
-    return this.prisma.test.findUnique({
-      where: { id: testId },
-      include: {
-        course: { select: { id: true, title: true, slug: true, courseType: true } },
-        lesson: { select: { id: true, title: true, lessonOrder: true } },
-        ...questionsInclude,
-      },
-    });
+  private async getTestWithQuestions(testId: string) {
+    return sortGraph(
+      await this.testRepo.findOne({
+        where: { id: testId },
+        relations: { course: true, lesson: true, ...graphRelations },
+      }),
+    );
   }
 
   private serializeAdminTest(test: FullTest) {
@@ -57,8 +80,8 @@ export class TestsService {
       passingScore: Number(test.passingScore),
       questionsCount: test.questionsCount,
       isActive: test.isActive,
-      course: test.course,
-      lesson: test.lesson,
+      course: courseSummary(test.course),
+      lesson: lessonSummary(test.lesson),
       questions: test.testQuestions.map((item) => ({
         id: item.question.id,
         questionType: item.question.questionType,
@@ -77,22 +100,24 @@ export class TestsService {
     };
   }
 
-  private findFinalTestForCourse(courseId: string, activeOnly = false) {
-    return this.prisma.test.findFirst({
-      where: {
-        courseId,
-        testType: 'final',
-        lessonId: null,
-        ...(activeOnly ? { isActive: true } : {}),
-      },
-      include: questionsInclude,
-    });
+  private async findFinalTestForCourse(courseId: string, activeOnly = false) {
+    return sortGraph(
+      await this.testRepo.findOne({
+        where: {
+          courseId,
+          testType: 'final',
+          lessonId: IsNull(),
+          ...(activeOnly ? { isActive: true } : {}),
+        },
+        relations: graphRelations,
+      }),
+    );
   }
 
   private async getFinalTestLockState(userId: string, testId: string): Promise<TestLockState> {
-    const attempts = await this.prisma.testAttempt.findMany({
-      where: { userId, testId, completedAt: { not: null } },
-      orderBy: { completedAt: 'asc' },
+    const attempts = await this.attempts.find({
+      where: { userId, testId, completedAt: Not(IsNull()) },
+      order: { completedAt: 'ASC' },
       select: { passed: true, completedAt: true },
     });
 
@@ -128,37 +153,40 @@ export class TestsService {
   }
 
   private async createQuestionsForTest(
-    tx: Prisma.TransactionClient,
+    em: EntityManager,
     courseId: string,
     testId: string,
     questions: QuestionInput[],
   ) {
     for (const [index, questionInput] of questions.entries()) {
-      const question = await tx.question.create({
-        data: {
+      const question = await em.save(
+        em.create(Question, {
           courseId,
           questionText: questionInput.questionText,
           questionType: questionInput.questionType,
           correctTextAnswer:
             questionInput.questionType === 'text' ? questionInput.correctTextAnswer : null,
           explanation: questionInput.explanation ?? null,
-        },
-      });
+          isActive: true,
+        }),
+      );
 
       if (questionInput.questionType === 'choice') {
-        await tx.questionOption.createMany({
-          data: questionInput.options.map((option) => ({
-            questionId: question.id,
-            optionText: option.optionText,
-            isCorrect: option.isCorrect,
-            optionOrder: option.optionOrder,
-          })),
-        });
+        await em.save(
+          questionInput.options.map((option) =>
+            em.create(QuestionOption, {
+              questionId: question.id,
+              optionText: option.optionText,
+              isCorrect: option.isCorrect,
+              optionOrder: option.optionOrder,
+            }),
+          ),
+        );
       }
 
-      await tx.testQuestion.create({
-        data: { testId, questionId: question.id, questionOrder: index + 1 },
-      });
+      await em.save(
+        em.create(TestQuestion, { testId, questionId: question.id, questionOrder: index + 1 }),
+      );
     }
   }
 
@@ -172,26 +200,24 @@ export class TestsService {
   // ─── Admin ─────────────────────────────────────────────────────────────────
 
   async adminList(courseRef?: string) {
-    const where: Prisma.TestWhereInput = {
-      testType: 'final',
-      course: { courseType: 'paid' },
-    };
+    const qb = this.testRepo
+      .createQueryBuilder('t')
+      .innerJoinAndSelect('t.course', 'c')
+      .leftJoinAndSelect('t.lesson', 'l')
+      .where("t.testType = 'final'")
+      .andWhere("c.courseType = 'paid'")
+      .orderBy('c.title', 'ASC');
 
     if (courseRef) {
-      where.course = {
-        courseType: 'paid',
-        OR: [{ slug: courseRef }, { id: courseRef }],
-      };
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('c.slug = :courseRef', { courseRef });
+          if (UUID_RE.test(courseRef)) w.orWhere('c.id = :courseRef', { courseRef });
+        }),
+      );
     }
 
-    const tests = await this.prisma.test.findMany({
-      where,
-      orderBy: [{ course: { title: 'asc' } }],
-      include: {
-        course: { select: { id: true, title: true, slug: true, courseType: true } },
-        lesson: { select: { id: true, title: true, lessonOrder: true } },
-      },
-    });
+    const tests = await qb.getMany();
 
     return {
       items: tests.map((test) => ({
@@ -201,8 +227,8 @@ export class TestsService {
         passingScore: Number(test.passingScore),
         questionsCount: test.questionsCount,
         isActive: test.isActive,
-        course: test.course,
-        lesson: test.lesson,
+        course: courseSummary(test.course),
+        lesson: lessonSummary(test.lesson),
       })),
       total: tests.length,
     };
@@ -220,8 +246,8 @@ export class TestsService {
     const course = await this.courses.resolveRef(data.courseRef);
     if (!course) throw new AppError(404, 'Курс табылган жок');
 
-    const existing = await this.prisma.test.findFirst({
-      where: { courseId: course.id, testType: 'final', lessonId: null },
+    const existing = await this.testRepo.findOne({
+      where: { courseId: course.id, testType: 'final', lessonId: IsNull() },
       select: { id: true },
     });
     if (existing) throw new AppError(400, 'Бул курс үчүн курстук тест эле бар');
@@ -229,20 +255,21 @@ export class TestsService {
     const title = data.title?.trim() || `${course.title} — курстук тест`;
     const passingScore = data.passingScore ?? 90;
 
-    const test = await this.prisma.$transaction(async (tx) => {
-      const createdTest = await tx.test.create({
-        data: {
+    const test = await this.ds.transaction(async (em) => {
+      const createdTest = await em.save(
+        em.create(Test, {
           courseId: course.id,
           lessonId: null,
           title,
           testType: 'final',
           questionsCount: data.questions.length,
           passingScore,
+          maxAttempts: null,
           isActive: true,
-        },
-      });
+        }),
+      );
 
-      await this.createQuestionsForTest(tx, course.id, createdTest.id, data.questions);
+      await this.createQuestionsForTest(em, course.id, createdTest.id, data.questions);
       return createdTest;
     });
 
@@ -251,35 +278,34 @@ export class TestsService {
   }
 
   async adminUpdate(id: string, data: z.infer<typeof updateTestSchema>) {
-    const existing = await this.prisma.test.findUnique({
-      where: { id },
-      include: { testQuestions: { select: { questionId: true } } },
-    });
+    const existing = await this.testRepo.findOne({ where: { id }, relations: { testQuestions: true } });
     if (!existing) throw new AppError(404, TEST_NOT_FOUND);
 
     if (data.questions) this.assertChoiceQuestions(data.questions);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.ds.transaction(async (em) => {
       if (data.questions) {
         const oldQuestionIds = existing.testQuestions.map((item) => item.questionId);
-        await tx.testQuestion.deleteMany({ where: { testId: existing.id } });
+        await em.delete(TestQuestion, { testId: existing.id });
         if (oldQuestionIds.length) {
-          await tx.questionOption.deleteMany({ where: { questionId: { in: oldQuestionIds } } });
-          await tx.question.deleteMany({ where: { id: { in: oldQuestionIds } } });
+          await em.delete(QuestionOption, { questionId: In(oldQuestionIds) });
+          await em.delete(Question, { id: In(oldQuestionIds) });
         }
 
-        await this.createQuestionsForTest(tx, existing.courseId, existing.id, data.questions);
+        await this.createQuestionsForTest(em, existing.courseId, existing.id, data.questions);
       }
 
-      await tx.test.update({
-        where: { id: existing.id },
-        data: {
+      await em.update(
+        Test,
+        { id: existing.id },
+        {
+          updatedAt: new Date(),
           ...(data.title !== undefined ? { title: data.title } : {}),
           ...(data.passingScore !== undefined ? { passingScore: data.passingScore } : {}),
           ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
           ...(data.questions ? { questionsCount: data.questions.length } : {}),
         },
-      });
+      );
     });
 
     const full = await this.getTestWithQuestions(existing.id);
@@ -287,19 +313,16 @@ export class TestsService {
   }
 
   async adminDelete(id: string) {
-    const existing = await this.prisma.test.findUnique({
-      where: { id },
-      include: { testQuestions: { select: { questionId: true } } },
-    });
+    const existing = await this.testRepo.findOne({ where: { id }, relations: { testQuestions: true } });
     if (!existing) throw new AppError(404, TEST_NOT_FOUND);
 
     const questionIds = existing.testQuestions.map((item) => item.questionId);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.test.delete({ where: { id: existing.id } });
+    await this.ds.transaction(async (em) => {
+      await em.delete(Test, { id: existing.id });
       if (questionIds.length) {
-        await tx.questionOption.deleteMany({ where: { questionId: { in: questionIds } } });
-        await tx.question.deleteMany({ where: { id: { in: questionIds } } });
+        await em.delete(QuestionOption, { questionId: In(questionIds) });
+        await em.delete(Question, { id: In(questionIds) });
       }
     });
   }
@@ -352,12 +375,10 @@ export class TestsService {
 
     const result = gradeTestAnswers(test, answers);
     const now = new Date();
-    const previousCount = await this.prisma.testAttempt.count({
-      where: { userId: user.id, testId: test.id },
-    });
+    const previousCount = await this.attempts.countBy({ userId: user.id, testId: test.id });
 
-    await this.prisma.testAttempt.create({
-      data: {
+    await this.attempts.save(
+      this.attempts.create({
         userId: user.id,
         testId: test.id,
         attemptNumber: previousCount + 1,
@@ -367,8 +388,8 @@ export class TestsService {
         passed: result.passed,
         startedAt: now,
         completedAt: now,
-      },
-    });
+      }),
+    );
 
     const nextLock = await this.getFinalTestLockState(user.id, test.id);
     return { ...result, ...nextLock };

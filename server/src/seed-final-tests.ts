@@ -1,53 +1,52 @@
-import dotenv from 'dotenv';
-import { resolve } from 'node:path';
-import { PrismaClient } from '@prisma/client';
+import { EntityManager, In, IsNull } from 'typeorm';
+import type { DataSource } from 'typeorm';
+import { connectScriptDb } from './database/data-source';
+import { Course, Question, QuestionOption, Test, TestQuestion } from './database/entities';
 import {
   buildGenericFinalTest,
   FINAL_TESTS_BY_SLUG,
   type SeedChoiceQuestion,
 } from './data/final-tests-seed.js';
 
-dotenv.config({ path: resolve(__dirname, '../../.env') });
-
-const prisma = new PrismaClient();
+let ds: DataSource;
 
 async function createQuestionsForTest(
+  em: EntityManager,
   courseId: string,
   testId: string,
   questions: SeedChoiceQuestion[],
 ) {
   for (const [index, questionInput] of questions.entries()) {
-    const question = await prisma.question.create({
-      data: {
+    const question = await em.save(
+      em.create(Question, {
         courseId,
         questionText: questionInput.questionText,
         questionType: 'choice',
+        correctTextAnswer: null,
         explanation: questionInput.explanation ?? null,
-      },
-    });
+        isActive: true,
+      }),
+    );
 
-    await prisma.questionOption.createMany({
-      data: questionInput.options.map((option) => ({
-        questionId: question.id,
-        optionText: option.optionText,
-        isCorrect: option.isCorrect,
-        optionOrder: option.optionOrder,
-      })),
-    });
+    await em.save(
+      questionInput.options.map((option) =>
+        em.create(QuestionOption, {
+          questionId: question.id,
+          optionText: option.optionText,
+          isCorrect: option.isCorrect,
+          optionOrder: option.optionOrder,
+        }),
+      ),
+    );
 
-    await prisma.testQuestion.create({
-      data: {
-        testId,
-        questionId: question.id,
-        questionOrder: index + 1,
-      },
-    });
+    await em.save(em.create(TestQuestion, { testId, questionId: question.id, questionOrder: index + 1 }));
   }
 }
 
 async function seedFinalTestForCourse(slug: string, title: string, courseId: string) {
-  const existing = await prisma.test.findFirst({
-    where: { courseId, testType: 'final', lessonId: null },
+  const tests = ds.getRepository(Test);
+  const existing = await tests.findOne({
+    where: { courseId, testType: 'final', lessonId: IsNull() },
     select: { id: true, questionsCount: true },
   });
 
@@ -59,55 +58,59 @@ async function seedFinalTestForCourse(slug: string, title: string, courseId: str
       return;
     }
 
-    const oldQuestions = await prisma.testQuestion.findMany({
+    const oldQuestions = await ds.getRepository(TestQuestion).find({
       where: { testId: existing.id },
       select: { questionId: true },
     });
     const oldQuestionIds = oldQuestions.map((item) => item.questionId);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.testQuestion.deleteMany({ where: { testId: existing.id } });
+    await ds.transaction(async (em) => {
+      await em.delete(TestQuestion, { testId: existing.id });
       if (oldQuestionIds.length) {
-        await tx.questionOption.deleteMany({ where: { questionId: { in: oldQuestionIds } } });
-        await tx.question.deleteMany({ where: { id: { in: oldQuestionIds } } });
+        await em.delete(QuestionOption, { questionId: In(oldQuestionIds) });
+        await em.delete(Question, { id: In(oldQuestionIds) });
       }
-      await tx.test.update({
-        where: { id: existing.id },
-        data: {
+      await em.update(
+        Test,
+        { id: existing.id },
+        {
           title: seed.title,
           passingScore: seed.passingScore,
           questionsCount: seed.questions.length,
           isActive: true,
+          updatedAt: new Date(),
         },
-      });
+      );
     });
 
-    await createQuestionsForTest(courseId, existing.id, seed.questions);
+    await ds.transaction((em) => createQuestionsForTest(em, courseId, existing.id, seed.questions));
     console.log(`✓ ${title}: тест жаңыртылды (${seed.questions.length} суроо)`);
     return;
   }
 
-  const test = await prisma.test.create({
-    data: {
+  const test = await tests.save(
+    tests.create({
       courseId,
       lessonId: null,
       title: seed.title,
       testType: 'final',
       questionsCount: seed.questions.length,
       passingScore: seed.passingScore,
+      maxAttempts: null,
       isActive: true,
-    },
-  });
+    }),
+  );
 
-  await createQuestionsForTest(courseId, test.id, seed.questions);
+  await ds.transaction((em) => createQuestionsForTest(em, courseId, test.id, seed.questions));
   console.log(`✓ ${title}: тест түзүлдү (${seed.questions.length} суроо)`);
 }
 
 async function main() {
-  const courses = await prisma.course.findMany({
+  ds = await connectScriptDb();
+  const courses = await ds.getRepository(Course).find({
     where: { courseType: 'paid', isPublished: true },
     select: { id: true, slug: true, title: true },
-    orderBy: { title: 'asc' },
+    order: { title: 'ASC' },
   });
 
   if (!courses.length) {
@@ -119,7 +122,7 @@ async function main() {
     await seedFinalTestForCourse(course.slug, course.title, course.id);
   }
 
-  const testCount = await prisma.test.count({ where: { testType: 'final' } });
+  const testCount = await ds.getRepository(Test).countBy({ testType: 'final' });
   console.log(`Final tests in DB: ${testCount}`);
 }
 
@@ -129,5 +132,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await ds?.destroy();
   });

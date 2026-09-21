@@ -10,7 +10,7 @@ import { HeroModule } from './hero/hero.module';
 import { LessonsModule } from './lessons/lessons.module';
 import { MailModule } from './mail/mail.module';
 import { PrayerModule } from './prayer/prayer.module';
-import { PrismaModule } from './prisma/prisma.service';
+import { DatabaseModule } from './database/database.module';
 import { ProgressModule } from './progress/progress.module';
 import { QaModule } from './qa/qa.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -25,7 +25,7 @@ import { TestsModule } from './tests/tests.module';
       secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
       signOptions: { expiresIn: '7d' },
     }),
-    PrismaModule,
+    DatabaseModule,
     CacheModule,
     MailModule,
     AuthModule,

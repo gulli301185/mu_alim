@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "nest start --watch",
     "start": "node dist/main.js",
-    "build": "prisma generate --schema ../prisma/schema.prisma && nest build",
+    "build": "nest build",
     "seed:qa": "tsx src/seed-qa.ts"
   },
   "dependencies": {
@@ -13,15 +13,17 @@
     "@nestjs/core": "^11.0.0",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "@prisma/client": "^6.14.0",
+    "@nestjs/typeorm": "^11.0.3",
     "bcryptjs": "^3.0.2",
     "dotenv": "^16.4.7",
     "ioredis": "^5.4.1",
     "nodemailer": "^10.0.1",
+    "pg": "^8.23.0",
     "raw-body": "^3.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
+    "typeorm": "^0.3.31",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -30,8 +32,8 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.10",
     "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.23.1",
     "@types/swagger-ui-express": "^4.1.8",
-    "prisma": "^6.14.0",
     "tsx": "^4.19.3",
     "typescript": "~5.8.3"
   }

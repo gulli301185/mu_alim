@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Brackets, DataSource, EntityManager, IsNull, Not, Repository } from 'typeorm';
 import { z } from 'zod';
 import { AppError } from '../common/app-error';
 import { CacheService } from '../cache/cache.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { QaArticle, TeacherQuestionSubmission } from '../database/entities';
+import { escapeLike } from '../database/sql';
 import { uniqueSlug } from '../lib/slug';
 
 export const submitSchema = z.object({
@@ -21,8 +23,6 @@ export const adminListQuerySchema = z.object({
 export const publishSchema = z.object({
   answer: z.string().trim().min(1, 'Жооп керек').max(20000),
 });
-
-type Db = Prisma.TransactionClient | PrismaService;
 
 function toAdminItem(row: {
   id: string;
@@ -50,18 +50,25 @@ function toAdminItem(row: {
 @Injectable()
 export class TeacherQuestionsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(TeacherQuestionSubmission)
+    private readonly submissions: Repository<TeacherQuestionSubmission>,
+    private readonly ds: DataSource,
     private readonly cache: CacheService,
   ) {}
 
-  async getNextQuestionNumber(db: Db = this.prisma): Promise<number> {
-    const [qaMax, submissionMax] = await Promise.all([
-      db.qaArticle.aggregate({ _max: { questionNumber: true } }),
-      db.teacherQuestionSubmission.aggregate({ _max: { questionNumber: true } }),
-    ]);
+  async getNextQuestionNumber(em: EntityManager = this.ds.manager): Promise<number> {
+    const max = async (target: typeof QaArticle | typeof TeacherQuestionSubmission) => {
+      const row = await em
+        .createQueryBuilder(target as never, 't')
+        .select('MAX(t.questionNumber)', 'max')
+        .getRawOne<{ max: number | null }>();
+      return row?.max ?? 0;
+    };
 
-    const current = Math.max(qaMax._max.questionNumber ?? 0, submissionMax._max.questionNumber ?? 0);
-    return current + 1;
+    // Sequential: inside a transaction both queries share a single connection.
+    const qaMax = await max(QaArticle);
+    const submissionMax = await max(TeacherQuestionSubmission);
+    return Math.max(qaMax, submissionMax) + 1;
   }
 
   async nextNumber() {
@@ -69,9 +76,17 @@ export class TeacherQuestionsService {
   }
 
   async submit(data: z.infer<typeof submitSchema>) {
-    const row = await this.prisma.$transaction(async (tx) => {
-      const questionNumber = await this.getNextQuestionNumber(tx);
-      return tx.teacherQuestionSubmission.create({ data: { ...data, questionNumber } });
+    const row = await this.ds.transaction(async (em) => {
+      const questionNumber = await this.getNextQuestionNumber(em);
+      return em.save(
+        em.create(TeacherQuestionSubmission, {
+          ...data,
+          questionNumber,
+          answer: null,
+          qaArticleId: null,
+          answeredAt: null,
+        }),
+      );
     });
 
     return {
@@ -82,37 +97,26 @@ export class TeacherQuestionsService {
   }
 
   async adminList({ status, page, limit, q }: z.infer<typeof adminListQuerySchema>) {
-    const statusWhere: Prisma.TeacherQuestionSubmissionWhereInput =
-      status === 'pending'
-        ? { qaArticleId: null }
-        : status === 'answered'
-          ? { qaArticleId: { not: null } }
-          : {};
+    const qb = this.submissions
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.qaArticle', 'a')
+      .orderBy('s.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
-    const searchWhere: Prisma.TeacherQuestionSubmissionWhereInput = q
-      ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { question: { contains: q, mode: 'insensitive' } },
-            ...(Number.isFinite(Number(q)) ? [{ questionNumber: Number(q) }] : []),
-          ],
-        }
-      : {};
+    if (status === 'pending') qb.andWhere('s.qaArticleId IS NULL');
+    if (status === 'answered') qb.andWhere('s.qaArticleId IS NOT NULL');
+    if (q) {
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('s.name ILIKE :like', { like: `%${escapeLike(q)}%` })
+            .orWhere('s.question ILIKE :like');
+          if (Number.isFinite(Number(q))) w.orWhere('s.questionNumber = :num', { num: Number(q) });
+        }),
+      );
+    }
 
-    const where: Prisma.TeacherQuestionSubmissionWhereInput = {
-      AND: [statusWhere, ...(q ? [searchWhere] : [])],
-    };
-
-    const [rows, total] = await Promise.all([
-      this.prisma.teacherQuestionSubmission.findMany({
-        where,
-        orderBy: [{ createdAt: 'desc' }],
-        skip: (page - 1) * limit,
-        take: limit,
-        include: { qaArticle: { select: { slug: true } } },
-      }),
-      this.prisma.teacherQuestionSubmission.count({ where }),
-    ]);
+    const [rows, total] = await qb.getManyAndCount();
 
     return {
       items: rows.map(toAdminItem),
@@ -122,8 +126,13 @@ export class TeacherQuestionsService {
     };
   }
 
-  private async publishSubmission(db: Db, submissionId: string, answer: string, createdById?: string) {
-    const submission = await db.teacherQuestionSubmission.findUnique({ where: { id: submissionId } });
+  private async publishSubmission(
+    em: EntityManager,
+    submissionId: string,
+    answer: string,
+    createdById?: string,
+  ) {
+    const submission = await em.findOneBy(TeacherQuestionSubmission, { id: submissionId });
     if (!submission) throw new AppError(404, 'Суроо табылган жок');
     if (submission.qaArticleId) throw new AppError(409, 'Бул суроо мурунтан жарияланган');
 
@@ -131,32 +140,35 @@ export class TeacherQuestionsService {
       submission.questionNumber != null ? `${submission.questionNumber}-suroo` : submission.question;
 
     const slug = await uniqueSlug(slugBase, async (candidate) => {
-      const found = await db.qaArticle.findUnique({ where: { slug: candidate } });
+      const found = await em.findOneBy(QaArticle, { slug: candidate });
       return Boolean(found);
     });
 
-    const article = await db.qaArticle.create({
-      data: {
+    const article = await em.save(
+      em.create(QaArticle, {
         slug,
         questionNumber: submission.questionNumber,
         question: submission.question,
         answer,
+        excerpt: null,
+        tags: [],
         isPublished: true,
         publishedAt: new Date(),
-        createdById,
-      },
-    });
+        createdById: createdById ?? null,
+      }),
+    );
 
-    await db.teacherQuestionSubmission.update({
-      where: { id: submission.id },
-      data: { answer, qaArticleId: article.id, answeredAt: new Date() },
-    });
+    await em.update(
+      TeacherQuestionSubmission,
+      { id: submission.id },
+      { answer, qaArticleId: article.id, answeredAt: new Date() },
+    );
 
     return article;
   }
 
   async publish(id: string, answer: string, adminId?: string) {
-    const article = await this.prisma.$transaction((tx) => this.publishSubmission(tx, id, answer, adminId));
+    const article = await this.ds.transaction((em) => this.publishSubmission(em, id, answer, adminId));
     await this.cache.invalidate('qa:');
 
     return {

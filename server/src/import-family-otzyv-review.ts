@@ -1,33 +1,33 @@
-import dotenv from 'dotenv';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { PrismaClient } from '@prisma/client';
+import type { DataSource } from 'typeorm';
+import { connectScriptDb } from './database/data-source';
+import { Course, Review, User } from './database/entities';
 
-dotenv.config({ path: resolve(__dirname, '../../.env') });
-
-const prisma = new PrismaClient();
+let ds: DataSource;
 const VIDEO_URL = '/uploads/reviews/family-otzyv.mp4';
 const VIDEO_FILE = resolve(__dirname, '../uploads/reviews/family-otzyv.mp4');
 
 async function main() {
+  ds = await connectScriptDb();
   if (!existsSync(VIDEO_FILE)) {
     throw new Error(`Видео табылган жок: ${VIDEO_FILE}`);
   }
 
-  const course = await prisma.course.findUnique({ where: { slug: 'family' } });
+  const course = await ds.getRepository(Course).findOneBy({ slug: 'family' });
   if (!course) throw new Error('Үй-бүлө курсу (family) табылган жок');
 
-  const admin = await prisma.user.findFirst({ where: { role: 'admin' } });
+  const admin = await ds.getRepository(User).findOneBy({ role: 'admin' });
   if (!admin) throw new Error('Админ колдонуучу табылган жок');
 
-  const existing = await prisma.review.findFirst({ where: { videoUrl: VIDEO_URL } });
+  const existing = await ds.getRepository(Review).findOneBy({ videoUrl: VIDEO_URL });
   if (existing) {
     console.log(`Video review already exists: ${existing.id}`);
     return;
   }
 
-  const review = await prisma.review.create({
-    data: {
+  const review = await ds.getRepository(Review).save(
+    ds.getRepository(Review).create({
       userId: admin.id,
       courseId: course.id,
       rating: 5,
@@ -36,8 +36,8 @@ async function main() {
       displayName: 'Окуучу',
       isAdminPosted: true,
       status: 'approved',
-    },
-  });
+    }),
+  );
 
   console.log(`Created family video review: ${review.id}`);
 }
@@ -48,5 +48,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await ds?.destroy();
   });

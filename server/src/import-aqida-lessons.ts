@@ -1,11 +1,10 @@
-import dotenv from 'dotenv';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { PrismaClient } from '@prisma/client';
+import type { DataSource } from 'typeorm';
+import { connectScriptDb } from './database/data-source';
+import { Course, Lesson } from './database/entities';
 
-dotenv.config({ path: resolve(__dirname, '../../.env') });
-
-const prisma = new PrismaClient();
+let ds: DataSource;
 
 const COURSE_SLUG = 'aqida';
 const EXPECTED_COUNT = 45;
@@ -22,6 +21,7 @@ function parseLessonTitle(title: string) {
 }
 
 async function main() {
+  ds = await connectScriptDb();
   const progressPath = resolve(process.argv[2] ?? `${process.env.HOME ?? ''}/Downloads/progress.json`);
   const raw = JSON.parse(readFileSync(progressPath, 'utf8')) as ProgressFile;
   const uploaded = Object.values(raw.uploaded ?? {});
@@ -44,26 +44,29 @@ async function main() {
     process.exit(1);
   }
 
-  const course = await prisma.course.findUnique({ where: { slug: COURSE_SLUG } });
+  const course = await ds.getRepository(Course).findOneBy({ slug: COURSE_SLUG });
   if (!course) {
     console.error('Акыйда курсу (slug: aqida) табылган жок');
     process.exit(1);
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.lesson.deleteMany({ where: { courseId: course.id } });
+  await ds.transaction(async (em) => {
+    await em.delete(Lesson, { courseId: course.id });
 
-    await tx.lesson.createMany({
-      data: lessons.map((lesson, index) => ({
-        courseId: course.id,
-        title: lesson.title,
-        description: `Акыйда ${lesson.tepkich}-тепкич, ${lesson.sabak}-сабак`,
-        youtubeUrl: `https://youtu.be/${lesson.videoId}`,
-        youtubeVideoId: lesson.videoId,
-        lessonOrder: index + 1,
-        isPublished: true,
-      })),
-    });
+    await em.save(
+      lessons.map((lesson, index) =>
+        em.create(Lesson, {
+          courseId: course.id,
+          title: lesson.title,
+          description: `Акыйда ${lesson.tepkich}-тепкич, ${lesson.sabak}-сабак`,
+          youtubeUrl: `https://youtu.be/${lesson.videoId}`,
+          youtubeVideoId: lesson.videoId,
+          durationSeconds: null,
+          lessonOrder: index + 1,
+          isPublished: true,
+        }),
+      ),
+    );
   });
 
   console.log(`✓ Акыйда курсуна ${lessons.length} сабак кошулду (unlisted шилтемелер).`);
@@ -78,5 +81,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await ds?.destroy();
   });

@@ -4,7 +4,10 @@ import { AppError } from '../common/app-error';
 import { AuthUser } from '../common/auth';
 import { CacheService } from '../cache/cache.service';
 import { CoursesService } from '../courses/courses.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Not, IsNull, Repository } from 'typeorm';
+import { anyContains } from '../database/sql';
+import { Review } from '../database/entities';
 
 const CACHE_TTL = 120;
 const COURSE_NOT_FOUND = 'Курс табылган жок';
@@ -89,15 +92,12 @@ function hasPublicReviewContent(review: { comment: string | null; videoUrl?: str
   return Boolean(review.comment?.trim() || review.videoUrl?.trim());
 }
 
-const authorAndCourse = {
-  user: { select: { firstName: true, lastName: true } },
-  course: { select: { title: true, slug: true } },
-} as const;
+const authorAndCourse = { user: true, course: true } as const;
 
 @Injectable()
 export class ReviewsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Review) private readonly reviewRepo: Repository<Review>,
     private readonly cache: CacheService,
     private readonly courses: CoursesService,
   ) {}
@@ -110,20 +110,20 @@ export class ReviewsService {
 
   listPublic({ page, limit }: ListQuery) {
     return this.cache.wrap(`reviews:list:${page}:${limit}`, CACHE_TTL, async () => {
-      const where = {
-        status: 'approved' as const,
-        OR: [{ comment: { not: null } }, { videoUrl: { not: null } }],
-      };
+      const where = [
+        { status: 'approved' as const, comment: Not(IsNull()) },
+        { status: 'approved' as const, videoUrl: Not(IsNull()) },
+      ];
 
       const [items, total] = await Promise.all([
-        this.prisma.review.findMany({
+        this.reviewRepo.find({
           where,
-          include: authorAndCourse,
-          orderBy: { createdAt: 'desc' },
+          relations: authorAndCourse,
+          order: { createdAt: 'DESC' },
           skip: (page - 1) * limit,
           take: limit,
         }),
-        this.prisma.review.count({ where }),
+        this.reviewRepo.count({ where }),
       ]);
 
       return {
@@ -143,15 +143,21 @@ export class ReviewsService {
     const shared = await this.cache.wrap(`reviews:course:${course.id}:${page}:${limit}`, CACHE_TTL, async () => {
       const where = { courseId: course.id, status: 'approved' as const };
       const [items, total, agg] = await Promise.all([
-        this.prisma.review.findMany({
+        this.reviewRepo.find({
           where,
-          include: authorAndCourse,
-          orderBy: { createdAt: 'desc' },
+          relations: authorAndCourse,
+          order: { createdAt: 'DESC' },
           skip: (page - 1) * limit,
           take: limit,
         }),
-        this.prisma.review.count({ where }),
-        this.prisma.review.aggregate({ where, _avg: { rating: true }, _count: true }),
+        this.reviewRepo.countBy(where),
+        this.reviewRepo
+          .createQueryBuilder('r')
+          .select('AVG(r.rating)', 'avg')
+          .addSelect('COUNT(*)', 'count')
+          .where('r.courseId = :courseId', { courseId: course.id })
+          .andWhere("r.status = 'approved'")
+          .getRawOne<{ avg: string | null; count: string }>(),
       ]);
 
       return {
@@ -159,15 +165,15 @@ export class ReviewsService {
         total,
         page,
         totalPages: Math.max(1, Math.ceil(total / limit)),
-        averageRating: agg._avg.rating ? Number(agg._avg.rating.toFixed(1)) : 0,
-        ratingsCount: agg._count,
+        averageRating: agg?.avg ? Number(Number(agg.avg).toFixed(1)) : 0,
+        ratingsCount: Number(agg?.count ?? 0),
       };
     });
 
     const mine = user
-      ? await this.prisma.review.findFirst({
+      ? await this.reviewRepo.findOne({
           where: { userId: user.id, courseId: course.id, isAdminPosted: false },
-          include: { user: { select: { firstName: true, lastName: true } } },
+          relations: { user: true },
         })
       : null;
 
@@ -178,16 +184,21 @@ export class ReviewsService {
     const course = await this.courses.resolveRef(ref);
     if (!course || !course.isPublished) throw new AppError(404, COURSE_NOT_FOUND);
 
-    const review = await this.prisma.review.create({
-      data: {
+    const saved = await this.reviewRepo.save(
+      this.reviewRepo.create({
         userId: user.id,
         courseId: course.id,
         rating: data.rating,
         comment: data.comment?.trim() ? data.comment.trim() : null,
+        videoUrl: null,
         displayName: data.displayName?.trim() || null,
+        isAdminPosted: false,
         status: 'approved',
-      },
-      include: { user: { select: { firstName: true, lastName: true } } },
+      }),
+    );
+    const review = await this.reviewRepo.findOneOrFail({
+      where: { id: saved.id },
+      relations: { user: true },
     });
 
     await this.invalidate();
@@ -199,35 +210,25 @@ export class ReviewsService {
   async adminList({ status, page, limit, q }: z.infer<typeof adminListQuerySchema>) {
     const search = q?.trim();
 
-    const where = {
-      ...(status ? { status } : {}),
-      ...(search
-        ? {
-            OR: [
-              { comment: { contains: search, mode: 'insensitive' as const } },
-              { course: { title: { contains: search, mode: 'insensitive' as const } } },
-              { user: { firstName: { contains: search, mode: 'insensitive' as const } } },
-              { user: { lastName: { contains: search, mode: 'insensitive' as const } } },
-              { user: { email: { contains: search, mode: 'insensitive' as const } } },
-              { displayName: { contains: search, mode: 'insensitive' as const } },
-            ],
-          }
-        : {}),
-    };
+    const qb = this.reviewRepo
+      .createQueryBuilder('r')
+      .innerJoinAndSelect('r.user', 'u')
+      .innerJoinAndSelect('r.course', 'c')
+      .orderBy('r.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+    if (status) qb.andWhere('r.status = :status', { status });
+    if (search) {
+      qb.andWhere(
+        anyContains(
+          ['r.comment', 'c.title', 'u.firstName', 'u.lastName', 'u.email', 'r.displayName'],
+          'search',
+          search,
+        ),
+      );
+    }
 
-    const [items, total] = await Promise.all([
-      this.prisma.review.findMany({
-        where,
-        include: {
-          user: { select: { firstName: true, lastName: true, email: true } },
-          course: { select: { title: true, slug: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.review.count({ where }),
-    ]);
+    const [items, total] = await qb.getManyAndCount();
 
     return {
       items: items.map((item) => ({ ...toReviewDto(item), authorEmail: item.user.email })),
@@ -241,8 +242,8 @@ export class ReviewsService {
     const course = await this.courses.resolveRef(data.courseRef);
     if (!course) throw new AppError(404, COURSE_NOT_FOUND);
 
-    const review = await this.prisma.review.create({
-      data: {
+    const saved = await this.reviewRepo.save(
+      this.reviewRepo.create({
         userId: user.id,
         courseId: course.id,
         rating: data.rating,
@@ -251,8 +252,11 @@ export class ReviewsService {
         displayName: data.displayName.trim(),
         isAdminPosted: true,
         status: data.status ?? 'approved',
-      },
-      include: authorAndCourse,
+      }),
+    );
+    const review = await this.reviewRepo.findOneOrFail({
+      where: { id: saved.id },
+      relations: authorAndCourse,
     });
 
     await this.invalidate();
@@ -260,7 +264,7 @@ export class ReviewsService {
   }
 
   async adminUpdate(id: string, data: z.infer<typeof adminUpdateSchema>) {
-    const existing = await this.prisma.review.findUnique({ where: { id } });
+    const existing = await this.reviewRepo.findOneBy({ id });
     if (!existing) throw new AppError(404, REVIEW_NOT_FOUND);
 
     let courseId = existing.courseId;
@@ -270,17 +274,16 @@ export class ReviewsService {
       courseId = course.id;
     }
 
-    const review = await this.prisma.review.update({
+    existing.courseId = courseId;
+    if (data.rating !== undefined) existing.rating = data.rating;
+    if (data.comment !== undefined) existing.comment = data.comment.trim() || null;
+    if (data.videoUrl !== undefined) existing.videoUrl = data.videoUrl.trim() || null;
+    if (data.displayName !== undefined) existing.displayName = data.displayName;
+    if (data.status !== undefined) existing.status = data.status;
+    await this.reviewRepo.save(existing);
+    const review = await this.reviewRepo.findOneOrFail({
       where: { id: existing.id },
-      data: {
-        courseId,
-        ...(data.rating !== undefined ? { rating: data.rating } : {}),
-        ...(data.comment !== undefined ? { comment: data.comment.trim() || null } : {}),
-        ...(data.videoUrl !== undefined ? { videoUrl: data.videoUrl.trim() || null } : {}),
-        ...(data.displayName !== undefined ? { displayName: data.displayName } : {}),
-        ...(data.status !== undefined ? { status: data.status } : {}),
-      },
-      include: authorAndCourse,
+      relations: authorAndCourse,
     });
 
     await this.invalidate();
@@ -288,10 +291,10 @@ export class ReviewsService {
   }
 
   async adminDelete(id: string) {
-    const existing = await this.prisma.review.findUnique({ where: { id } });
+    const existing = await this.reviewRepo.findOneBy({ id });
     if (!existing) throw new AppError(404, REVIEW_NOT_FOUND);
 
-    await this.prisma.review.delete({ where: { id: existing.id } });
+    await this.reviewRepo.delete({ id: existing.id });
     await this.invalidate();
     return { ok: true };
   }

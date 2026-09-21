@@ -6,11 +6,6 @@
     "server"
   ],
   "scripts": {
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:setup": "prisma generate && prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio",
     "db:seed:qa": "tsx server/src/seed-qa.ts",
     "db:seed:qa-views": "tsx server/src/seed-qa-telegram-views.ts",
     "db:seed:courses": "tsx server/src/seed-courses.ts",
@@ -24,14 +19,13 @@
     "dev:client": "npm run dev --prefix client",
     "dev": "npx --yes concurrently -k -n server,client -c blue,green \"npm run dev:server\" \"npm run dev:client\"",
     "build:client": "npm run build --prefix client",
-    "build:server": "npm run build --prefix server"
+    "build:server": "npm run build --prefix server",
+    "db:schema": "psql \"$DATABASE_URL\" -f server/db/schema.sql"
   },
   "devDependencies": {
-    "prisma": "^6.14.0",
     "tsx": "^4.19.3"
   },
   "dependencies": {
-    "@prisma/client": "^6.14.0",
     "react-router-dom": "^7.18.3"
   }
 }

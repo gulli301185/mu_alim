@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { InjectRepository } from '@nestjs/typeorm';
+import { ArrayContains, FindOptionsOrder, FindOptionsWhere, Repository, Brackets, DataSource } from 'typeorm';
 import { z } from 'zod';
 import { AppError } from '../common/app-error';
 import { CacheService } from '../cache/cache.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { QaArticle } from '../database/entities';
+import { containsInsensitive } from '../database/sql';
 import { importQaArticles } from '../lib/qa-import-service';
 import { parseQuestionNumberSearch } from '../lib/qa-search';
 import { uniqueSlug } from '../lib/slug';
@@ -83,28 +85,31 @@ function dailySkip(dateKey: string, total: number) {
   return dayOffset % total;
 }
 
-function orderFor(sort: z.infer<typeof sortSchema>): Prisma.QaArticleOrderByWithRelationInput[] {
+const questionNumberAsc = { direction: 'ASC', nulls: 'LAST' } as const;
+
+function orderFor(sort: z.infer<typeof sortSchema>): FindOptionsOrder<QaArticle> {
   switch (sort) {
     case 'newest':
-      return [{ publishedAt: 'desc' }, { questionNumber: { sort: 'asc', nulls: 'last' } }];
+      return { publishedAt: 'DESC', questionNumber: questionNumberAsc };
     case 'oldest':
-      return [{ publishedAt: 'asc' }, { questionNumber: { sort: 'asc', nulls: 'last' } }];
+      return { publishedAt: 'ASC', questionNumber: questionNumberAsc };
     case 'popular':
-      return [
-        { views: 'desc' },
-        { siteViews: 'desc' },
-        { telegramViews: 'desc' },
-        { questionNumber: { sort: 'asc', nulls: 'last' } },
-      ];
+      return {
+        views: 'DESC',
+        siteViews: 'DESC',
+        telegramViews: 'DESC',
+        questionNumber: questionNumberAsc,
+      };
     default:
-      return [{ questionNumber: { sort: 'asc', nulls: 'last' } }, { publishedAt: 'desc' }];
+      return { questionNumber: questionNumberAsc, publishedAt: 'DESC' };
   }
 }
 
 @Injectable()
 export class QaService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(QaArticle) private readonly articles: Repository<QaArticle>,
+    private readonly ds: DataSource,
     private readonly cache: CacheService,
   ) {}
 
@@ -123,26 +128,26 @@ export class QaService {
       `qa:list:${sort}:${page}:${limit}:${encodeURIComponent(search.toLowerCase())}`,
       LIST_TTL,
       async () => {
-        const where: Prisma.QaArticleWhereInput = { isPublished: true };
+        let where: FindOptionsWhere<QaArticle>[] = [{ isPublished: true }];
         if (search) {
-          const or: Prisma.QaArticleWhereInput[] = [
-            { question: { contains: search, mode: 'insensitive' } },
-            { answer: { contains: search, mode: 'insensitive' } },
-            { tags: { has: search.toLowerCase() } },
+          const like = containsInsensitive(search);
+          where = [
+            { isPublished: true, question: like },
+            { isPublished: true, answer: like },
+            { isPublished: true, tags: ArrayContains([search.toLowerCase()]) },
           ];
           const questionNumber = parseQuestionNumberSearch(search);
-          if (questionNumber != null) or.unshift({ questionNumber });
-          where.OR = or;
+          if (questionNumber != null) where.unshift({ isPublished: true, questionNumber });
         }
 
         const [items, total] = await Promise.all([
-          this.prisma.qaArticle.findMany({
+          this.articles.find({
             where,
-            orderBy: orderFor(sort),
+            order: orderFor(sort),
             skip: (page - 1) * limit,
             take: limit,
           }),
-          this.prisma.qaArticle.count({ where }),
+          this.articles.count({ where }),
         ]);
 
         return {
@@ -162,14 +167,15 @@ export class QaService {
       `qa:daily:${date}`,
       ARTICLE_TTL,
       async () => {
-        const where: Prisma.QaArticleWhereInput = { isPublished: true };
-        const total = await this.prisma.qaArticle.count({ where });
+        const where = { isPublished: true };
+        const total = await this.articles.countBy(where);
         if (total === 0) return null;
 
-        const article = await this.prisma.qaArticle.findFirst({
+        const [article] = await this.articles.find({
           where,
-          orderBy: [{ questionNumber: { sort: 'asc', nulls: 'last' } }, { publishedAt: 'asc' }],
+          order: { questionNumber: questionNumberAsc, publishedAt: 'ASC' },
           skip: dailySkip(date, total),
+          take: 1,
         });
         return article ? { ...toClient(article), date } : null;
       },
@@ -186,27 +192,30 @@ export class QaService {
     const items = parseTelegramHtmlExport(text);
     if (items.length === 0) throw new AppError(400, 'Суроо-жооп табылган жок');
 
-    const result = await importQaArticles(this.prisma, items);
+    const result = await importQaArticles(this.ds, items);
     await this.invalidate();
     return { message: 'Телеграм экспорту ийгиликтүү импорт кылынды', ...result };
   }
 
   async getBySlug(slug: string) {
     const result = await this.cache.wrap<ClientArticle | null>(`qa:article:${slug}`, ARTICLE_TTL, async () => {
-      const article = await this.prisma.qaArticle.findFirst({ where: { slug, isPublished: true } });
+      const article = await this.articles.findOneBy({ slug, isPublished: true });
       if (!article) return null;
 
       const client = toClient(article);
       if (client.number == null) {
-        const rank = await this.prisma.qaArticle.count({
-          where: {
-            isPublished: true,
-            OR: [
-              { publishedAt: { lt: article.publishedAt } },
-              { publishedAt: article.publishedAt, createdAt: { lt: article.createdAt } },
-            ],
-          },
-        });
+        const rank = await this.articles
+          .createQueryBuilder('a')
+          .where('a.isPublished = true')
+          .andWhere(
+            new Brackets((w) => {
+              w.where('a.publishedAt < :publishedAt').orWhere(
+                'a.publishedAt = :publishedAt AND a.createdAt < :createdAt',
+              );
+            }),
+            { publishedAt: article.publishedAt, createdAt: article.createdAt },
+          )
+          .getCount();
         client.number = rank + 1;
       }
       return client;
@@ -217,19 +226,24 @@ export class QaService {
   }
 
   async registerView(slug: string) {
-    const article = await this.prisma.qaArticle.findFirst({ where: { slug, isPublished: true } });
+    const article = await this.articles.findOneBy({ slug, isPublished: true });
     if (!article) throw new AppError(404, NOT_FOUND);
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.qaArticle.update({
-        where: { id: article.id },
-        data: { siteViews: { increment: 1 } },
-      });
+    // One atomic statement: bump the site counter and keep the combined total in sync.
+    await this.articles
+      .createQueryBuilder()
+      .update(QaArticle)
+      .set({
+        siteViews: () => 'site_views + 1',
+        views: () => 'telegram_views + site_views + 1',
+        updatedAt: new Date(),
+      })
+      .where('id = :id', { id: article.id })
+      .execute();
 
-      return tx.qaArticle.update({
-        where: { id: row.id },
-        data: { views: row.telegramViews + row.siteViews },
-      });
+    const updated = await this.articles.findOneOrFail({
+      where: { id: article.id },
+      select: { telegramViews: true, siteViews: true },
     });
 
     return { views: (updated.telegramViews ?? 0) + (updated.siteViews ?? 0) };
@@ -237,54 +251,51 @@ export class QaService {
 
   async create(data: z.infer<typeof qaBodySchema>, createdById?: string) {
     const slug = await uniqueSlug(data.question, async (s) => {
-      const found = await this.prisma.qaArticle.findUnique({ where: { slug: s } });
+      const found = await this.articles.findOneBy({ slug: s });
       return Boolean(found);
     });
 
-    const article = await this.prisma.qaArticle.create({
-      data: {
+    const article = await this.articles.save(
+      this.articles.create({
         slug,
-        questionNumber: data.number,
+        questionNumber: data.number ?? null,
         question: data.question,
         answer: data.answer,
+        excerpt: null,
         tags: data.tags ?? [],
         type: data.type ?? 'text',
         isPublished: data.isPublished ?? true,
         publishedAt: data.publishedAt ? new Date(data.publishedAt) : new Date(),
-        createdById,
-      },
-    });
+        createdById: createdById ?? null,
+      }),
+    );
 
     await this.invalidate();
     return toClient(article);
   }
 
   async update(id: string, data: Partial<z.infer<typeof qaBodySchema>>) {
-    const existing = await this.prisma.qaArticle.findUnique({ where: { id } });
+    const existing = await this.articles.findOneBy({ id });
     if (!existing) throw new AppError(404, NOT_FOUND);
 
-    const article = await this.prisma.qaArticle.update({
-      where: { id },
-      data: {
-        ...(data.question !== undefined ? { question: data.question } : {}),
-        ...(data.number !== undefined ? { questionNumber: data.number } : {}),
-        ...(data.answer !== undefined ? { answer: data.answer } : {}),
-        ...(data.tags !== undefined ? { tags: data.tags } : {}),
-        ...(data.type !== undefined ? { type: data.type } : {}),
-        ...(data.isPublished !== undefined ? { isPublished: data.isPublished } : {}),
-        ...(data.publishedAt !== undefined ? { publishedAt: new Date(data.publishedAt) } : {}),
-      },
-    });
+    if (data.question !== undefined) existing.question = data.question;
+    if (data.number !== undefined) existing.questionNumber = data.number;
+    if (data.answer !== undefined) existing.answer = data.answer;
+    if (data.tags !== undefined) existing.tags = data.tags;
+    if (data.type !== undefined) existing.type = data.type;
+    if (data.isPublished !== undefined) existing.isPublished = data.isPublished;
+    if (data.publishedAt !== undefined) existing.publishedAt = new Date(data.publishedAt);
+    const article = await this.articles.save(existing);
 
     await this.invalidate();
     return toClient(article);
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.qaArticle.findUnique({ where: { id } });
+    const existing = await this.articles.findOneBy({ id });
     if (!existing) throw new AppError(404, NOT_FOUND);
 
-    await this.prisma.qaArticle.delete({ where: { id } });
+    await this.articles.delete({ id });
     await this.invalidate();
   }
 }

@@ -3,10 +3,6 @@
     "target": "ES2022",
     "module": "commonjs",
     "moduleResolution": "node",
-    "baseUrl": ".",
-    "paths": {
-      "@prisma/client": ["../node_modules/@prisma/client"]
-    },
     "outDir": "dist",
     "rootDir": "src",
     "declaration": false,

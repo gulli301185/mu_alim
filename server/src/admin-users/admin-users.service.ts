@@ -1,10 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AppError } from '../common/app-error';
 import { CacheService } from '../cache/cache.service';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  Certificate,
+  Course,
+  CourseProgress,
+  Enrollment,
+  Payment,
+  User,
+} from '../database/entities';
+import { anyContains } from '../database/sql';
 
 export const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -17,15 +26,6 @@ export const statusSchema = z.object({ isActive: z.boolean() });
 export const grantEnrollmentSchema = z.object({ courseId: z.string().uuid() });
 
 const USER_NOT_FOUND = 'Колдонуучу табылган жок';
-
-const courseSummarySelect = {
-  id: true,
-  title: true,
-  slug: true,
-  courseType: true,
-  price: true,
-  currency: true,
-} as const;
 
 function toPublicUser(user: {
   id: string;
@@ -58,7 +58,7 @@ function toCourseSummary(course: {
   title: string;
   slug: string;
   courseType: 'free' | 'paid';
-  price: Prisma.Decimal;
+  price: number;
   currency: string;
 }) {
   return {
@@ -87,50 +87,46 @@ function toEnrollmentDto(
 @Injectable()
 export class AdminUsersService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(Course) private readonly courses: Repository<Course>,
+    @InjectRepository(Enrollment) private readonly enrollments: Repository<Enrollment>,
+    private readonly ds: DataSource,
     private readonly cache: CacheService,
   ) {}
 
   private async requireLearner(id: string) {
-    const user = await this.prisma.user.findFirst({ where: { id, role: 'user' } });
+    const user = await this.users.findOneBy({ id, role: 'user' });
     if (!user) throw new AppError(404, USER_NOT_FOUND);
     return user;
   }
 
   async list({ page, limit, search }: z.infer<typeof listQuerySchema>) {
-    const where: Prisma.UserWhereInput = {
-      role: 'user',
-      ...(search
-        ? {
-            OR: [
-              { email: { contains: search, mode: 'insensitive' } },
-              { firstName: { contains: search, mode: 'insensitive' } },
-              { lastName: { contains: search, mode: 'insensitive' } },
-              { phone: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
-    };
+    const qb = this.users
+      .createQueryBuilder('u')
+      .where("u.role = 'user'")
+      .orderBy('u.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .loadRelationCountAndMap('u.enrollmentsCount', 'u.enrollments')
+      .loadRelationCountAndMap('u.certificatesCount', 'u.certificates')
+      .loadRelationCountAndMap('u.activeCoursesCount', 'u.courseProgress');
+    if (search) {
+      qb.andWhere(anyContains(['u.email', 'u.firstName', 'u.lastName', 'u.phone'], 'search', search));
+    }
 
-    const [total, users] = await Promise.all([
-      this.prisma.user.count({ where }),
-      this.prisma.user.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          _count: { select: { enrollments: true, certificates: true, courseProgress: true } },
-        },
-      }),
-    ]);
+    const [users, total] = (await qb.getManyAndCount()) as unknown as [
+      Array<
+        User & { enrollmentsCount: number; certificatesCount: number; activeCoursesCount: number }
+      >,
+      number,
+    ];
 
     return {
       items: users.map((user) => ({
         ...toPublicUser(user),
-        enrollmentsCount: user._count.enrollments,
-        certificatesCount: user._count.certificates,
-        activeCoursesCount: user._count.courseProgress,
+        enrollmentsCount: user.enrollmentsCount,
+        certificatesCount: user.certificatesCount,
+        activeCoursesCount: user.activeCoursesCount,
       })),
       total,
       page,
@@ -139,24 +135,17 @@ export class AdminUsersService {
   }
 
   async get(id: string) {
-    const user = await this.prisma.user.findFirst({
+    const user = await this.users.findOne({
       where: { id, role: 'user' },
-      include: {
-        enrollments: {
-          orderBy: { enrolledAt: 'desc' },
-          include: { course: { select: courseSummarySelect } },
-        },
-        courseProgress: {
-          orderBy: { updatedAt: 'desc' },
-          include: {
-            course: { select: courseSummarySelect },
-            lastLesson: { select: { id: true, title: true, lessonOrder: true } },
-          },
-        },
-        certificates: {
-          orderBy: { issuedAt: 'desc' },
-          include: { course: { select: courseSummarySelect } },
-        },
+      relations: {
+        enrollments: { course: true },
+        courseProgress: { course: true, lastLesson: true },
+        certificates: { course: true },
+      },
+      order: {
+        enrollments: { enrolledAt: 'DESC' },
+        courseProgress: { updatedAt: 'DESC' },
+        certificates: { issuedAt: 'DESC' },
       },
     });
     if (!user) throw new AppError(404, USER_NOT_FOUND);
@@ -193,37 +182,34 @@ export class AdminUsersService {
   async grantEnrollment(userId: string, courseId: string) {
     const user = await this.requireLearner(userId);
 
-    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+    const course = await this.courses.findOneBy({ id: courseId });
     if (!course) throw new AppError(404, 'Курс табылган жок');
     if (course.courseType !== 'paid') {
       throw new AppError(400, 'Бекер курс үчүн төлөм талап кылынбайт');
     }
 
     const now = new Date();
-    const existing = await this.prisma.enrollment.findUnique({
-      where: { userId_courseId: { userId: user.id, courseId: course.id } },
-    });
+    const existing = await this.enrollments.findOneBy({ userId: user.id, courseId: course.id });
 
     if (existing?.status === 'active') {
       return { enrollment: toEnrollmentDto(existing, course), alreadyActive: true };
     }
 
-    const enrollment = await this.prisma.$transaction(async (tx) => {
+    const enrollment = await this.ds.transaction(async (em) => {
       const record = existing
-        ? await tx.enrollment.update({
-            where: { id: existing.id },
-            data: {
+        ? await em.save(Object.assign(existing, { status: 'active' as const }))
+        : await em.save(
+            em.create(Enrollment, {
+              userId: user.id,
+              courseId: course.id,
               status: 'active',
-              enrolledAt: existing.enrolledAt,
-              completedAt: existing.completedAt,
-            },
-          })
-        : await tx.enrollment.create({
-            data: { userId: user.id, courseId: course.id, status: 'active', enrolledAt: now },
-          });
+              enrolledAt: now,
+              completedAt: null,
+            }),
+          );
 
-      await tx.payment.create({
-        data: {
+      await em.save(
+        em.create(Payment, {
           userId: user.id,
           courseId: course.id,
           amount: course.price,
@@ -233,17 +219,24 @@ export class AdminUsersService {
           status: 'success',
           paidAt: now,
           providerResponse: { source: 'admin_grant' },
-        },
-      });
+        }),
+      );
 
-      const existingCourseProgress = await tx.courseProgress.findUnique({
-        where: { userId_courseId: { userId: user.id, courseId: course.id } },
+      const existingCourseProgress = await em.findOne(CourseProgress, {
+        where: { userId: user.id, courseId: course.id },
         select: { id: true },
       });
       if (!existingCourseProgress) {
-        await tx.courseProgress.create({
-          data: { userId: user.id, courseId: course.id, progressPercent: 0, isCompleted: false },
-        });
+        await em.save(
+          em.create(CourseProgress, {
+            userId: user.id,
+            courseId: course.id,
+            progressPercent: 0,
+            lastLessonId: null,
+            isCompleted: false,
+            completedAt: null,
+          }),
+        );
       }
 
       return record;
@@ -254,17 +247,18 @@ export class AdminUsersService {
 
   async setStatus(id: string, isActive: boolean) {
     const existing = await this.requireLearner(id);
-    const updated = await this.prisma.user.update({ where: { id: existing.id }, data: { isActive } });
+    existing.isActive = isActive;
+    const updated = await this.users.save(existing);
     return { user: toPublicUser(updated) };
   }
 
   async remove(id: string) {
     const existing = await this.requireLearner(id);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.payment.deleteMany({ where: { userId: existing.id } });
-      await tx.certificate.deleteMany({ where: { userId: existing.id } });
-      await tx.user.delete({ where: { id: existing.id } });
+    await this.ds.transaction(async (em) => {
+      await em.delete(Payment, { userId: existing.id });
+      await em.delete(Certificate, { userId: existing.id });
+      await em.delete(User, { id: existing.id });
     });
 
     // Their reviews are cascade-deleted, so the cached public review lists are stale.

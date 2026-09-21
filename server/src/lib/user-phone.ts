@@ -1,4 +1,5 @@
-import type { PrismaClient } from '@prisma/client';
+import type { DataSource } from 'typeorm';
+import { User } from '../database/entities';
 import { normalizeKgPhone } from './phone';
 
 export function kgPhoneDigitKeys(normalized: string): string[] {
@@ -17,28 +18,27 @@ export function phonesMatch(storedPhone: string | null | undefined, normalized: 
 }
 
 export async function findUserByKgPhone(
-  prisma: PrismaClient,
+  ds: DataSource,
   normalizedPhone: string,
   excludeId?: string,
 ) {
   const keys = kgPhoneDigitKeys(normalizedPhone);
-  const rows = excludeId
-    ? await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+  const rows: Array<{ id: string }> = excludeId
+    ? await ds.query(
         `SELECT id FROM users
          WHERE regexp_replace(coalesce(phone, ''), '\\D', '', 'g') = ANY($1::text[])
            AND id <> $2::uuid
          LIMIT 1`,
-        keys,
-        excludeId,
+        [keys, excludeId],
       )
-    : await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+    : await ds.query(
         `SELECT id FROM users
          WHERE regexp_replace(coalesce(phone, ''), '\\D', '', 'g') = ANY($1::text[])
          LIMIT 1`,
-        keys,
+        [keys],
       );
 
   const id = rows[0]?.id;
   if (!id) return null;
-  return prisma.user.findUnique({ where: { id } });
+  return ds.getRepository(User).findOneBy({ id });
 }

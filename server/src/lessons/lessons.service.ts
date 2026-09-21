@@ -4,7 +4,9 @@ import { AppError } from '../common/app-error';
 import { AuthUser } from '../common/auth';
 import { CacheService } from '../cache/cache.service';
 import { CoursesService } from '../courses/courses.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Not, Repository } from 'typeorm';
+import { Course, Lesson } from '../database/entities';
 import { parseYoutubeVideoId } from '../lib/youtube-parse';
 
 export const createLessonSchema = z.object({
@@ -55,7 +57,8 @@ function toDto(lesson: LessonRow, options?: { hideVideo?: boolean }) {
 @Injectable()
 export class LessonsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Lesson) private readonly lessonRepo: Repository<Lesson>,
+    @InjectRepository(Course) private readonly courseRepo: Repository<Course>,
     private readonly cache: CacheService,
     private readonly courses: CoursesService,
   ) {}
@@ -66,15 +69,15 @@ export class LessonsService {
       const courseId = await this.courses.resolveId(ref);
       if (!courseId) return null;
 
-      const course = await this.prisma.course.findUnique({
+      const course = await this.courseRepo.findOne({
         where: { id: courseId },
         select: { id: true, courseType: true },
       });
       if (!course) return null;
 
-      const lessons = await this.prisma.lesson.findMany({
+      const lessons = await this.lessonRepo.find({
         where: { courseId: course.id, isPublished: true },
-        orderBy: { lessonOrder: 'asc' },
+        order: { lessonOrder: 'ASC' },
         select: {
           id: true,
           title: true,
@@ -102,14 +105,14 @@ export class LessonsService {
     const videoId = parseYoutubeVideoId(data.youtubeUrl);
     if (!videoId) throw new AppError(400, BAD_YOUTUBE);
 
-    const orderTaken = await this.prisma.lesson.findFirst({
+    const orderTaken = await this.lessonRepo.findOne({
       where: { courseId, lessonOrder: data.lessonOrder },
       select: { id: true },
     });
     if (orderTaken) throw new AppError(400, ORDER_TAKEN);
 
-    const lesson = await this.prisma.lesson.create({
-      data: {
+    const lesson = await this.lessonRepo.save(
+      this.lessonRepo.create({
         courseId,
         title: data.title,
         description: data.description ?? null,
@@ -118,15 +121,15 @@ export class LessonsService {
         durationSeconds: data.durationSeconds ?? null,
         lessonOrder: data.lessonOrder,
         isPublished: data.isPublished ?? false,
-      },
-    });
+      }),
+    );
 
     await this.courses.invalidate();
     return toDto(lesson);
   }
 
   async update(id: string, data: z.infer<typeof updateLessonSchema>) {
-    const existing = await this.prisma.lesson.findUnique({ where: { id } });
+    const existing = await this.lessonRepo.findOneBy({ id });
     if (!existing) throw new AppError(404, 'Сабак табылган жок');
 
     const updateData: {
@@ -152,28 +155,24 @@ export class LessonsService {
     }
 
     if (data.lessonOrder !== undefined) {
-      const orderTaken = await this.prisma.lesson.findFirst({
-        where: {
-          courseId: existing.courseId,
-          lessonOrder: data.lessonOrder,
-          NOT: { id: existing.id },
-        },
+      const orderTaken = await this.lessonRepo.findOne({
+        where: { courseId: existing.courseId, lessonOrder: data.lessonOrder, id: Not(existing.id) },
         select: { id: true },
       });
       if (orderTaken) throw new AppError(400, ORDER_TAKEN);
       updateData.lessonOrder = data.lessonOrder;
     }
 
-    const lesson = await this.prisma.lesson.update({ where: { id: existing.id }, data: updateData });
+    const lesson = await this.lessonRepo.save(Object.assign(existing, updateData));
     await this.courses.invalidate();
     return toDto(lesson);
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.lesson.findUnique({ where: { id }, select: { id: true } });
+    const existing = await this.lessonRepo.findOne({ where: { id }, select: { id: true } });
     if (!existing) throw new AppError(404, 'Сабак табылган жок');
 
-    await this.prisma.lesson.delete({ where: { id: existing.id } });
+    await this.lessonRepo.delete({ id: existing.id });
     await this.courses.invalidate();
   }
 }
