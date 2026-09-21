@@ -5158,12 +5158,12 @@ button.footer-link {
 }
 
 .course-learn-sidebar {
-  @apply p-4 sm:p-5 flex flex-col order-2 lg:order-1 min-h-0 overflow-hidden;
+  @apply p-4 sm:p-5 flex flex-col order-2 lg:order-1;
 }
 
 @media (min-width: 1024px) {
   .course-learn-sidebar {
-    @apply sticky top-[84px] h-full order-1;
+    @apply sticky top-[84px] h-full order-1 min-h-0 overflow-hidden;
   }
 }
 
@@ -5174,7 +5174,13 @@ button.footer-link {
 }
 
 .course-learn-lessons {
-  @apply list-none m-0 p-0 flex flex-col gap-4 overflow-y-auto flex-1;
+  @apply list-none m-0 p-0 flex flex-col gap-4;
+}
+
+@media (min-width: 1024px) {
+  .course-learn-lessons {
+    @apply overflow-y-auto flex-1 min-h-0;
+  }
 }
 
 .course-learn-lesson-block {

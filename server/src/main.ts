@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import swaggerUi from 'swagger-ui-express';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
+import { CacheService } from './cache/cache.service';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ensureSchema } from './database/bootstrap-schema';
 import { MailService } from './mail/mail.service';
@@ -30,13 +31,20 @@ function allowedOrigins() {
   ];
 }
 
+function isAllowedOrigin(origin: string | undefined) {
+  if (!origin) return true;
+  const normalized = origin.replace(/\/+$/, '');
+  if (allowedOrigins().includes(normalized)) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(normalized);
+}
+
 async function bootstrap() {
   // Body parsing is wired by hand: the review-video upload streams its raw body itself.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   const port = Number(process.env.PORT) || 3001;
   const openapiDocument = JSON.parse(readFileSync(resolve(__dirname, 'openapi.json'), 'utf8'));
 
-  app.enableCors({ origin: allowedOrigins() });
+  app.enableCors({ origin: (origin, callback) => callback(null, isAllowedOrigin(origin)) });
   app.use(json());
   app.useStaticAssets(resolve(__dirname, '../uploads'), { prefix: '/uploads' });
   app.use(
@@ -49,7 +57,7 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();
 
-  await ensureSchema(app.get(DataSource));
+  await ensureSchema(app.get(DataSource), app.get(CacheService));
   await app.listen(port);
 
   console.log(`API server: http://localhost:${port}`);
