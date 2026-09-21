@@ -1,23 +1,27 @@
+# Build context: the `server/` directory.
+#   docker build -t mu-alim-server server
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY server ./server
-
-WORKDIR /app/server
+COPY package.json package-lock.json ./
 RUN npm ci
+
+COPY . .
 RUN npm run build
 
 FROM node:22-alpine
 
-WORKDIR /app/server
+WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
 
-COPY --from=builder /app/server/node_modules ./node_modules
-COPY --from=builder /app/server/dist ./dist
-COPY --from=builder /app/server/uploads ./uploads
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/uploads ./uploads
 
 EXPOSE 3001
 
