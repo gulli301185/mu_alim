@@ -158,15 +158,21 @@ function AuthButtons({
 
   if (user && isAdmin) {
     return (
-      <button
-        type="button"
-        className="header-logout-btn"
-        onClick={onLogout}
-        disabled={isLoggingOut}
-      >
-        <LogOut className="h-4 w-4" />
-        {isLoggingOut ? 'Чыгууда...' : 'Чыгуу'}
-      </button>
+      <>
+        <Link to="/admin" className="header-login-btn">
+          <Shield className="h-4 w-4" />
+          Админ
+        </Link>
+        <button
+          type="button"
+          className="header-logout-btn"
+          onClick={onLogout}
+          disabled={isLoggingOut}
+        >
+          <LogOut className="h-4 w-4" />
+          {isLoggingOut ? 'Чыгууда...' : 'Чыгуу'}
+        </button>
+      </>
     );
   }
 
@@ -249,10 +255,17 @@ function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
             <p className="header-user-dropdown-email">{user.email}</p>
             {isAdmin ? <span className="header-user-dropdown-role">Администратор</span> : null}
           </div>
-          <Link to="/profile" className="header-user-dropdown-link" onClick={closeAll}>
-            <User className="h-4 w-4" />
-            Профиль
-          </Link>
+          {isAdmin ? (
+            <Link to="/admin" className="header-user-dropdown-link" onClick={closeAll}>
+              <Shield className="h-4 w-4" />
+              Админ панель
+            </Link>
+          ) : (
+            <Link to="/profile" className="header-user-dropdown-link" onClick={closeAll}>
+              <User className="h-4 w-4" />
+              Профиль
+            </Link>
+          )}
           <button type="button" className="header-user-dropdown-link" onClick={() => { logout(); closeAll(); }}>
             <LogOut className="h-4 w-4" />
             Чыгуу
@@ -346,7 +359,7 @@ export function Header({
         <div className="header-dots" aria-hidden />
         <div className="wrap header-inner">
           <Link
-            to={adminArea || isAdmin ? '/admin/questions' : '/'}
+            to={adminArea ? '/admin/questions' : '/'}
             className="header-logo no-underline shrink-0"
           >
             <img src={image(SITE_IMAGE_KEYS.logo)} alt="" className="header-logo-img" aria-hidden />
@@ -504,6 +517,10 @@ export function Header({
               </div>
             ) : !loading && user && isAdmin ? (
               <div className="header-mobile-auth">
+                <Link to="/admin" className="header-login-btn header-login-btn-mobile" onClick={closeAll}>
+                  <Shield className="h-4 w-4" />
+                  Админ панель
+                </Link>
                 <button
                   type="button"
                   className="header-logout-btn header-login-btn-mobile"

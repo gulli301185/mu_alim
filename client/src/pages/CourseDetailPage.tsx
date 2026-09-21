@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BookOpen, GraduationCap, Lock, Play, Star, Youtube } from 'lucide-react';
 import {
   fetchCourseByRef,
+  fetchCourses,
   fetchFreeLessons,
   formatCourseDuration,
   isFreeCourse,
@@ -455,9 +456,14 @@ function FreeLessonHubCard({ lesson }: { lesson: FreeLessonItem }) {
 }
 
 export function FreeCoursesPage() {
-  const { data: freeLessons, isLoading } = useQuery({
+  const { data: freeLessons, isLoading, isError, refetch } = useQuery({
     queryKey: ['free-lessons'],
     queryFn: fetchFreeLessons,
+  });
+  const { data: freeCourses } = useQuery({
+    queryKey: ['courses', 'free'],
+    queryFn: () => fetchCourses({ type: 'free', limit: 100 }),
+    enabled: !isLoading && (isError || (freeLessons?.items.length ?? 0) === 0),
   });
 
   if (isLoading) {
@@ -471,6 +477,7 @@ export function FreeCoursesPage() {
   }
 
   const items = freeLessons?.items ?? [];
+  const fallbackCourses = freeCourses?.items ?? [];
 
   return (
     <section className="courses-hub">
@@ -488,12 +495,26 @@ export function FreeCoursesPage() {
               <FreeLessonHubCard key={lesson.id} lesson={lesson} />
             ))}
           </div>
+        ) : fallbackCourses.length > 0 ? (
+          <div className="courses-hub-grid">
+            {fallbackCourses.map((course) => (
+              <CourseHubCard key={course.id} course={course} free />
+            ))}
+          </div>
         ) : (
           <div className="courses-hub-empty ui-card">
-            <p className="courses-hub-empty-title">Бекер сабактар азырынча жок</p>
-            <Link to="/courses" className="btn-gold courses-hub-empty-btn">
-              Акылуу курстарга өтүү
-            </Link>
+            <p className="courses-hub-empty-title">
+              {isError ? 'Бекер сабактар жүктөлбөдү' : 'Бекер сабактар азырынча жок'}
+            </p>
+            {isError ? (
+              <button type="button" className="btn-gold courses-hub-empty-btn" onClick={() => void refetch()}>
+                Кайра жүктөө
+              </button>
+            ) : (
+              <Link to="/courses" className="btn-gold courses-hub-empty-btn">
+                Акылуу курстарга өтүү
+              </Link>
+            )}
           </div>
         )}
       </div>

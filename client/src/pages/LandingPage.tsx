@@ -249,16 +249,14 @@ function VideoPanel({
           </div>
           {featured.badge && <span className="video-free-badge">{featured.badge}</span>}
           <span className="video-duration">{featured.duration}</span>
-          {(featured.lessons || featured.rating || featured.price) && (
-            <div className="video-main-meta">
-              <p className="video-main-meta-title">{featured.title}</p>
-              <CourseMeta
-                lessons={featured.lessons}
-                rating={featured.rating}
-                price={featured.price}
-              />
-            </div>
-          )}
+          <div className="video-main-meta">
+            <p className="video-main-meta-title">{featured.title}</p>
+            <CourseMeta
+              lessons={featured.lessons}
+              rating={featured.rating}
+              price={featured.price}
+            />
+          </div>
         </VideoPanelLink>
         <div className="videos-side-wrap">
           <div className="videos-side-list">

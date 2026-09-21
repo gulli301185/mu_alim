@@ -47,10 +47,9 @@ function PublicThemeShell() {
 }
 
 export function PublicLayout() {
-  const { loading, isAdmin } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) return <AuthLoading />;
-  if (isAdmin) return <Navigate to="/admin" replace />;
 
   return <PublicThemeShell />;
 }

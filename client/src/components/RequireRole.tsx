@@ -37,10 +37,9 @@ export function RequireUser() {
 }
 
 export function BlockAdminFromUserArea() {
-  const { loading, isAdmin } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) return <AuthLoading />;
-  if (isAdmin) return <Navigate to="/admin" replace />;
 
   return <Outlet />;
 }
