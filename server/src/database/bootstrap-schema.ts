@@ -3,10 +3,13 @@ import bcrypt from 'bcryptjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { DataSource } from 'typeorm';
-import { User } from './entities';
+import { uniqueSlug } from '../lib/slug';
+import { QaArticle, User } from './entities';
 
 const SCHEMA_FILE = resolve(__dirname, '../../db/schema.sql');
 const FREE_CATALOGUE_FILE = resolve(__dirname, '../../db/free-lessons.sql');
+const PAID_CATALOGUE_FILE = resolve(__dirname, '../../db/paid-courses.sql');
+const QA_SEED_FILE = resolve(__dirname, '../../db/qa-seed.json');
 
 /**
  * Creates the tables from `db/schema.sql` when the database is empty (no `users` table).
@@ -18,7 +21,10 @@ export async function ensureSchema(
 ) {
   await createSchemaIfEmpty(ds);
   const seededFree = await ensureFreeCatalogue(ds);
-  if (seededFree) await cache?.invalidate('courses:');
+  const seededPaid = await ensurePaidCatalogue(ds);
+  const seededQa = await ensureQaCatalogue(ds);
+  if (seededFree || seededPaid) await cache?.invalidate('courses:');
+  if (seededQa) await cache?.invalidate('qa:');
   await ensureAdmin(ds);
 }
 
@@ -138,6 +144,130 @@ async function ensureFreeCatalogue(ds: DataSource): Promise<boolean> {
     return false;
   } finally {
     await runner.release();
+  }
+}
+
+function paidCataloguePath() {
+  return [PAID_CATALOGUE_FILE, resolve(__dirname, '../db/paid-courses.sql')].find((path) =>
+    existsSync(path),
+  );
+}
+
+function paidCourseIdsFromSql(sql: string) {
+  const ids: string[] = [];
+  for (const line of sql.split('\n')) {
+    if (!line.includes('INSERT INTO public.courses') || !line.includes(", 'paid',")) continue;
+    const match = line.match(/VALUES \('([0-9a-f-]{36})'/i);
+    if (match) ids.push(match[1]);
+  }
+  return ids;
+}
+
+/**
+ * Loads paid courses and their lessons when none are published yet.
+ */
+async function ensurePaidCatalogue(ds: DataSource): Promise<boolean> {
+  const logger = new Logger('Database');
+  const file = paidCataloguePath();
+  if (!file) return false;
+
+  const [{ n }] = await ds.query(`
+    SELECT COUNT(*)::int AS n
+    FROM courses
+    WHERE course_type = 'paid' AND is_published = true
+  `);
+  if (n > 0) return false;
+
+  const sql = readFileSync(file, 'utf8');
+  const paidIds = paidCourseIdsFromSql(sql);
+  const statements = sql
+    .split('\n')
+    .filter((line) => {
+      if (line.includes("INSERT INTO public.categories") && line.includes("'paid-courses'")) return true;
+      if (line.includes('INSERT INTO public.courses') && line.includes(", 'paid',")) return true;
+      if (line.includes('INSERT INTO public.lessons') && paidIds.some((id) => line.includes(`'${id}'`))) {
+        return true;
+      }
+      return false;
+    });
+  if (statements.length === 0) return false;
+
+  const runner = ds.createQueryRunner();
+  await runner.connect();
+  await runner.startTransaction();
+  try {
+    for (const statement of statements) {
+      await runner.query(statement);
+    }
+    await runner.commitTransaction();
+    logger.log(`Loaded ${paidIds.length} paid courses from db/paid-courses.sql`);
+    return true;
+  } catch (err) {
+    await runner.rollbackTransaction();
+    logger.error(`Failed to load paid courses: ${(err as Error).message}`);
+    return false;
+  } finally {
+    await runner.release();
+  }
+}
+
+function qaSeedPath() {
+  return [
+    QA_SEED_FILE,
+    resolve(__dirname, '../db/qa-seed.json'),
+    resolve(__dirname, '../../../client/src/data/telegram-questions.json'),
+  ].find((path) => existsSync(path));
+}
+
+/**
+ * Loads published Q&A when the table is empty so /api/qa/daily is not blank.
+ */
+async function ensureQaCatalogue(ds: DataSource): Promise<boolean> {
+  const logger = new Logger('Database');
+  const file = qaSeedPath();
+  if (!file) return false;
+
+  const [{ n }] = await ds.query(`SELECT COUNT(*)::int AS n FROM qa_articles WHERE is_published = true`);
+  if (n > 0) return false;
+
+  type SeedItem = {
+    id: string;
+    number?: number;
+    question: string;
+    answer: string;
+    tags?: string[];
+    publishedAt: string;
+  };
+  const items = JSON.parse(readFileSync(file, 'utf8')) as SeedItem[];
+  if (!items.length) return false;
+
+  const articles = ds.getRepository(QaArticle);
+  try {
+    for (const item of items) {
+      const slug = await uniqueSlug(item.id || item.question, async (s) => {
+        const found = await articles.findOneBy({ slug: s });
+        return Boolean(found);
+      });
+      await articles.save(
+        articles.create({
+          slug,
+          questionNumber: item.number ?? null,
+          question: item.question,
+          answer: item.answer,
+          excerpt: null,
+          tags: item.tags ?? [],
+          publishedAt: new Date(item.publishedAt),
+          type: 'text',
+          isPublished: true,
+          createdById: null,
+        }),
+      );
+    }
+    logger.log(`Loaded ${items.length} Q&A articles from ${file}`);
+    return true;
+  } catch (err) {
+    logger.error(`Failed to load Q&A: ${(err as Error).message}`);
+    return false;
   }
 }
 
