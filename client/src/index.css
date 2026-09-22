@@ -3425,6 +3425,7 @@ button.footer-link {
 
 @media (min-width: 992px) {
   .events-faq-section {
+    margin-top: 80px;
     padding: 88px 0 88px;
   }
 }
@@ -3781,20 +3782,27 @@ button.footer-link {
   object-position: center 42%;
   /* The mountain reads as a faded backdrop, not a competing photo — this is what keeps
      the text on top of it readable. */
-  opacity: 0.32;
+  opacity: 0.62;
 }
 
 .ustaz-teaser-content-wash {
   @apply absolute inset-0 pointer-events-none;
-  /* Heaviest at the right edge (the seam with the portrait panel) and eases off toward
-     the text — the portrait panel mirrors this fade on its own left edge below, so the
-     two panels melt into each other instead of meeting at a hard line. */
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--color-tunduk-blue-dark) 55%, transparent) 0%,
-    color-mix(in srgb, var(--color-tunduk-blue-dark) 72%, transparent) 55%,
-    color-mix(in srgb, var(--color-tunduk-blue-dark) 97%, transparent) 100%
-  );
+  /* Sky over the peaks: brighter and more see-through. Darker only lower/right so copy
+     stays readable and the portrait seam still melts together. */
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, #d6eefb 14%, transparent) 0%,
+      color-mix(in srgb, var(--color-sky) 8%, transparent) 24%,
+      transparent 48%,
+      color-mix(in srgb, var(--color-tunduk-blue-dark) 36%, transparent) 100%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-tunduk-blue-dark) 28%, transparent) 0%,
+      color-mix(in srgb, var(--color-tunduk-blue-dark) 42%, transparent) 58%,
+      color-mix(in srgb, var(--color-tunduk-blue-dark) 70%, transparent) 100%
+    );
 }
 
 .ustaz-teaser-portrait-panel {
@@ -3809,13 +3817,15 @@ button.footer-link {
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  /* Mirrors .ustaz-teaser-content-wash's right edge, so the seam between the two panels
-     reads as one continuous fade rather than a cut between two flat images. */
+  /* Soft shadow on the photo's left edge that melts into the mountain, not a hard cut. */
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--color-tunduk-blue-dark) 97%, transparent) 0%,
-    transparent 26%
+    color-mix(in srgb, var(--color-tunduk-blue-dark) 62%, transparent) 0%,
+    color-mix(in srgb, var(--color-tunduk-blue-dark) 34%, transparent) 18%,
+    color-mix(in srgb, var(--color-tunduk-blue-mid) 12%, transparent) 38%,
+    transparent 58%
   );
+  box-shadow: inset 56px 0 48px -12px rgba(18, 38, 84, 0.42);
 }
 
 .ustaz-teaser-banner {
@@ -3893,11 +3903,16 @@ button.footer-link {
   }
 
   .ustaz-teaser-content-bg {
-    opacity: 0.72;
+    opacity: 0.86;
   }
 
   .ustaz-teaser-content-wash {
-    background: color-mix(in srgb, var(--color-tunduk-blue-dark) 42%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, #d6eefb 16%, transparent) 0%,
+      color-mix(in srgb, var(--color-sky) 10%, transparent) 32%,
+      color-mix(in srgb, var(--color-tunduk-blue-dark) 20%, transparent) 100%
+    );
   }
 
   .ustaz-teaser-text {
