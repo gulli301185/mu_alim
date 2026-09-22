@@ -99,7 +99,12 @@ export function Footer() {
             <div className="footer-brand">
               <Link to="/" className="footer-brand-top">
                 <img src={image(SITE_IMAGE_KEYS.logo)} alt={FOOTER_BRAND} className="footer-brand-logo" />
-                <span className="footer-brand-name">{FOOTER_BRAND}</span>
+                <span className="header-brand-wordmark" aria-label={FOOTER_BRAND}>
+                  <span className="header-brand-wordmark-text">
+                    <span className="header-brand-wordmark-gold">Mu</span>
+                    <span className="header-brand-wordmark-light">alim</span>
+                  </span>
+                </span>
               </Link>
               <p className="footer-brand-motto">
                 <span>БИЛИМ – ЭРКИНДИК,</span>

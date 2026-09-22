@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -58,17 +58,20 @@ function VideoPanelLink({
   external,
   className,
   children,
+  linkRef,
 }: {
   href: string;
   external?: boolean;
   className: string;
   children: ReactNode;
+  linkRef?: Ref<HTMLAnchorElement>;
 }) {
   const isExternal = external || href.startsWith('http');
   if (isExternal) {
     const isYoutube = href.includes('youtube.com') || href.includes('youtu.be');
     return (
       <a
+        ref={linkRef}
         href={href}
         className={className}
         {...(isYoutube ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
@@ -78,7 +81,7 @@ function VideoPanelLink({
     );
   }
   return (
-    <Link to={href} className={className}>
+    <Link ref={linkRef} to={href} className={className}>
       {children}
     </Link>
   );
@@ -224,6 +227,23 @@ function VideoPanel({
   featured: VideoPanelItem;
   sideItems: VideoPanelItem[];
 }) {
+  const videoMainRef = useRef<HTMLAnchorElement>(null);
+  // The side list's scroll height follows the featured video's own rendered height (90% of it),
+  // so it stays proportional at every screen width instead of a guessed fixed pixel value.
+  const [sideMaxHeight, setSideMaxHeight] = useState<number>();
+
+  useEffect(() => {
+    const el = videoMainRef.current;
+    if (!el) return;
+
+    const update = () => setSideMaxHeight(el.getBoundingClientRect().height * 0.9);
+    update();
+
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div id={id} className="ui-card p-5 sm:p-6 main-panel main-panel-videos">
       <div className="panel-head">
@@ -240,7 +260,12 @@ function VideoPanel({
         )}
       </div>
       <div className="videos-split">
-        <VideoPanelLink href={featured.href} external={featured.external} className="video-main block no-underline">
+        <VideoPanelLink
+          href={featured.href}
+          external={featured.external}
+          className="video-main block no-underline"
+          linkRef={videoMainRef}
+        >
           <img src={featured.thumbnail} alt={featured.title} />
           <div className="video-play">
             <div className="play-circle-white">
@@ -258,7 +283,10 @@ function VideoPanel({
             />
           </div>
         </VideoPanelLink>
-        <div className="videos-side-wrap">
+        <div
+          className="videos-side-wrap"
+          style={sideMaxHeight ? { maxHeight: sideMaxHeight } : undefined}
+        >
           <div className="videos-side-list">
           {sideItems.map((v) => (
             <VideoPanelLink
@@ -356,7 +384,7 @@ export function LandingPage() {
         </div>
       </div>
 
-      <section className="py-8">
+      <section className="landing-band">
         <div className="wrap">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {QUICK_ACCESS.map((item) => (
@@ -369,7 +397,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="py-4 bg-page">
+      <section className="landing-band bg-page">
         <div className="wrap">
           <div className="main-split">
             <ReviewsFeed />
@@ -431,59 +459,41 @@ export function LandingPage() {
       <section className="ustaz-section">
         <div className="wrap">
           <div className="ustaz-teaser-card">
-              <div className="ustaz-teaser-photo-wrap">
-                <img
-                  src={image(SITE_IMAGE_KEYS.landingUstazBg)}
-                  alt=""
-                  className="ustaz-teaser-bg-photo"
-                  aria-hidden
-                />
-                <div className="ustaz-teaser-bg-wash" aria-hidden />
-              </div>
-
-              <div className="ustaz-teaser-wave" aria-hidden>
-                <svg className="ustaz-wave-svg" viewBox="0 0 1440 120" preserveAspectRatio="none">
-                  <path
-                    d="M0,80 L0,120 L1440,120 L1440,20 C1200,60 960,0 720,40 C480,80 240,20 0,80 Z"
-                    className="ustaz-wave-path-back"
-                  />
-                </svg>
-                <svg className="ustaz-wave-svg ustaz-wave-svg-front" viewBox="0 0 1440 100" preserveAspectRatio="none">
-                  <path
-                    d="M0,70 L0,100 L1440,100 L1440,0 C1080,50 720,10 360,55 C180,75 60,65 0,70 Z"
-                    className="ustaz-wave-path-front"
-                  />
-                </svg>
-              </div>
-
-              <div className="ustaz-teaser-body">
-                <div className="ustaz-teaser-banner-wrap">
-                  <img
-                    src={image(SITE_IMAGE_KEYS.landingUstazTeaser)}
-                    alt={TEACHER.name}
-                    className="ustaz-teaser-banner"
-                  />
+            <div className="ustaz-teaser-content">
+              <img
+                src={image(SITE_IMAGE_KEYS.landingUstazBg)}
+                alt=""
+                className="ustaz-teaser-content-bg"
+                aria-hidden
+              />
+              <div className="ustaz-teaser-content-wash" aria-hidden />
+              <div className="ustaz-teaser-body-copy">
+                <p className="ustaz-teaser-label">УСТАЗ ЖӨНҮНДӨ</p>
+                <div className="ustaz-teaser-text">
+                  <p>
+                    Мухаммадалим Исаков — ислам билимин заманбап окутуу менен айкалыштырып,
+                    терең жана системалуу окутуу менен бирге адамдын руханий өсүшүнө жана
+                    үй-бүлөлөрдүн бекем болушуна салым кошуп келет.
+                  </p>
+                  <p>
+                    Ал Кыргызстандагы алгачкы «Үй-бүлө бактысы» курсун түптөп, үй-бүлө
+                    баалуулуктарын бекемдөө менен бирге, бул багытты мамлекеттик деңгээлде
+                    өнүктүрүүгө жана коомдун бекем пайдубалын түзүүгө умтулат.
+                  </p>
                 </div>
-                <div className="ustaz-teaser-body-copy">
-                  <p className="ustaz-teaser-label">УСТАЗ ЖӨНҮНДӨ</p>
-                  <div className="ustaz-teaser-text">
-                    <p>
-                      Мухаммадалим Исаков — ислам билимин заманбап окутуу менен айкалыштырып,
-                      терең жана системалуу окутуу менен бирге адамдын руханий өсүшүнө жана
-                      үй-бүлөлөрдүн бекем болушуна салым кошуп келет.
-                    </p>
-                    <p>
-                      Ал Кыргызстандагы алгачкы «Үй-бүлө бактысы» курсун түптөп, үй-бүлө
-                      баалуулуктарын бекемдөө менен бирге, бул багытты мамлекеттик деңгээлде
-                      өнүктүрүүгө жана коомдун бекем пайдубалын түзүүгө умтулат.
-                    </p>
-
-                  </div>
-                  <Link to="/ustaz" className="btn-gold ustaz-teaser-btn">
-                    Кененирээк
-                  </Link>
-                </div>
+                <Link to="/ustaz" className="btn-gold ustaz-teaser-btn">
+                  Кененирээк
+                </Link>
               </div>
+            </div>
+
+            <div className="ustaz-teaser-portrait-panel">
+              <img
+                src={image(SITE_IMAGE_KEYS.landingUstazTeaser)}
+                alt={TEACHER.name}
+                className="ustaz-teaser-banner"
+              />
+            </div>
           </div>
         </div>
       </section>

@@ -31,7 +31,7 @@
 html { scroll-behavior: smooth; }
 body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
 .font-display { font-family: var(--font-display); }
-.wrap { @apply mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8; }
+.wrap { @apply mx-auto w-[90%] max-w-[1280px] px-4 sm:px-6 lg:px-8; }
 
 /* Header (wave layout — matches footer) */
 .header-wave {
@@ -311,7 +311,7 @@ body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
   color: var(--color-gold-dark);
 }
 .header-lang-select {
-  @apply appearance-none text-sm font-semibold rounded-lg pl-8 pr-7 py-1.5 cursor-pointer transition-colors;
+  @apply appearance-none text-sm font-semibold rounded-lg pl-8 pr-7 py-2 cursor-pointer transition-colors;
   color: var(--color-navy);
   border: 1px solid var(--color-sky);
   background: var(--color-sky-light) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231a367e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.5rem center;
@@ -1135,6 +1135,37 @@ button.header-dropdown-link {
   gap: 20px;
 }
 
+@media (max-width: 767px) {
+  .main-split {
+    gap: 30px;
+  }
+
+  .landing-band {
+    padding: 30px 0 0;
+  }
+
+  .main-split > .otzyv-panel .otzyv-stack,
+  .main-split > .otzyv-panel .otzyv-video-feed-row {
+    padding: 0;
+  }
+
+  .main-split > .otzyv-panel .otzyv-video-feed {
+    padding: 30px 0 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .ayah-hadith-grid {
+    gap: 30px;
+  }
+}
+
+@media (min-width: 768px) {
+  .landing-band {
+    padding: 2rem 0 0;
+  }
+}
+
 .main-split .main-panel-videos {
   width: 100%;
 }
@@ -1773,6 +1804,7 @@ button.header-dropdown-link {
 
 .videos-side-wrap {
   min-height: 220px;
+  max-height: 420px;
   min-width: 0;
   height: 100%;
   display: flex;
@@ -2104,7 +2136,7 @@ button.header-dropdown-link {
 }
 
 .teacher-question-wrap {
-  @apply w-full;
+  /* Uses the site's standard `.wrap` container width — no override here. */
 }
 
 .teacher-question-hero {
@@ -2121,7 +2153,8 @@ button.header-dropdown-link {
 
 @media (min-width: 900px) {
   .teacher-question-grid {
-    grid-template-columns: minmax(300px, 42%) minmax(0, 58%);
+    /* Reverted: a narrower visual column cropped the teacher's photo. */
+    grid-template-columns: minmax(280px, 38%) minmax(0, 62%);
   }
 }
 
@@ -2487,6 +2520,11 @@ button.header-dropdown-link {
 }
 
 @media (max-width: 899px) {
+  .teacher-question-section {
+    padding-top: 0;
+    padding-bottom: 2.5rem;
+  }
+
   .teacher-question-visual {
     min-height: 240px;
     aspect-ratio: auto;
@@ -2754,12 +2792,15 @@ button.header-dropdown-link {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
-.footer-brand-name {
-  @apply text-2xl font-bold transition-opacity font-display;
-  color: #fff;
-  letter-spacing: -0.02em;
+.footer-brand-top:hover .header-brand-wordmark-gold {
+  color: var(--color-gold);
 }
-.footer-brand-top:hover .footer-brand-name { opacity: 0.85; }
+.footer-brand-top:hover .header-brand-wordmark-text {
+  border-bottom-color: var(--color-gold);
+}
+.footer-brand-top:hover .header-brand-wordmark-light {
+  color: var(--color-sky);
+}
 
 .footer-brand-motto {
   @apply mt-3 text-xs sm:text-sm font-medium leading-snug max-w-xs;
@@ -2881,7 +2922,7 @@ button.footer-link {
 }
 
 .theme-btn {
-  @apply flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer;
+  @apply flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors cursor-pointer;
   color: var(--color-navy);
   border: 1px solid var(--color-sky);
   background: var(--color-sky-light);
@@ -3313,7 +3354,76 @@ button.footer-link {
   overflow: hidden;
 }
 
-@media (min-width: 768px) {
+@media (max-width: 991px) {
+  .events-faq-section {
+    margin-top: 30px;
+    margin-bottom: 30px;
+    padding: 28px 0 56px;
+    overflow: visible;
+  }
+
+  .events-faq-inner {
+    min-height: 0;
+  }
+
+  .events-faq-grid {
+    gap: 28px;
+    justify-items: stretch;
+  }
+
+  .events-faq-grid .events-panel,
+  .events-faq-grid .faq-panel,
+  .faq-panel {
+    min-height: 0;
+    height: auto;
+    width: 100%;
+    justify-self: start;
+    align-items: flex-start;
+    text-align: left;
+    margin-inline: 0 auto;
+  }
+
+  .events-faq-section .events-panel-title,
+  .events-faq-section .faq-panel-title {
+    text-align: left;
+    width: 100%;
+  }
+
+  .events-faq-section .events-panel-body,
+  .events-faq-section .faq-accordion {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .events-faq-section .event-row {
+    justify-content: flex-start;
+  }
+
+  .events-faq-section .faq-item {
+    width: 100%;
+  }
+
+  .events-faq-section .faq-trigger {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+    justify-items: start;
+    text-align: left;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.75rem;
+  }
+
+  .events-faq-section .faq-trigger span {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .events-faq-section .faq-content > p {
+    text-align: left;
+  }
+}
+
+@media (min-width: 992px) {
   .events-faq-section {
     padding: 88px 0 88px;
   }
@@ -3329,6 +3439,12 @@ button.footer-link {
     var(--color-navy-light) 100%
   );
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 64px), 50% 100%, 0 calc(100% - 64px));
+}
+
+@media (max-width: 767px) {
+  .events-faq-bg {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 40px), 50% 100%, 0 calc(100% - 40px));
+  }
 }
 
 @media (min-width: 768px) {
@@ -3359,7 +3475,7 @@ button.footer-link {
 
 .events-faq-grid {
   display: grid;
-  gap: 24px;
+  gap: 84px;
   grid-template-columns: 1fr;
   align-items: stretch;
 }
@@ -3375,13 +3491,21 @@ button.footer-link {
   position: relative;
   overflow: hidden;
   height: 100%;
-  min-height: 460px;
   background: transparent;
   border: none;
   box-shadow: none;
   backdrop-filter: none;
   border-radius: 0;
   @apply p-0 sm:p-0 lg:p-0;
+}
+
+@media (min-width: 992px) {
+  .events-faq-grid .events-panel,
+  .events-faq-grid .faq-panel {
+    /* Only needed once the two panels sit side by side — it's what keeps them the same
+       height. Stacked on mobile it just leaves dead space between them. */
+    min-height: 460px;
+  }
 }
 
 .uzor-corners {
@@ -3565,9 +3689,60 @@ button.footer-link {
   color: var(--color-gold-light);
 }
 
+@media (max-width: 640px) {
+  .events-faq-section .events-panel-title,
+  .events-faq-section .faq-panel-title {
+    @apply text-sm mb-3;
+  }
+
+  .events-faq-section .events-panel-body {
+    gap: 8px;
+  }
+
+  .events-faq-section .event-row {
+    padding-top: 4px;
+    padding-bottom: 4px;
+    gap: 0.75rem;
+  }
+
+  .events-faq-section .events-panel .event-date {
+    @apply w-11 h-11;
+  }
+
+  .event-date-num {
+    @apply text-base;
+  }
+
+  .events-faq-section .event-row-title {
+    font-size: 0.875rem;
+    line-height: 1.35;
+  }
+
+  .events-faq-section .event-row-meta {
+    @apply text-xs;
+  }
+
+  .events-faq-section .faq-trigger {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: 0.875rem;
+    line-height: 1.35;
+    column-gap: 0.75rem;
+  }
+}
+
 /* Ustaz section */
 .ustaz-section {
   @apply py-8 bg-page;
+}
+
+@media (max-width: 720px) {
+  .ustaz-section {
+    margin-top: 0;
+    margin-bottom: 30px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }
 
 .ustaz-section .ustaz-teaser-card {
@@ -3576,9 +3751,16 @@ button.footer-link {
   overflow: visible;
 }
 
+/*
+ * "Устаз жөнүндө" teaser — the mountain photo sits behind the copy as a faded backdrop
+ * (a dark wash over it keeps the text readable), the portrait is its own full-height panel
+ * on the right. Both panels are simply grid columns — no overlap arithmetic.
+ */
 .ustaz-teaser-card {
-  @apply rounded-2xl shadow-md flex flex-col h-full relative;
-  overflow: visible;
+  @apply rounded-2xl shadow-md relative overflow-hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 34%);
+  min-height: 440px;
   transition: box-shadow 0.2s, transform 0.2s;
 }
 
@@ -3587,99 +3769,81 @@ button.footer-link {
   transform: translateY(-2px);
 }
 
-.ustaz-teaser-photo-wrap {
-  @apply relative w-full overflow-hidden;
-  height: clamp(500px, calc(48vw + 200px), 620px);
-  background: var(--color-sky);
-  z-index: 1;
-  border-radius: 1rem 1rem 0 0;
+.ustaz-teaser-content {
+  @apply relative flex items-center overflow-hidden;
+  background: var(--tunduk-panel-bg);
+  padding: clamp(1.75rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3.5rem);
 }
 
-.ustaz-teaser-bg-photo,
-.ustaz-teaser-bg-wash {
-  position: absolute;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.ustaz-teaser-bg-photo {
-  inset: 0;
-  top: -160px;
-  width: 100%;
-  height: calc(100% + 160px);
+.ustaz-teaser-content-bg {
+  @apply absolute inset-0 w-full h-full pointer-events-none;
   object-fit: cover;
-  object-position: center 50%;
-  border-radius: 1rem 1rem 0 0;
+  object-position: center 42%;
+  /* The mountain reads as a faded backdrop, not a competing photo — this is what keeps
+     the text on top of it readable. */
+  opacity: 0.32;
 }
 
-.ustaz-teaser-bg-wash {
-  inset: 0;
-  width: 100%;
-  height: 100%;
+.ustaz-teaser-content-wash {
+  @apply absolute inset-0 pointer-events-none;
+  /* Heaviest at the right edge (the seam with the portrait panel) and eases off toward
+     the text — the portrait panel mirrors this fade on its own left edge below, so the
+     two panels melt into each other instead of meeting at a hard line. */
   background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.02) 45%,
-    rgba(26, 54, 126, 0.08) 100%
+    90deg,
+    color-mix(in srgb, var(--color-tunduk-blue-dark) 55%, transparent) 0%,
+    color-mix(in srgb, var(--color-tunduk-blue-dark) 72%, transparent) 55%,
+    color-mix(in srgb, var(--color-tunduk-blue-dark) 97%, transparent) 100%
   );
 }
 
-.ustaz-teaser-banner-wrap {
-  position: relative;
-  z-index: 1000;
-  width: clamp(260px, 48vw, 420px);
-  max-width: min(420px, calc(100% - 1.5rem));
-  aspect-ratio: 819 / 1024;
-  height: auto;
-  margin-top: calc(
-    -0.42 * clamp(500px, calc(48vw + 200px), 620px)
-    - clamp(44px, 6vw, 56px)
-    + 50px
+.ustaz-teaser-portrait-panel {
+  @apply relative overflow-hidden;
+  min-height: 320px;
+  background: var(--color-sky);
+}
+
+.ustaz-teaser-portrait-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* Mirrors .ustaz-teaser-content-wash's right edge, so the seam between the two panels
+     reads as one continuous fade rather than a cut between two flat images. */
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-tunduk-blue-dark) 97%, transparent) 0%,
+    transparent 26%
   );
-  margin-left: auto;
-  margin-right: auto;
-  justify-self: center;
-  align-self: start;
-  border-radius: 1.5rem;
-  overflow: hidden;
-  isolation: isolate;
-  box-shadow: 0 10px 28px rgba(8, 20, 48, 0.28);
-  background: #122654;
 }
 
 .ustaz-teaser-banner {
   @apply block w-full h-full;
   object-fit: cover;
   object-position: top center;
-  border-radius: inherit;
-}
-
-.ustaz-teaser-body {
-  @apply px-5 sm:px-6 pb-6 relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.25rem;
-  width: 100%;
-  padding-top: clamp(0.75rem, 2vw, 1.25rem);
-  background: var(--tunduk-panel-bg);
-  border-radius: 0 0 1rem 1rem;
-  z-index: 5;
-  overflow: visible;
 }
 
 .ustaz-teaser-body-copy {
-  @apply flex flex-col min-w-0 items-center;
-  width: 100%;
-  max-width: 42rem;
-  padding-top: 0.25rem;
-  text-align: center;
+  @apply relative flex flex-col min-w-0 items-start;
+  max-width: 32rem;
+  text-align: left;
+  z-index: 1;
+}
+
+.ustaz-teaser-label {
+  @apply font-bold uppercase tracking-widest mb-2;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+  color: var(--color-gold);
+  text-shadow: 0 1px 8px rgba(241, 158, 31, 0.25);
+  text-align: left;
 }
 
 .ustaz-teaser-text {
   @apply text-sm leading-relaxed mb-5;
   color: color-mix(in srgb, var(--color-tunduk-gold-light) 92%, #fff);
-  text-align: center;
+  text-align: left;
 }
 
 .ustaz-teaser-text p + p {
@@ -3702,30 +3866,38 @@ button.footer-link {
 }
 
 .ustaz-teaser-btn {
-  @apply inline-flex self-center no-underline text-sm px-5 py-2.5;
+  @apply inline-flex self-start no-underline text-sm px-5 py-2.5;
 }
 
-@media (max-width: 640px) {
-  .ustaz-teaser-body {
-    gap: 1rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
+@media (max-width: 720px) {
+  .ustaz-teaser-card {
+    grid-template-columns: 1fr;
+    background: var(--tunduk-panel-bg);
   }
 
-  .ustaz-teaser-banner-wrap {
-    width: clamp(210px, 68vw, 300px);
+  .ustaz-teaser-portrait-panel {
+    order: -1;
+    width: 100%;
+    margin: 0;
     aspect-ratio: 819 / 1024;
-    height: auto;
-    border-radius: 1.25rem;
-    margin-top: calc(
-      -0.42 * clamp(500px, calc(48vw + 200px), 620px)
-      - 44px
-      + 50px
-    );
+    min-height: 0;
+    border-radius: 0;
   }
 
-  .ustaz-teaser-banner {
-    border-radius: inherit;
+  .ustaz-teaser-content {
+    padding: 1.75rem 1.25rem;
+  }
+
+  .ustaz-teaser-portrait-panel::before {
+    display: none;
+  }
+
+  .ustaz-teaser-content-bg {
+    opacity: 0.72;
+  }
+
+  .ustaz-teaser-content-wash {
+    background: color-mix(in srgb, var(--color-tunduk-blue-dark) 42%, transparent);
   }
 
   .ustaz-teaser-text {
@@ -3772,54 +3944,6 @@ button.footer-link {
   padding-bottom: 0;
 }
 
-
-.ustaz-teaser-wave {
-  position: relative;
-  margin-top: -1px;
-  line-height: 0;
-  background: color-mix(in srgb, var(--color-tunduk-blue) 88%, #fff);
-  z-index: 2;
-  pointer-events: none;
-}
-
-.ustaz-wave-svg {
-  display: block;
-  width: 100%;
-  height: 44px;
-  margin-bottom: -1px;
-}
-@media (min-width: 768px) {
-  .ustaz-wave-svg { height: 56px; }
-}
-
-.ustaz-wave-svg-front {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1;
-  height: 48px;
-}
-@media (min-width: 768px) {
-  .ustaz-wave-svg-front { height: 60px; }
-}
-
-.ustaz-wave-path-back {
-  fill: var(--color-sky);
-}
-
-.ustaz-wave-path-front {
-  fill: var(--color-tunduk-blue);
-}
-
-.ustaz-teaser-label {
-  @apply font-bold uppercase tracking-widest mb-2;
-  font-family: var(--font-display);
-  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
-  color: var(--color-gold);
-  text-shadow: 0 1px 8px rgba(241, 158, 31, 0.25);
-  text-align: center;
-}
 
 .faq-panel {
   @apply p-5 sm:p-6 lg:p-7 flex flex-col h-full;
