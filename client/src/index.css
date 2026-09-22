@@ -6435,7 +6435,7 @@ a.course-learn-review-tab {
   position: relative;
   isolation: isolate;
   @apply py-8 sm:py-10;
-  overflow-x: clip;
+  overflow-x: visible;
   background:
     radial-gradient(circle at 10% 6%, color-mix(in srgb, var(--color-sky) 22%, transparent) 0, transparent 55%),
     radial-gradient(circle at 90% 2%, color-mix(in srgb, var(--color-gold) 10%, transparent) 0, transparent 45%),
@@ -6625,7 +6625,8 @@ a.course-learn-review-tab {
 }
 
 .qa-pagination {
-  @apply flex flex-nowrap items-center justify-center gap-2 pt-4 w-full max-w-full min-w-0;
+  @apply flex flex-wrap items-center justify-center gap-2 pt-4 w-full max-w-full min-w-0;
+  overflow: visible;
 }
 .qa-page-nav-btn {
   @apply inline-flex items-center gap-1.5 min-h-9 px-3 rounded-lg border text-sm font-semibold transition-colors shrink-0;

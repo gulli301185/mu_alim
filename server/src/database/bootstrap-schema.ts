@@ -230,9 +230,6 @@ async function ensureQaCatalogue(ds: DataSource): Promise<boolean> {
   const file = qaSeedPath();
   if (!file) return false;
 
-  const [{ n }] = await ds.query(`SELECT COUNT(*)::int AS n FROM qa_articles WHERE is_published = true`);
-  if (n > 0) return false;
-
   type SeedItem = {
     id: string;
     number?: number;
@@ -244,9 +241,15 @@ async function ensureQaCatalogue(ds: DataSource): Promise<boolean> {
   const items = JSON.parse(readFileSync(file, 'utf8')) as SeedItem[];
   if (!items.length) return false;
 
+  const [{ n }] = await ds.query(`SELECT COUNT(*)::int AS n FROM qa_articles WHERE is_published = true`);
+  if (n >= items.length) return false;
+
   const articles = ds.getRepository(QaArticle);
   try {
+    let created = 0;
     for (const item of items) {
+      const exists = await articles.findOneBy({ question: item.question });
+      if (exists) continue;
       const slug = await uniqueSlug(item.id || item.question, async (s) => {
         const found = await articles.findOneBy({ slug: s });
         return Boolean(found);
@@ -265,8 +268,10 @@ async function ensureQaCatalogue(ds: DataSource): Promise<boolean> {
           createdById: null,
         }),
       );
+      created += 1;
     }
-    logger.log(`Loaded ${items.length} Q&A articles from ${file}`);
+    if (created === 0) return false;
+    logger.log(`Loaded ${created} Q&A articles from ${file}`);
     return true;
   } catch (err) {
     logger.error(`Failed to load Q&A: ${(err as Error).message}`);
