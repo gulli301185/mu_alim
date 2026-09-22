@@ -1,10 +1,11 @@
 import { Logger } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { uniqueSlug } from '../lib/slug';
-import { QaArticle, User } from './entities';
+import { Course, QaArticle, Review, User } from './entities';
 
 const SCHEMA_FILE = resolve(__dirname, '../../db/schema.sql');
 const FREE_CATALOGUE_FILE = resolve(__dirname, '../../db/free-lessons.sql');
@@ -26,6 +27,8 @@ export async function ensureSchema(
   if (seededFree || seededPaid) await cache?.invalidate('courses:');
   if (seededQa) await cache?.invalidate('qa:');
   await ensureAdmin(ds);
+  const seededReviews = await ensureVideoReviews(ds);
+  if (seededReviews) await cache?.invalidate('reviews:');
 }
 
 async function createSchemaIfEmpty(ds: DataSource) {
@@ -297,4 +300,103 @@ async function ensureAdmin(ds: DataSource) {
     }),
   );
   new Logger('Database').log(`Created the first admin account: ${email}`);
+}
+
+const VIDEO_REVIEW_FILES = [
+  'family-otz1.mp4',
+  'family-otz2.mp4',
+  'family-otz3.mp4',
+  'family-otz4.mp4',
+  'family-otz5.mp4',
+  'family-otz6.mp4',
+  'family-otz7.mp4',
+  'family-otz8.mp4',
+  'family-otzyv.mp4',
+  'family-img-2047.mp4',
+] as const;
+
+function reviewsUploadDir() {
+  return [
+    resolve(__dirname, '../../uploads/reviews'),
+    resolve(__dirname, '../uploads/reviews'),
+  ].find((path) => existsSync(path));
+}
+
+async function reviewAuthor(ds: DataSource) {
+  const users = ds.getRepository(User);
+  const admin = await users.findOneBy({ role: 'admin' });
+  if (admin) return admin;
+
+  const email = 'reviews@mualim.kg';
+  const existing = await users.findOneBy({ email });
+  if (existing) return existing;
+
+  return users.save(
+    users.create({
+      email,
+      passwordHash: await bcrypt.hash(randomUUID(), 10),
+      firstName: 'Окуучу',
+      lastName: '',
+      phone: null,
+      role: 'user',
+      isActive: true,
+      isVerified: true,
+      lastLoginAt: null,
+    }),
+  );
+}
+
+/**
+ * Loads the family video reviews when none are published yet.
+ * Video files ship in `uploads/reviews` with the API image.
+ */
+async function ensureVideoReviews(ds: DataSource): Promise<boolean> {
+  const logger = new Logger('Database');
+  const [{ n }] = await ds.query(`
+    SELECT COUNT(*)::int AS n
+    FROM reviews
+    WHERE status = 'approved' AND video_url IS NOT NULL AND btrim(video_url) <> ''
+  `);
+  if (n > 0) return false;
+
+  const uploads = reviewsUploadDir();
+  if (!uploads) {
+    logger.warn('Video reviews were not loaded — uploads/reviews is missing');
+    return false;
+  }
+
+  const course = await ds.getRepository(Course).findOneBy({ slug: 'family' });
+  if (!course) {
+    logger.warn('Video reviews were not loaded — family course is missing');
+    return false;
+  }
+
+  const author = await reviewAuthor(ds);
+  const reviews = ds.getRepository(Review);
+  let created = 0;
+
+  for (const file of VIDEO_REVIEW_FILES) {
+    const videoFile = resolve(uploads, file);
+    if (!existsSync(videoFile)) continue;
+    const videoUrl = `/uploads/reviews/${file}`;
+    if (await reviews.findOneBy({ videoUrl })) continue;
+
+    await reviews.save(
+      reviews.create({
+        userId: author.id,
+        courseId: course.id,
+        rating: 5,
+        comment: null,
+        videoUrl,
+        displayName: 'Окуучу',
+        isAdminPosted: true,
+        status: 'approved',
+      }),
+    );
+    created += 1;
+  }
+
+  if (created === 0) return false;
+  logger.log(`Loaded ${created} video reviews`);
+  return true;
 }
