@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { uniqueSlug } from '../lib/slug';
+import { ensureFinalTests } from './ensure-final-tests';
 import { Course, QaArticle, Review, User } from './entities';
 
 const SCHEMA_FILE = resolve(__dirname, '../../db/schema.sql');
@@ -29,6 +30,8 @@ export async function ensureSchema(
   await ensureAdmin(ds);
   const seededReviews = await ensureVideoReviews(ds);
   if (seededReviews) await cache?.invalidate('reviews:');
+  const seededTests = await ensureFinalTests(ds);
+  if (seededTests) await cache?.invalidate('courses:');
 }
 
 async function createSchemaIfEmpty(ds: DataSource) {
