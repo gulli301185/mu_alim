@@ -31,7 +31,13 @@
 html { scroll-behavior: smooth; }
 body { @apply bg-page text-gray-800 font-sans antialiased; margin: 0; }
 .font-display { font-family: var(--font-display); }
-.wrap { @apply mx-auto w-[90%] max-w-[1280px] px-4 sm:px-6 lg:px-8; }
+.wrap { @apply mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8; }
+@media (min-width: 1440px) {
+  .wrap {
+    width: 90%;
+    max-width: 1680px;
+  }
+}
 
 /* Header (wave layout — matches footer) */
 .header-wave {
@@ -2153,8 +2159,7 @@ button.header-dropdown-link {
 
 @media (min-width: 900px) {
   .teacher-question-grid {
-    /* Reverted: a narrower visual column cropped the teacher's photo. */
-    grid-template-columns: minmax(280px, 38%) minmax(0, 62%);
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -2523,6 +2528,10 @@ button.header-dropdown-link {
   .teacher-question-section {
     padding-top: 0;
     padding-bottom: 2.5rem;
+  }
+
+  .teacher-question-title {
+    font-size: 1.45rem;
   }
 
   .teacher-question-visual {
