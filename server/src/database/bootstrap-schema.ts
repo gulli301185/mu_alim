@@ -12,6 +12,7 @@ const SCHEMA_FILE = resolve(__dirname, '../../db/schema.sql');
 const FREE_CATALOGUE_FILE = resolve(__dirname, '../../db/free-lessons.sql');
 const PAID_CATALOGUE_FILE = resolve(__dirname, '../../db/paid-courses.sql');
 const QA_SEED_FILE = resolve(__dirname, '../../db/qa-seed.json');
+const TEXT_REVIEWS_SEED_FILE = resolve(__dirname, '../../db/text-reviews-seed.json');
 
 /**
  * Creates the tables from `db/schema.sql` when the database is empty (no `users` table).
@@ -29,7 +30,8 @@ export async function ensureSchema(
   if (seededQa) await cache?.invalidate('qa:');
   await ensureAdmin(ds);
   const seededReviews = await ensureVideoReviews(ds);
-  if (seededReviews) await cache?.invalidate('reviews:');
+  const seededTextReviews = await ensureTextReviews(ds);
+  if (seededReviews || seededTextReviews) await cache?.invalidate('reviews:');
   const seededTests = await ensureFinalTests(ds);
   if (seededTests) await cache?.invalidate('courses:');
 }
@@ -406,5 +408,75 @@ async function ensureVideoReviews(ds: DataSource): Promise<boolean> {
 
   if (created === 0) return false;
   logger.log(`Loaded ${created} video reviews`);
+  return true;
+}
+
+function textReviewsSeedPath() {
+  return [TEXT_REVIEWS_SEED_FILE, resolve(__dirname, '../db/text-reviews-seed.json')].find((path) =>
+    existsSync(path),
+  );
+}
+
+/**
+ * Loads approved text reviews when the public catalogue is still nearly empty.
+ */
+async function ensureTextReviews(ds: DataSource): Promise<boolean> {
+  const logger = new Logger('Database');
+  const file = textReviewsSeedPath();
+  if (!file) return false;
+
+  type SeedItem = {
+    courseSlug: string;
+    rating: number;
+    comment: string;
+    authorName: string;
+    createdAt?: string;
+  };
+  const items = JSON.parse(readFileSync(file, 'utf8')) as SeedItem[];
+  if (!items.length) return false;
+
+  const [{ n }] = await ds.query(`
+    SELECT COUNT(*)::int AS n
+    FROM reviews
+    WHERE status = 'approved' AND comment IS NOT NULL AND btrim(comment) <> ''
+  `);
+  if (n >= items.length) return false;
+
+  const author = await reviewAuthor(ds);
+  const courses = ds.getRepository(Course);
+  const reviews = ds.getRepository(Review);
+  const courseCache = new Map<string, string>();
+  let created = 0;
+
+  for (const item of items) {
+    const comment = item.comment.trim();
+    if (!comment) continue;
+    if (await reviews.findOneBy({ comment })) continue;
+
+    let courseId = courseCache.get(item.courseSlug);
+    if (!courseId) {
+      const course = await courses.findOneBy({ slug: item.courseSlug });
+      if (!course) continue;
+      courseId = course.id;
+      courseCache.set(item.courseSlug, courseId);
+    }
+
+    await reviews.save(
+      reviews.create({
+        userId: author.id,
+        courseId,
+        rating: item.rating || 5,
+        comment,
+        videoUrl: null,
+        displayName: item.authorName?.trim() || 'Окуучу',
+        isAdminPosted: true,
+        status: 'approved',
+      }),
+    );
+    created += 1;
+  }
+
+  if (created === 0) return false;
+  logger.log(`Loaded ${created} text reviews`);
   return true;
 }
