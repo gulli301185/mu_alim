@@ -5744,14 +5744,15 @@ button.footer-link {
 }
 
 .course-learn-playback-controls-embed {
-  position: absolute;
-  left: 10px;
-  right: 52px;
-  bottom: 10px;
-  z-index: 17;
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-top: 0.5rem;
   pointer-events: auto;
 }
 
@@ -5760,6 +5761,88 @@ button.footer-link {
   padding: 6px 10px;
   border-radius: 10px;
   background: rgba(18, 38, 84, 0.9);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.course-learn-playback-speed-select {
+  display: none;
+}
+
+.course-learn-playback-speed-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 767px) {
+  .course-learn-yt-chrome-block {
+    height: 48px;
+  }
+
+  .course-learn-yt-chrome-block-bottom {
+    height: 52px;
+  }
+
+  .course-learn-yt-chrome-block-side {
+    top: 48px;
+    bottom: 52px;
+    width: 36px;
+  }
+
+  .course-learn-playback-controls-embed {
+    gap: 4px;
+    margin-top: 0.35rem;
+  }
+
+  .course-learn-playback-controls-embed .course-learn-playback-speed-embed {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 8px;
+  }
+
+  .course-learn-playback-speed-embed .course-learn-playback-speed-label {
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .course-learn-playback-speed-select {
+    display: inline-flex;
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.12)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23fff' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")
+      no-repeat right 8px center;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.3rem 1.5rem 0.3rem 0.55rem;
+    min-height: 1.75rem;
+  }
+
+  .course-learn-playback-speed-btns {
+    display: none;
+  }
+
+  .course-learn-playback-seek-row {
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 8px;
+  }
+
+  .course-learn-playback-time {
+    min-width: 2rem;
+    font-size: 0.62rem;
+  }
+
+  .course-learn-playback-seek {
+    height: 3px;
+  }
 }
 
 .course-learn-playback-seek-row {
