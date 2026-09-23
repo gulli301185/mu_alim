@@ -60,12 +60,13 @@ export function ReviewCarousel({
   title: string;
   items: CourseReview[];
 }) {
-  const [index, setIndex] = useState(0);
   const textItems = items.filter((item) => !isVideoReview(item));
   const newestId = textItems[0]?.id ?? '';
+  // Open on the first written review so text is visible immediately (cover is still reachable via prev).
+  const [index, setIndex] = useState(() => (textItems.length > 0 ? 1 : 0));
 
   useEffect(() => {
-    setIndex(0);
+    setIndex(textItems.length > 0 ? 1 : 0);
   }, [newestId, textItems.length]);
 
   const slides: ReactNode[] = [

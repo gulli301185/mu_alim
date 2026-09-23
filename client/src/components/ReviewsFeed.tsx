@@ -45,15 +45,17 @@ export function ReviewsFeed() {
 
     for (const course of courses) {
       seen.add(course.slug);
+      const list = bySlug.get(course.slug) ?? [];
+      if (!list.length) continue;
       result.push({
         slug: course.slug,
         title: coverTitleForCourse(course.slug, course.title),
-        items: bySlug.get(course.slug) ?? [],
+        items: list,
       });
     }
 
     for (const [slug, list] of bySlug) {
-      if (seen.has(slug)) continue;
+      if (seen.has(slug) || !list.length) continue;
       result.push({
         slug,
         title: coverTitleForCourse(slug, list[0]?.courseTitle),
