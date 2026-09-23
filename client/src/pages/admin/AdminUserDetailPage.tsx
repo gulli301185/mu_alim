@@ -25,7 +25,7 @@ export function AdminUserDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingStatus, setSavingStatus] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [paidCourses, setPaidCourses] = useState<{ id: string; title: string; priceLabel: string }[]>([]);
+  const [paidCourses, setPaidCourses] = useState<{ id: string; slug: string; title: string; priceLabel: string }[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [granting, setGranting] = useState(false);
 
@@ -56,6 +56,7 @@ export function AdminUserDetailPage() {
         setPaidCourses(
           response.items.map((course) => ({
             id: course.recordId,
+            slug: course.slug,
             title: course.title,
             priceLabel: course.priceLabel,
           })),
@@ -94,12 +95,19 @@ export function AdminUserDetailPage() {
     }
   };
 
-  const enrolledCourseIds = useMemo(
-    () => new Set(data?.enrollments.filter((item) => item.status === 'active').map((item) => item.course.id) ?? []),
-    [data?.enrollments],
-  );
+  const enrolledCourseIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of data?.enrollments ?? []) {
+      if (item.status !== 'active' && item.status !== 'completed') continue;
+      ids.add(item.course.id);
+      if (item.course.slug) ids.add(item.course.slug);
+    }
+    return ids;
+  }, [data?.enrollments]);
 
-  const grantableCourses = paidCourses.filter((course) => !enrolledCourseIds.has(course.id));
+  const grantableCourses = paidCourses.filter(
+    (course) => !enrolledCourseIds.has(course.id) && !enrolledCourseIds.has(course.slug ?? ''),
+  );
 
   const handleGrantAccess = async () => {
     if (!token || !data || !selectedCourseId) return;

@@ -464,82 +464,84 @@ export function CourseYoutubePlayer({
             <span>Төмөнкү «Улантуу» баскычын басыңыз</span>
           </div>
         ) : null}
-      </div>
-      {allowSpeedControl ? (
-        <div className="course-learn-playback-controls-embed">
-          <div
-            className="course-learn-playback-speed course-learn-playback-speed-embed"
-            role="group"
-            aria-label="Видео ылдамдыгы"
-          >
-            <label className="course-learn-playback-speed-label" htmlFor="course-playback-rate">
-              Ылдамдык
-            </label>
-            <select
-              id="course-playback-rate"
-              className="course-learn-playback-speed-select"
-              value={playbackRate}
+        {allowSpeedControl ? (
+          <div className="course-learn-playback-controls-embed">
+            <div
+              className="course-learn-playback-speed course-learn-playback-speed-embed"
+              role="group"
               aria-label="Видео ылдамдыгы"
-              onChange={(event) => {
-                handleSpeedChange(Number(event.target.value));
-              }}
             >
-              {PLAYBACK_RATES.map((rate) => (
-                <option key={rate} value={rate}>
-                  {rate === 1 ? '1×' : `${rate}×`}
-                </option>
-              ))}
-            </select>
-            <div className="course-learn-playback-speed-btns">
-              {PLAYBACK_RATES.map((rate) => (
-                <button
-                  key={rate}
-                  type="button"
-                  className={`course-learn-playback-speed-btn${
-                    playbackRate === rate ? ' course-learn-playback-speed-btn-active' : ''
-                  }`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleSpeedChange(rate);
-                  }}
-                >
-                  {rate === 1 ? '1×' : `${rate}×`}
-                </button>
-              ))}
+              <label className="course-learn-playback-speed-label" htmlFor="course-playback-rate">
+                Ылдамдык
+              </label>
+              <select
+                id="course-playback-rate"
+                className="course-learn-playback-speed-select"
+                value={playbackRate}
+                aria-label="Видео ылдамдыгы"
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => {
+                  event.stopPropagation();
+                  handleSpeedChange(Number(event.target.value));
+                }}
+              >
+                {PLAYBACK_RATES.map((rate) => (
+                  <option key={rate} value={rate}>
+                    {rate === 1 ? '1×' : `${rate}×`}
+                  </option>
+                ))}
+              </select>
+              <div className="course-learn-playback-speed-btns">
+                {PLAYBACK_RATES.map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    className={`course-learn-playback-speed-btn${
+                      playbackRate === rate ? ' course-learn-playback-speed-btn-active' : ''
+                    }`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleSpeedChange(rate);
+                    }}
+                  >
+                    {rate === 1 ? '1×' : `${rate}×`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="course-learn-playback-seek-row">
+              <span className="course-learn-playback-time">{formatVideoTime(currentTime)}</span>
+              <input
+                type="range"
+                className="course-learn-playback-seek"
+                min={0}
+                max={Math.max(duration, 1)}
+                step={1}
+                value={Math.min(currentTime, Math.max(duration, 1))}
+                aria-label="Видео убакыты"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  isSeekingRef.current = true;
+                }}
+                onChange={(event) => {
+                  event.stopPropagation();
+                  const next = Number(event.target.value);
+                  setCurrentTime(next);
+                  handleSeek(next);
+                }}
+                onPointerUp={(event) => {
+                  event.stopPropagation();
+                  isSeekingRef.current = false;
+                }}
+                onPointerCancel={() => {
+                  isSeekingRef.current = false;
+                }}
+              />
+              <span className="course-learn-playback-time">{formatVideoTime(duration)}</span>
             </div>
           </div>
-          <div className="course-learn-playback-seek-row">
-            <span className="course-learn-playback-time">{formatVideoTime(currentTime)}</span>
-            <input
-              type="range"
-              className="course-learn-playback-seek"
-              min={0}
-              max={Math.max(duration, 1)}
-              step={1}
-              value={Math.min(currentTime, Math.max(duration, 1))}
-              aria-label="Видео убакыты"
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                isSeekingRef.current = true;
-              }}
-              onChange={(event) => {
-                event.stopPropagation();
-                const next = Number(event.target.value);
-                setCurrentTime(next);
-                handleSeek(next);
-              }}
-              onPointerUp={(event) => {
-                event.stopPropagation();
-                isSeekingRef.current = false;
-              }}
-              onPointerCancel={() => {
-                isSeekingRef.current = false;
-              }}
-            />
-            <span className="course-learn-playback-time">{formatVideoTime(duration)}</span>
-          </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       {requireFullWatch && !watchComplete ? (
         <p className="course-learn-video-progress" aria-live="polite">
           Көрүлдү: {watchProgress}% · Токтотуп коё аласыз, бирок аягына чейин көрүшүңүз керек

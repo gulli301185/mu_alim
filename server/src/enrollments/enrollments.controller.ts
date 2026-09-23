@@ -14,7 +14,10 @@ export class EnrollmentsController {
     assertUserRole(user);
 
     const enrollments = await this.enrollments.find({
-      where: { userId: user.id, status: 'active' },
+      where: [
+        { userId: user.id, status: 'active' },
+        { userId: user.id, status: 'completed' },
+      ],
       order: { enrolledAt: 'DESC' },
       relations: { course: true },
     });

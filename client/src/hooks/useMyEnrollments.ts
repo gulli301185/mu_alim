@@ -10,17 +10,19 @@ import {
 
 export const enrollmentKeys = {
   all: ['enrollments'] as const,
-  mine: () => [...enrollmentKeys.all, 'mine'] as const,
+  mine: (token?: string | null) => [...enrollmentKeys.all, 'mine', token ?? 'anon'] as const,
 };
 
 export function useMyEnrollments() {
   const { token, isUser } = useAuth();
 
   const query = useQuery({
-    queryKey: enrollmentKeys.mine(),
+    queryKey: enrollmentKeys.mine(token),
     queryFn: () => fetchMyEnrollments(token!),
     enabled: Boolean(token && isUser),
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const enrollments: MyEnrollment[] = query.data?.items ?? [];
@@ -45,9 +47,14 @@ export function useCourseEnrollment(courseRef: CourseRef | null | undefined) {
 
   const enrolled = courseRef ? isEnrolledIn(courseRef) : false;
 
+  // While a fresh enrollment check is in flight, don't treat "not enrolled" as final —
+  // otherwise a stale empty cache redirects away right after admin grants access.
+  const accessPending =
+    Boolean(token && isUser) && (isLoading || (isFetching && !enrolled));
+
   return {
     enrolled,
-    isLoading: Boolean(token && isUser) && isLoading,
+    isLoading: accessPending,
     isFetching,
     refetch,
     needsLogin: !token || !isUser,

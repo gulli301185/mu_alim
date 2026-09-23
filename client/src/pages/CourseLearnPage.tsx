@@ -145,21 +145,34 @@ export function CourseLearnPage() {
     isLoading: lessonsLoading,
     isError: lessonsIsError,
     error: lessonsQueryError,
+    refetch: refetchLessons,
   } = useQuery({
-    queryKey: ['course-lessons', courseId, hasAccess ? 'open' : 'locked'],
+    queryKey: ['course-lessons', courseId, hasAccess ? 'open' : 'locked', token ? 'auth' : 'anon'],
     queryFn: () => getLessonsByCourse(courseId!, token),
     enabled: Boolean(courseId && course && hasAccess),
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const lessons = useMemo(
     () => (apiLessons && course ? mapLessonsToCourseLessons(apiLessons, course.title) : []),
     [apiLessons, course?.title],
   );
+
+  const lessonsUnlockRetryRef = useRef(false);
+  // If enrollment says open but lessons still came back locked (stale/anon cache), refetch once.
+  useEffect(() => {
+    if (!hasAccess || !enrolled || !apiLessons?.length || !token) return;
+    const allLocked = apiLessons.every((lesson) => lesson.locked || !lesson.youtubeVideoId);
+    if (!allLocked) {
+      lessonsUnlockRetryRef.current = false;
+      return;
+    }
+    if (lessonsUnlockRetryRef.current) return;
+    lessonsUnlockRetryRef.current = true;
+    void refetchLessons();
+  }, [hasAccess, enrolled, apiLessons, token, refetchLessons]);
 
   const { data: serverProgress } = useQuery({
     queryKey: ['course-progress', courseId, progressUserId],
@@ -774,6 +787,22 @@ export function CourseLearnPage() {
                 const completed = progress.completedLessonIds.includes(lesson.id);
                 const active = lesson.id === activeLessonId;
 
+                const openLesson = () => {
+                  if (!unlocked) return;
+                  // Completed lessons are always reopenable. Incomplete ones only if
+                  // the current lesson is finished (or this is already the active one).
+                  if (
+                    !completed &&
+                    activeLessonId &&
+                    activeLessonId !== lesson.id &&
+                    !progress.completedLessonIds.includes(activeLessonId)
+                  ) {
+                    return;
+                  }
+                  setViewMode('lesson');
+                  setActiveLessonId(lesson.id);
+                };
+
                 return (
                   <li
                     key={lesson.id}
@@ -792,18 +821,7 @@ export function CourseLearnPage() {
                           !unlocked ? ' course-learn-lesson-locked' : ''
                         }`}
                         disabled={!unlocked}
-                        onClick={() => {
-                          if (!unlocked) return;
-                          if (
-                            !completed &&
-                            activeLessonId &&
-                            activeLessonId !== lesson.id &&
-                            !progress.completedLessonIds.includes(activeLessonId)
-                          ) {
-                            return;
-                          }
-                          setActiveLessonId(lesson.id);
-                        }}
+                        onClick={openLesson}
                       >
                         <span className="course-learn-lesson-icon" aria-hidden>
                           {completed ? (
@@ -832,10 +850,14 @@ export function CourseLearnPage() {
                           </span>
                         </span>
                       </button>
-                      <div
+                      <button
+                        type="button"
                         className={`course-learn-lesson-mini-video${
                           completed ? ' course-learn-lesson-mini-video-done' : ''
                         }`}
+                        disabled={!unlocked}
+                        aria-label={`${lesson.title} видеону ачуу`}
+                        onClick={openLesson}
                       >
                         {lesson.videoId ? (
                           <img src={youtubeThumbnail(lesson.videoId)} alt="" />
@@ -847,7 +869,7 @@ export function CourseLearnPage() {
                             <PlayCircle className="h-6 w-6" fill="currentColor" />
                           )}
                         </span>
-                      </div>
+                      </button>
                     </div>
                   </li>
                 );

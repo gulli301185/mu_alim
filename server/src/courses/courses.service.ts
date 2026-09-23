@@ -137,11 +137,14 @@ export class CoursesService {
     if (user.role === 'admin') return true;
 
     const enrollment = await this.enrollments.findOne({
-      where: { userId: user.id, courseId },
+      where: [
+        { userId: user.id, courseId, status: 'active' },
+        { userId: user.id, courseId, status: 'completed' },
+      ],
       select: { status: true },
     });
 
-    return enrollment?.status === 'active';
+    return Boolean(enrollment);
   }
 
   /** Attaches the lesson count and the first lesson (for the intro video) to each course. */

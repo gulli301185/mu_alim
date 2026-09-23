@@ -8,7 +8,7 @@ import { PasswordField } from '../components/PasswordField';
 import { emailSchema, firstZodError, formatZodErrors, requiredPhoneSchema } from '../lib/auth-validation';
 
 export function ProfilePage() {
-  const { user, loading, updateProfile, logout } = useAuth();
+  const { user, loading, updateProfile, refreshUser, logout } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -18,16 +18,37 @@ export function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
+  // Always load first/last name from backend when opening profile (registration values).
   useEffect(() => {
-    if (!user) return;
-    setFirstName(user.firstName);
-    setLastName(user.lastName);
-    setEmail(user.email);
-    setPhone(user.phone ?? '');
-  }, [user]);
+    let cancelled = false;
+    setHydrated(false);
+    void (async () => {
+      try {
+        const fresh = await refreshUser();
+        if (cancelled || !fresh) return;
+        setFirstName(fresh.firstName);
+        setLastName(fresh.lastName);
+        setEmail(fresh.email);
+        setPhone(fresh.phone ?? '');
+      } catch {
+        if (!cancelled && user) {
+          setFirstName(user.firstName);
+          setLastName(user.lastName);
+          setEmail(user.email);
+          setPhone(user.phone ?? '');
+        }
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshUser, user?.id]);
 
-  if (loading) {
+  if (loading || !hydrated) {
     return (
       <section className="profile-page">
         <div className="wrap profile-page-wrap">
@@ -75,6 +96,13 @@ export function ProfilePage() {
           ? { currentPassword, newPassword }
           : {}),
       });
+      const fresh = await refreshUser();
+      if (fresh) {
+        setFirstName(fresh.firstName);
+        setLastName(fresh.lastName);
+        setEmail(fresh.email);
+        setPhone(fresh.phone ?? '');
+      }
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');

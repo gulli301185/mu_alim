@@ -54,6 +54,8 @@ export function isEnrolledInCourse(
     ),
   );
   return enrollments.some(
-    (item) => item.status === 'active' && (refs.has(item.courseSlug) || refs.has(item.courseId)),
+    (item) =>
+      (item.status === 'active' || item.status === 'completed') &&
+      (refs.has(item.courseSlug) || refs.has(item.courseId)),
   );
 }

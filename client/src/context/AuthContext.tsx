@@ -38,6 +38,7 @@ type AuthContextValue = {
   confirmCode: (input: { email: string; code: string }) => Promise<void>;
   logout: () => void;
   updateProfile: (input: UpdateProfileInput) => Promise<void>;
+  refreshUser: () => Promise<AuthUser | null>;
   forgotPassword: (input: { email: string }) => Promise<{ message: string }>;
   resetPassword: (input: {
     token: string;
@@ -66,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const meQuery = useQuery({
-    queryKey: authKeys.me(),
+    queryKey: authKeys.me(token),
     queryFn: async () => {
       if (!token || !sessionKind) return null;
       const user = await fetchMe(token);
@@ -79,19 +80,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     enabled: Boolean(token && sessionKind),
     retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const applySession = useCallback(
     (kind: SessionKind, nextToken: string, user: AuthUser) => {
       const otherKind: SessionKind = kind === 'admin' ? 'user' : 'admin';
       clearStoredAuth(otherKind);
+      clearAllStoredAuth();
       saveStoredAuth(kind, { token: nextToken, user });
       setSessionKind(kind);
       setToken(nextToken);
-      queryClient.setQueryData(authKeys.me(), user);
+      queryClient.removeQueries({ queryKey: authKeys.all });
+      queryClient.setQueryData(authKeys.me(nextToken), user);
       if (kind === 'user') {
-        void queryClient.invalidateQueries({ queryKey: enrollmentKeys.mine() });
+        void queryClient.invalidateQueries({ queryKey: enrollmentKeys.all });
         queryClient.removeQueries({ queryKey: ['course-progress'] });
+        queryClient.removeQueries({ queryKey: ['course-lessons'] });
       }
     },
     [queryClient],
@@ -167,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (user) => {
       if (!token || !sessionKind) return;
       saveStoredAuth(sessionKind, { token, user });
-      queryClient.setQueryData(authKeys.me(), user);
+      queryClient.setQueryData(authKeys.me(token), user);
     },
   });
 
@@ -235,6 +241,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [updateProfileMutation],
   );
 
+  const refreshUser = useCallback(async () => {
+    if (!token || !sessionKind) return null;
+    const next = await queryClient.fetchQuery({
+      queryKey: authKeys.me(token),
+      queryFn: async () => {
+        const me = await fetchMe(token);
+        if (!isSessionValid(sessionKind, me)) {
+          clearStoredAuth(sessionKind);
+          throw new Error('Сессия жараксыз');
+        }
+        saveStoredAuth(sessionKind, { token, user: me });
+        return me;
+      },
+    });
+    return next;
+  }, [token, sessionKind, queryClient]);
+
   const forgotPassword = useCallback(
     async (input: { email: string }) => forgotPasswordMutation.mutateAsync(input),
     [forgotPasswordMutation],
@@ -252,8 +275,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const storedUser =
     sessionKind && token ? loadStoredAuth(sessionKind)?.user ?? null : null;
+  // Prefer live backend `/me` data; localStorage is only a brief placeholder while loading.
   const user = meQuery.data ?? storedUser;
-  const loading = Boolean(token && sessionKind) && meQuery.isPending;
+  const loading = Boolean(token && sessionKind) && meQuery.isPending && !meQuery.data;
   const isAdmin = sessionKind === 'admin' && user?.role === 'admin';
   const isUser = sessionKind === 'user' && user?.role === 'user';
 
@@ -271,6 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       confirmCode,
       logout,
       updateProfile,
+      refreshUser,
       forgotPassword,
       resetPassword,
       isLoggingIn: loginUserMutation.isPending || loginAdminMutation.isPending,
@@ -290,6 +315,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       confirmCode,
       logout,
       updateProfile,
+      refreshUser,
       forgotPassword,
       resetPassword,
       loginUserMutation.isPending,

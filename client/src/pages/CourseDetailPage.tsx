@@ -153,13 +153,18 @@ export function CourseDetailPage() {
     staleTime: 10_000,
   });
 
-  const { data: courseLessons } = useQuery({
-    queryKey: ['course-lessons', courseId, paid ? 'open' : 'locked'],
+  const { data: courseLessons, refetch: refetchLessons } = useQuery({
+    queryKey: ['course-lessons', courseId, paid ? 'open' : 'locked', token ? 'auth' : 'anon'],
     queryFn: () => getLessonsByCourse(courseId!, token),
     enabled: Boolean(courseId && course),
     staleTime: 0,
     refetchOnMount: 'always',
   });
+
+  useEffect(() => {
+    if (!paid || !token) return;
+    void refetchLessons();
+  }, [paid, token, refetchLessons]);
 
   const publishedLessons = useMemo(
     () =>
@@ -284,6 +289,7 @@ export function CourseDetailPage() {
                   learnPath={learnPath}
                   onEnrolled={() => {
                     void refetchEnrollment();
+                    void refetchLessons();
                     const mapped = mapLessonsToCourseLessons(publishedLessons, '');
                     const firstId =
                       getFirstUnlockedLessonId(mapped, []) ?? publishedLessons[0]?.id ?? null;
