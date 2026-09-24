@@ -389,6 +389,7 @@ export class CourseProgress {
 }
 
 @Entity('certificates')
+@Index(['userId', 'courseId'], { unique: true })
 export class Certificate {
   @PrimaryColumn('uuid')
   id!: string;
@@ -407,6 +408,9 @@ export class Certificate {
 
   @Column({ name: 'pdf_file', type: 'varchar', length: 500 })
   pdfFile!: string;
+
+  @Column({ name: 'recipient_name', type: 'varchar', length: 200, nullable: true })
+  recipientName!: string | null;
 
   @Column({ name: 'issued_at', ...timestamptz })
   issuedAt!: Date;

@@ -6,11 +6,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import {
+  Certificate,
   CourseProgress,
   Enrollment,
   Lesson,
   LessonProgress,
+  Test,
+  TestAttempt,
 } from '../database/entities';
+
+const CERTIFICATE_PASS_SCORE = 90;
 
 @Injectable()
 export class ProgressService {
@@ -19,6 +24,9 @@ export class ProgressService {
     @InjectRepository(Enrollment) private readonly enrollments: Repository<Enrollment>,
     @InjectRepository(CourseProgress) private readonly courseProgress: Repository<CourseProgress>,
     @InjectRepository(LessonProgress) private readonly lessonProgress: Repository<LessonProgress>,
+    @InjectRepository(Test) private readonly tests: Repository<Test>,
+    @InjectRepository(TestAttempt) private readonly attempts: Repository<TestAttempt>,
+    @InjectRepository(Certificate) private readonly certificates: Repository<Certificate>,
     private readonly ds: DataSource,
     private readonly courses: CoursesService,
   ) {}
@@ -102,7 +110,7 @@ export class ProgressService {
   async get(user: AuthUser | undefined, ref: string) {
     const { userId, courseId } = await this.authorize(user, ref);
 
-    const [enrollment, progress, lessonRows] = await Promise.all([
+    const [enrollment, progress, lessonRows, finalTest] = await Promise.all([
       this.enrollments.findOne({
         where: { userId, courseId },
         select: { enrolledAt: true, completedAt: true, status: true },
@@ -115,12 +123,52 @@ export class ProgressService {
         where: { userId, isLessonCompleted: true, lesson: { courseId, isPublished: true } },
         select: { lessonId: true },
       }),
+      this.tests.findOne({
+        where: { courseId, testType: 'final', isActive: true },
+        select: { id: true, passingScore: true },
+      }),
     ]);
+
+    let finalTestPassed = false;
+    let finalTestScore: number | null = null;
+    if (finalTest) {
+      const bestAttempt = await this.attempts.findOne({
+        where: { userId, testId: finalTest.id },
+        order: { score: 'DESC', completedAt: 'DESC' },
+        select: { score: true, passed: true },
+      });
+      if (bestAttempt) {
+        finalTestScore = Number(bestAttempt.score);
+        finalTestPassed = Boolean(bestAttempt.passed);
+      }
+    }
+
+    const certificate = await this.certificates.findOne({
+      where: { userId, courseId },
+      select: {
+        id: true,
+        certificateNumber: true,
+        verificationCode: true,
+        recipientName: true,
+        issuedAt: true,
+      },
+    });
 
     return {
       completedLessonIds: lessonRows.map((row) => row.lessonId),
       isCompleted: Boolean(progress?.isCompleted || enrollment?.completedAt),
       enrolledAt: enrollment?.enrolledAt?.toISOString() ?? null,
+      finalTestPassed,
+      finalTestScore,
+      certificate: certificate
+        ? {
+            id: certificate.id,
+            certificateNumber: certificate.certificateNumber,
+            verificationCode: certificate.verificationCode,
+            recipientName: certificate.recipientName,
+            issuedAt: certificate.issuedAt.toISOString(),
+          }
+        : null,
     };
   }
 
@@ -236,5 +284,112 @@ export class ProgressService {
     });
 
     return { completedLessonIds: completedRows.map((row) => row.lessonId) };
+  }
+
+  async issueCertificate(
+    user: AuthUser | undefined,
+    ref: string,
+    body: { studentName?: string; certificateNumber?: string },
+  ) {
+    const { userId, courseId } = await this.authorize(user, ref);
+
+    const existing = await this.certificates.findOne({
+      where: { userId, courseId },
+      relations: { course: true },
+    });
+    if (existing) {
+      const name = body.studentName?.trim();
+      if (name && name !== existing.recipientName) {
+        existing.recipientName = name.slice(0, 200);
+        await this.certificates.save(existing);
+      }
+      return this.toCertificateDto(existing);
+    }
+
+    const published = await this.lessons.find({
+      where: { courseId, isPublished: true },
+      select: { id: true },
+      order: { lessonOrder: 'ASC' },
+    });
+    if (published.length === 0) throw new AppError(400, 'Курс сабактары жок');
+
+    const doneRows = await this.lessonProgress.find({
+      where: {
+        userId,
+        isLessonCompleted: true,
+        lessonId: In(published.map((lesson) => lesson.id)),
+      },
+      select: { lessonId: true },
+    });
+    if (doneRows.length < published.length) {
+      throw new AppError(400, 'Бардык сабактарды бүтүрүңүз');
+    }
+
+    const finalTest = await this.tests.findOne({
+      where: { courseId, testType: 'final', isActive: true },
+      select: { id: true },
+    });
+    if (finalTest) {
+      const bestAttempt = await this.attempts.findOne({
+        where: { userId, testId: finalTest.id, passed: true },
+        order: { score: 'DESC' },
+        select: { score: true, passed: true },
+      });
+      const score = bestAttempt ? Number(bestAttempt.score) : 0;
+      if (!bestAttempt?.passed || score < CERTIFICATE_PASS_SCORE) {
+        throw new AppError(400, `Сертификат үчүн тестти ${CERTIFICATE_PASS_SCORE}% жана андан жогору тапшырыңыз`);
+      }
+    }
+
+    const recipientName = (body.studentName?.trim() || '').slice(0, 200) || null;
+    let certificateNumber = body.certificateNumber?.trim() || this.makeCertificateNumber(courseId);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const clash = await this.certificates.findOne({
+        where: { certificateNumber },
+        select: { id: true },
+      });
+      if (!clash) break;
+      certificateNumber = this.makeCertificateNumber(courseId);
+    }
+
+    const now = new Date();
+    const created = await this.certificates.save(
+      this.certificates.create({
+        userId,
+        courseId,
+        certificateNumber,
+        verificationCode: randomUUID(),
+        pdfFile: `client/${certificateNumber}.pdf`,
+        recipientName,
+        issuedAt: now,
+        createdAt: now,
+      }),
+    );
+
+    const withCourse = await this.certificates.findOne({
+      where: { id: created.id },
+      relations: { course: true },
+    });
+    return this.toCertificateDto(withCourse ?? created);
+  }
+
+  private makeCertificateNumber(courseId: string) {
+    const year = new Date().getFullYear();
+    const prefix = courseId.replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'CRS';
+    const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return `MA-${year}-${prefix}-${rand}`;
+  }
+
+  private toCertificateDto(cert: Certificate) {
+    return {
+      id: cert.id,
+      certificateNumber: cert.certificateNumber,
+      verificationCode: cert.verificationCode,
+      recipientName: cert.recipientName,
+      issuedAt: cert.issuedAt.toISOString(),
+      courseId: cert.courseId,
+      courseTitle: cert.course?.title ?? null,
+    };
   }
 }

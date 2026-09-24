@@ -390,6 +390,9 @@ export function AdminUserDetailPage() {
                   <li key={item.id} className="admin-user-cert-item">
                     <div>
                       <p className="admin-user-course-title">{item.course.title}</p>
+                      {item.recipientName ? (
+                        <p className="admin-user-course-meta">Аты: {item.recipientName}</p>
+                      ) : null}
                       <p className="admin-user-course-meta">№ {item.certificateNumber}</p>
                       <p className="admin-user-course-meta">Берилген: {formatAdminDate(item.issuedAt)}</p>
                     </div>

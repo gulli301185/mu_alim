@@ -29,6 +29,7 @@ export async function ensureSchema(
   if (seededFree || seededPaid) await cache?.invalidate('courses:');
   if (seededQa) await cache?.invalidate('qa:');
   await ensureAdmin(ds);
+  await ensureCertificateColumns(ds);
   const seededReviews = await ensureVideoReviews(ds);
   const seededTextReviews = await ensureTextReviews(ds);
   if (seededReviews || seededTextReviews) await cache?.invalidate('reviews:');
@@ -66,6 +67,23 @@ async function createSchemaIfEmpty(ds: DataSource) {
     await runner.release();
   }
 
+}
+
+/** Adds certificate metadata columns/indexes used by learner issue + admin views. */
+async function ensureCertificateColumns(ds: DataSource) {
+  const [{ exists }] = await ds.query(
+    `SELECT to_regclass('public.certificates') IS NOT NULL AS exists`,
+  );
+  if (!exists) return;
+
+  await ds.query(`
+    ALTER TABLE public.certificates
+    ADD COLUMN IF NOT EXISTS recipient_name character varying(200)
+  `);
+  await ds.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS certificates_user_id_course_id_key
+    ON public.certificates (user_id, course_id)
+  `);
 }
 
 const FREE_COURSE_ID = 'ca4f6ef6-4636-47c1-82d6-4bef3a29c7e7';

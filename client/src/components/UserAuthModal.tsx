@@ -115,6 +115,18 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
       await loginUser(parsed.data);
       onClose();
     } catch (err) {
+      if (err instanceof AuthApiError && err.needsConfirmation) {
+        setTab('register');
+        setRegisterStep('code');
+        setRegisterForm((prev) => ({
+          ...prev,
+          email: err.email ?? loginForm.email,
+          password: loginForm.password,
+        }));
+        setForgotMessage(err.message);
+        toastError(err.message);
+        return;
+      }
       if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
       toastError(getErrorMessage(err, 'Кирүү ийгиликсиз'));
     } finally {

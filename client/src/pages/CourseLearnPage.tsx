@@ -21,7 +21,7 @@ import {
 } from '../lib/courseAccess';
 import { useAuth } from '../context/AuthContext';
 import { useCourseEnrollment } from '../hooks/useMyEnrollments';
-import { completeCourseLesson, fetchCourseProgress, syncCourseProgress } from '../lib/course-progress-api';
+import { completeCourseLesson, fetchCourseProgress, issueCourseCertificate, syncCourseProgress } from '../lib/course-progress-api';
 import { fetchCourseByRef, isFreeCourse } from '../lib/course-api';
 import { CourseYoutubePlayer } from '../components/CourseYoutubeLink';
 import {
@@ -48,7 +48,7 @@ import {
   SITE_LOGO_URL,
 } from '../lib/certificatePdf';
 import { youtubeThumbnail, youtubeWatchUrl } from '../lib/youtube';
-import { toastError } from '../lib/toast';
+import { getErrorMessage, toastError, toastSuccess } from '../lib/toast';
 import { CourseReviewsSection } from '../components/CourseReviews';
 
 type ViewMode = 'lesson' | 'final-test';
@@ -195,7 +195,22 @@ export function CourseLearnPage() {
   const [gradeResult, setGradeResult] = useState<GradeTestResult | null>(null);
   const [testSubmitting, setTestSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('lesson');
-  const [certificateName, setCertificateName] = useState(() => loadCertificateName());
+  const [certificateName, setCertificateName] = useState('');
+  const [certificateDownloading, setCertificateDownloading] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setCertificateName('');
+      return;
+    }
+    const stored = loadCertificateName(user.id);
+    if (stored) {
+      setCertificateName(stored);
+      return;
+    }
+    const fromProfile = `${user.firstName} ${user.lastName}`.trim();
+    setCertificateName(fromProfile);
+  }, [user?.id, user?.firstName, user?.lastName]);
 
   useEffect(() => {
     if (!courseId || courseLoading || enrollmentLoading) return;
@@ -218,9 +233,32 @@ export function CourseLearnPage() {
     const completedLessonIds = lessons.length
       ? resolveCompletedLessonIds(lessons, storedIds)
       : [...new Set(storedIds)];
-    const next = { ...local, completedLessonIds };
+
+    const serverScore =
+      typeof serverProgress?.finalTestScore === 'number' ? serverProgress.finalTestScore : 0;
+    const localScore = typeof local.finalTestScore === 'number' ? local.finalTestScore : 0;
+    const finalTestScore = Math.max(serverScore, localScore) || undefined;
+    const finalTestPassed = Boolean(
+      local.finalTestPassed ||
+        serverProgress?.finalTestPassed ||
+        (finalTestScore != null && finalTestScore >= CERTIFICATE_THRESHOLD * 100),
+    );
+
+    const next = {
+      ...local,
+      completedLessonIds,
+      finalTestPassed: finalTestPassed || local.finalTestPassed,
+      finalTestScore: finalTestScore ?? local.finalTestScore,
+      certificateNumber: serverProgress?.certificate?.certificateNumber ?? local.certificateNumber,
+      certificateIssuedAt:
+        serverProgress?.certificate?.issuedAt ?? local.certificateIssuedAt,
+    };
     saveCourseProgress(courseId, next, progressUserId);
     setProgress(next);
+
+    if (serverProgress?.certificate?.recipientName && !loadCertificateName(progressUserId)) {
+      setCertificateName(serverProgress.certificate.recipientName);
+    }
 
     if (
       !isFree &&
@@ -348,7 +386,20 @@ export function CourseLearnPage() {
     setProgress(next);
     setVideoWatched(true);
     if (token && !isFree) {
-      void completeCourseLesson(courseId, activeLesson.id, token).catch(() => {});
+      void completeCourseLesson(courseId, activeLesson.id, token)
+        .then((server) => {
+          if (!server.completedLessonIds?.length) return;
+          const merged = resolveCompletedLessonIds(lessons, [
+            ...next.completedLessonIds,
+            ...server.completedLessonIds,
+          ]);
+          const saved = { ...next, completedLessonIds: merged };
+          saveCourseProgress(courseId, saved, progressUserId);
+          setProgress(saved);
+        })
+        .catch(() => {
+          toastError('Сабак серверге сакталган жок. Интернетти текшерип, сабакты кайра бүтүрүңүз.');
+        });
     }
 
     const allDone = next.completedLessonIds.length >= lessons.length;
@@ -403,29 +454,49 @@ export function CourseLearnPage() {
   };
 
   const handleCertificateDownload = async () => {
-    if (!courseId || !course) return;
+    if (!courseId || !course || certificateDownloading) return;
 
     const trimmedName = certificateName.trim();
     if (!trimmedName) return;
 
-    saveCertificateName(trimmedName);
+    saveCertificateName(trimmedName, progressUserId);
 
     const score = progress.finalTestScore ?? 0;
-    const certificateNumber =
-      progress.certificateNumber ?? generateCertificateNumber(courseId);
+    setCertificateDownloading(true);
+    try {
+      let certificateNumber =
+        progress.certificateNumber ?? generateCertificateNumber(courseId);
 
-    if (!progress.certificateNumber) {
-      const next = ensureCertificateMeta(courseId, certificateNumber, progressUserId);
-      setProgress(next);
+      if (token && !isFree) {
+        const issued = await issueCourseCertificate(courseId, token, {
+          studentName: trimmedName,
+          certificateNumber,
+        });
+        certificateNumber = issued.certificateNumber;
+        const next = ensureCertificateMeta(courseId, certificateNumber, progressUserId);
+        setProgress({
+          ...next,
+          certificateNumber: issued.certificateNumber,
+          certificateIssuedAt: issued.issuedAt,
+        });
+      } else if (!progress.certificateNumber) {
+        const next = ensureCertificateMeta(courseId, certificateNumber, progressUserId);
+        setProgress(next);
+      }
+
+      const result = await downloadCourseCertificate({
+        studentName: trimmedName,
+        courseTitle: course.title,
+        scorePercent: score,
+        issuedAt: new Date(),
+        certificateNumber,
+      });
+      if (result === 'ok') toastSuccess('Сертификат даяр');
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Сертификат жүктөлгөн жок. Кайра аракет кылыңыз.'));
+    } finally {
+      setCertificateDownloading(false);
     }
-
-    await downloadCourseCertificate({
-      studentName: trimmedName,
-      courseTitle: course.title,
-      scorePercent: score,
-      issuedAt: new Date(),
-      certificateNumber,
-    });
   };
 
 
@@ -732,10 +803,10 @@ export function CourseLearnPage() {
                 type="button"
                 className="btn-gold course-learn-cert-btn"
                 onClick={() => void handleCertificateDownload()}
-                disabled={!certificateName.trim()}
+                disabled={!certificateName.trim() || certificateDownloading}
               >
                 <Download className="h-4 w-4" aria-hidden />
-                ПДФ сертификатты жүктөө
+                {certificateDownloading ? 'Даярдалууда...' : 'ПДФ сертификатты жүктөө'}
               </button>
             </div>
           ) : null}
@@ -1019,10 +1090,10 @@ export function CourseLearnPage() {
                                       type="button"
                                       className="btn-gold course-learn-cert-btn"
                                       onClick={() => void handleCertificateDownload()}
-                                      disabled={!certificateName.trim()}
+                                      disabled={!certificateName.trim() || certificateDownloading}
                                     >
                                       <Download className="h-4 w-4" aria-hidden />
-                                      ПДФ сертификатты жүктөө
+                                      {certificateDownloading ? 'Даярдалууда...' : 'ПДФ сертификатты жүктөө'}
                                     </button>
                                   </>
                                 ) : (

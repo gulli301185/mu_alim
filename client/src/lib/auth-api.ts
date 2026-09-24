@@ -47,11 +47,19 @@ export type UpdateProfileInput = {
 
 export class AuthApiError extends Error {
   fields?: Record<string, string>;
+  needsConfirmation?: boolean;
+  email?: string;
 
-  constructor(message: string, fields?: Record<string, string>) {
+  constructor(
+    message: string,
+    fields?: Record<string, string>,
+    extra?: { needsConfirmation?: boolean; email?: string },
+  ) {
     super(message);
     this.name = 'AuthApiError';
     this.fields = fields;
+    this.needsConfirmation = extra?.needsConfirmation;
+    this.email = extra?.email;
   }
 }
 
@@ -64,8 +72,16 @@ function authHeaders(token: string) {
 
 async function parseApiError(res: Response, fallback: string): Promise<AuthApiError> {
   try {
-    const data = (await res.json()) as { error?: string; fields?: Record<string, string> };
-    return new AuthApiError(data.error ?? fallback, data.fields);
+    const data = (await res.json()) as {
+      error?: string;
+      fields?: Record<string, string>;
+      needsConfirmation?: boolean;
+      email?: string;
+    };
+    return new AuthApiError(data.error ?? fallback, data.fields, {
+      needsConfirmation: data.needsConfirmation,
+      email: data.email,
+    });
   } catch {
     return new AuthApiError(fallback);
   }

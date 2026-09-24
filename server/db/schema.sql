@@ -133,6 +133,7 @@ CREATE TABLE public.certificates (
     certificate_number character varying(100) NOT NULL,
     verification_code uuid NOT NULL,
     pdf_file character varying(500) NOT NULL,
+    recipient_name character varying(200),
     issued_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

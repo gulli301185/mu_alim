@@ -111,6 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.removeQueries({ queryKey: authKeys.all });
     queryClient.removeQueries({ queryKey: enrollmentKeys.all });
     queryClient.removeQueries({ queryKey: ['course-progress'] });
+    queryClient.removeQueries({ queryKey: ['course-lessons'] });
+    queryClient.removeQueries({ queryKey: ['course-final-test'] });
   }, [queryClient, sessionKind]);
 
   useEffect(() => {

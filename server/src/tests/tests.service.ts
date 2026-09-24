@@ -333,6 +333,11 @@ export class TestsService {
     const course = await this.courses.resolveRef(ref);
     if (!course) throw new AppError(404, TEST_NOT_FOUND);
 
+    if (course.courseType === 'paid') {
+      const canWatch = await this.courses.userCanWatchPaidCourse(user, course.id);
+      if (!canWatch) throw new AppError(403, 'Курс ачыла элек');
+    }
+
     const test = await this.findFinalTestForCourse(course.id, true);
     if (!test) throw new AppError(404, TEST_NOT_FOUND);
 
@@ -362,6 +367,11 @@ export class TestsService {
   async gradeFinalTest(ref: string, user: AuthUser, answers: GradeAnswers) {
     const course = await this.courses.resolveRef(ref);
     if (!course) throw new AppError(404, 'Курс табылган жок');
+
+    if (course.courseType === 'paid') {
+      const canWatch = await this.courses.userCanWatchPaidCourse(user, course.id);
+      if (!canWatch) throw new AppError(403, 'Курс ачыла элек');
+    }
 
     const test = await this.findFinalTestForCourse(course.id, true);
     if (!test) throw new AppError(404, TEST_NOT_FOUND);

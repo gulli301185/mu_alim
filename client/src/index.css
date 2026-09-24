@@ -1163,6 +1163,39 @@ button.header-dropdown-link {
 @media (max-width: 639px) {
   .ayah-hadith-grid {
     gap: 30px;
+    align-items: start;
+  }
+
+  .ayah-hadith-grid .ayah-panel,
+  .ayah-hadith-grid .hadith-panel {
+    height: auto;
+  }
+
+  .ayah-panel-body,
+  .hadith-panel-body {
+    overflow: hidden;
+    flex: 0 1 auto;
+    justify-content: flex-start;
+  }
+
+  .ayah-translation,
+  .hadith-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 7;
+    overflow: hidden;
+  }
+
+  .hadith-sign {
+    position: static;
+    align-self: flex-end;
+    margin-top: 1rem;
+    right: auto;
+    bottom: auto;
+  }
+
+  .hadith-panel-body {
+    padding-bottom: 0;
   }
 }
 
@@ -1321,7 +1354,7 @@ button.header-dropdown-link {
 .hadith-panel-body {
   @apply flex flex-1 flex-col justify-center text-center;
   min-height: 0;
-  overflow: visible;
+  overflow: auto;
   padding-bottom: 2.75rem;
 }
 
@@ -2074,7 +2107,7 @@ button.header-dropdown-link {
 .ayah-panel-body {
   @apply flex flex-1 flex-col justify-center text-center;
   min-height: 0;
-  overflow: visible;
+  overflow: auto;
 }
 
 .ayah-panel-body::-webkit-scrollbar,

@@ -31,4 +31,14 @@ export class ProgressController {
   ) {
     return this.progress.sync(user, courseId, body);
   }
+
+  @Post('certificate')
+  @HttpCode(200)
+  issueCertificate(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('courseId') courseId: string,
+    @Body() body: { studentName?: string; certificateNumber?: string },
+  ) {
+    return this.progress.issueCertificate(user, courseId, body ?? {});
+  }
 }

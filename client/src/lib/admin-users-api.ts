@@ -54,6 +54,7 @@ export type AdminUserCertificate = {
   id: string;
   certificateNumber: string;
   verificationCode: string;
+  recipientName?: string | null;
   issuedAt: string;
   course: AdminUserCourse;
 };

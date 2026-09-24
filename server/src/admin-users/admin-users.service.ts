@@ -172,6 +172,7 @@ export class AdminUsersService {
         id: item.id,
         certificateNumber: item.certificateNumber,
         verificationCode: item.verificationCode,
+        recipientName: item.recipientName ?? null,
         issuedAt: item.issuedAt.toISOString(),
         course: toCourseSummary(item.course),
       })),

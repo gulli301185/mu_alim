@@ -104,10 +104,17 @@ export function loadCourseProgress(
   const scopedRecords = refs.map((ref) => scoped[ref]);
   const hasScoped = scopedRecords.some((record) => record);
 
-  const legacyMap = options?.adoptLegacy !== false ? readProgressMap(COURSE_PROGRESS_KEY) : {};
-  const legacyRecords = refs.map((ref) => legacyMap[ref]);
+  // Scoped-only: never merge the old global key into another account.
+  // Drop any leftover global progress so shared phones cannot leak progress.
+  if (options?.adoptLegacy !== false) {
+    try {
+      localStorage.removeItem(COURSE_PROGRESS_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
 
-  const merged = mergeProgressRecords([...scopedRecords, ...legacyRecords]);
+  const merged = mergeProgressRecords(scopedRecords);
   if (merged.completedLessonIds.length || hasScoped) {
     saveCourseProgress(courseId, merged, userId);
     return merged;

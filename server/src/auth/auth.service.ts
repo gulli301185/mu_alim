@@ -151,6 +151,12 @@ export class AuthService {
     if (user.role === 'admin') {
       throw new AppError(403, 'Админ үчүн /admin/login баракчасын колдонуңуз');
     }
+    if (!user.isVerified) {
+      throw new AppError(403, 'Аккаунт ырастала элек. Почтадагы кодду киргизиңиз.', {
+        needsConfirmation: true,
+        email: user.email,
+      });
+    }
 
     return { token: this.signToken({ id: user.id, role: user.role }), user: toPublicUser(user) };
   }

@@ -4,6 +4,15 @@ export type CourseServerProgress = {
   completedLessonIds: string[];
   isCompleted: boolean;
   enrolledAt: string | null;
+  finalTestPassed?: boolean;
+  finalTestScore?: number | null;
+  certificate?: {
+    id: string;
+    certificateNumber: string;
+    verificationCode: string;
+    recipientName: string | null;
+    issuedAt: string;
+  } | null;
 };
 
 function authHeaders(token: string) {
@@ -11,6 +20,15 @@ function authHeaders(token: string) {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
   };
+}
+
+async function parseProgressError(res: Response, fallback: string) {
+  try {
+    const data = (await res.json()) as { error?: string };
+    return new Error(data.error ?? fallback);
+  } catch {
+    return new Error(fallback);
+  }
 }
 
 export async function fetchCourseProgress(
@@ -21,7 +39,7 @@ export async function fetchCourseProgress(
     headers: authHeaders(token),
   });
   if (!res.ok) {
-    throw new Error('Прогресс жүктөлбөдү');
+    throw await parseProgressError(res, 'Прогресс жүктөлбөдү');
   }
   return res.json() as Promise<CourseServerProgress>;
 }
@@ -39,7 +57,7 @@ export async function completeCourseLesson(
     },
   );
   if (!res.ok) {
-    throw new Error('Сабак белгиленген жок');
+    throw await parseProgressError(res, 'Сабак белгиленген жок');
   }
   return res.json() as Promise<{ completedLessonIds: string[] }>;
 }
@@ -55,7 +73,33 @@ export async function syncCourseProgress(
     body: JSON.stringify({ completedLessonIds }),
   });
   if (!res.ok) {
-    throw new Error('Прогресс сакталган жок');
+    throw await parseProgressError(res, 'Прогресс сакталган жок');
   }
   return res.json() as Promise<{ completedLessonIds: string[] }>;
+}
+
+export type IssuedCertificate = {
+  id: string;
+  certificateNumber: string;
+  verificationCode: string;
+  recipientName: string | null;
+  issuedAt: string;
+  courseId: string;
+  courseTitle: string | null;
+};
+
+export async function issueCourseCertificate(
+  courseRef: string,
+  token: string,
+  input: { studentName: string; certificateNumber?: string },
+): Promise<IssuedCertificate> {
+  const res = await fetch(`${API_BASE}/api/courses/${courseRef}/progress/certificate`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    throw await parseProgressError(res, 'Сертификат сакталган жок');
+  }
+  return res.json() as Promise<IssuedCertificate>;
 }
