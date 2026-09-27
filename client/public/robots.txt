@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /reset-password
+
+Sitemap: https://mualim.kg/sitemap.xml
