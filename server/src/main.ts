@@ -41,6 +41,9 @@ function isAllowedOrigin(origin: string | undefined) {
 async function bootstrap() {
   // Body parsing is wired by hand: the review-video upload streams its raw body itself.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  // Behind Cloudflare + Traefik: trust the proxy chain so the throttler's fallback
+  // IP (req.ip / req.ips) reflects the real client, not the local proxy.
+  app.set('trust proxy', true);
   const port = Number(process.env.PORT) || 3001;
   const openapiDocument = JSON.parse(readFileSync(resolve(__dirname, 'openapi.json'), 'utf8'));
 

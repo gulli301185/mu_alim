@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AuthModule } from './auth/auth.module';
 import { CacheModule } from './cache/cache.service';
@@ -25,6 +26,7 @@ import { TestsModule } from './tests/tests.module';
       secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
       signOptions: { expiresIn: '7d' },
     }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 300 }]),
     DatabaseModule,
     CacheModule,
     MailModule,

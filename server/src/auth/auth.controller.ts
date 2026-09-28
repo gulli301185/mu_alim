@@ -1,7 +1,9 @@
 import { Body, Controller, Get, HttpCode, Post, Put, Res, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import type { z } from 'zod';
 import { AuthUser, CurrentUser, JwtAuthGuard } from '../common/auth';
+import { CfThrottlerGuard } from '../common/cf-throttler.guard';
 import { ZodPipe } from '../common/zod.pipe';
 import {
   confirmCodeSchema,
@@ -16,22 +18,26 @@ import { AuthService } from './auth.service';
 const formErrors = { fields: true } as const;
 
 @Controller('auth')
+@UseGuards(CfThrottlerGuard)
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('login')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   login(@Body(new ZodPipe(loginSchema, formErrors)) body: z.infer<typeof loginSchema>) {
     return this.auth.login(body);
   }
 
   @Post('admin/login')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   adminLogin(@Body(new ZodPipe(loginSchema, formErrors)) body: z.infer<typeof loginSchema>) {
     return this.auth.adminLogin(body);
   }
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(
     @Body(new ZodPipe(registerSchema, formErrors)) body: z.infer<typeof registerSchema>,
     @Res({ passthrough: true }) res: Response,
@@ -43,6 +49,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   forgotPassword(
     @Body(new ZodPipe(forgotPasswordSchema, formErrors)) body: z.infer<typeof forgotPasswordSchema>,
   ) {
@@ -51,12 +58,14 @@ export class AuthController {
 
   @Post('confirm-code')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   confirmCode(@Body(new ZodPipe(confirmCodeSchema, formErrors)) body: z.infer<typeof confirmCodeSchema>) {
     return this.auth.confirmCode(body);
   }
 
   @Post('reset-password')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   resetPassword(
     @Body(new ZodPipe(resetPasswordSchema, formErrors)) body: z.infer<typeof resetPasswordSchema>,
   ) {
