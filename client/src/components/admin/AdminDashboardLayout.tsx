@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LogOut, Menu, Moon, Sun, X } from 'lucide-react';
+import { KeyRound, LogOut, Menu, Moon, Sun, X } from 'lucide-react';
 import { ADMIN_NAV, findAdminNavItem } from '../../data/admin-nav';
+import { AdminPasswordModal } from './AdminPasswordModal';
 import { useAuth } from '../../context/AuthContext';
 import { useSiteImages } from '../../context/SiteImagesContext';
 import { SITE_IMAGE_KEYS } from '../../lib/site-images-api';
@@ -20,6 +21,7 @@ export function AdminDashboardLayout() {
   const { pathname } = useLocation();
   const [dark, setDark] = useState(getInitialDark);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const current = findAdminNavItem(pathname);
 
   useEffect(() => {
@@ -115,6 +117,15 @@ export function AdminDashboardLayout() {
             >
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
+            <button
+              type="button"
+              className="admin-topbar-icon-btn"
+              aria-label="Сыр сөздү өзгөртүү"
+              title="Сыр сөздү өзгөртүү"
+              onClick={() => setPasswordOpen(true)}
+            >
+              <KeyRound className="h-4 w-4" />
+            </button>
             {user ? (
               <div className="admin-topbar-user">
                 <span className="admin-topbar-avatar">{user.firstName.charAt(0).toUpperCase()}</span>
@@ -137,6 +148,8 @@ export function AdminDashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      {passwordOpen ? <AdminPasswordModal onClose={() => setPasswordOpen(false)} /> : null}
     </div>
   );
 }
