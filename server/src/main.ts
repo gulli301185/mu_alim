@@ -45,16 +45,20 @@ async function bootstrap() {
   // IP (req.ip / req.ips) reflects the real client, not the local proxy.
   app.set('trust proxy', true);
   const port = Number(process.env.PORT) || 3001;
-  const openapiDocument = JSON.parse(readFileSync(resolve(__dirname, 'openapi.json'), 'utf8'));
+  // Swagger exposes the whole API surface, so keep it out of production.
+  const docsEnabled = process.env.NODE_ENV !== 'production' || process.env.ENABLE_API_DOCS === 'true';
 
   app.enableCors({ origin: (origin, callback) => callback(null, isAllowedOrigin(origin)) });
   app.use(json());
   app.useStaticAssets(resolve(__dirname, '../uploads'), { prefix: '/uploads' });
-  app.use(
-    '/api-docs',
-    swaggerUi.serve,
-    swaggerUi.setup(openapiDocument, { customSiteTitle: 'Mu Alim API — Swagger' }),
-  );
+  if (docsEnabled) {
+    const openapiDocument = JSON.parse(readFileSync(resolve(__dirname, 'openapi.json'), 'utf8'));
+    app.use(
+      '/api-docs',
+      swaggerUi.serve,
+      swaggerUi.setup(openapiDocument, { customSiteTitle: 'Mu Alim API — Swagger' }),
+    );
+  }
 
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -64,7 +68,7 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`API server: http://localhost:${port}`);
-  console.log(`Swagger UI: http://localhost:${port}/api-docs`);
+  if (docsEnabled) console.log(`Swagger UI: http://localhost:${port}/api-docs`);
   console.log(
     `Reset codes: SMS ${app.get(SmsService).isConfigured() ? 'on' : 'off'}, email ${app.get(MailService).isConfigured() ? 'on' : 'off'}`,
   );
