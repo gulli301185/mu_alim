@@ -967,7 +967,7 @@ button.header-dropdown-link {
 .hero-sky-text {
   position: absolute;
   left: 5%;
-  top: 43%;
+  top: 34%;
   transform: translateY(-50%);
   z-index: 2;
   max-width: min(46%, 460px);
