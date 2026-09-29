@@ -173,8 +173,16 @@ export function VideoReviewStack({ clips }: { clips: CourseReview[] }) {
   );
 }
 
+// Temporarily hidden until re-edited (an uncovered face needs blurring before it can show again).
+const HIDDEN_VIDEO_FILES = ['family-otz2.mp4'];
+
+function isHiddenVideoReview(review: CourseReview) {
+  const url = review.videoUrl || '';
+  return HIDDEN_VIDEO_FILES.some((file) => url.includes(file));
+}
+
 export function VideoReviewFeed({ items }: { items: CourseReview[] }) {
-  const groups = groupVideoReviews(items);
+  const groups = groupVideoReviews(items.filter((item) => !isHiddenVideoReview(item)));
   if (!groups.length) return null;
 
   return (
