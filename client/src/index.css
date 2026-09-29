@@ -980,11 +980,10 @@ button.header-dropdown-link {
   font-weight: 700;
   font-size: clamp(1.85rem, 3.2vw, 2.75rem);
   line-height: 1.2;
-  color: #ffd24a;
+  color: #b8860b;
   text-shadow:
-    0 1px 0 #fff4c4,
-    0 2px 10px rgba(255, 196, 40, 0.7),
-    0 0 22px rgba(255, 210, 74, 0.55);
+    0 1px 1px rgba(255, 255, 255, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.3);
 }
 .hero-sky-sub {
   margin: 0.5em 0 0;
@@ -1371,10 +1370,8 @@ button.header-dropdown-link {
   font-weight: 700;
   font-size: clamp(0.95rem, 1.45vw, 1.15rem);
   line-height: 1.45;
-  color: var(--color-sky-light);
-  text-shadow:
-    0 1px 0 rgba(184, 223, 245, 0.35),
-    0 2px 10px rgba(126, 192, 232, 0.35);
+  color: #f2f8ff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .hadith-sign {
@@ -2135,10 +2132,8 @@ button.header-dropdown-link {
   font-weight: 700;
   font-size: clamp(0.95rem, 1.45vw, 1.15rem);
   line-height: 1.45;
-  color: var(--color-sky-light);
-  text-shadow:
-    0 1px 0 rgba(184, 223, 245, 0.35),
-    0 2px 10px rgba(126, 192, 232, 0.35);
+  color: #f2f8ff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .ayah-source {

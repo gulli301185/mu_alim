@@ -361,7 +361,19 @@ export function LandingPage() {
         <img src={banner.skyImageUrl} alt="" className="hero-sky-photo" />
         <div className="hero-sky-text">
           <p className="hero-sky-title">{banner.title}</p>
-          <p className="hero-sky-sub">{banner.subtitle}</p>
+          <p className="hero-sky-sub">
+            {(() => {
+              const comma = banner.subtitle.indexOf(',');
+              if (comma === -1) return banner.subtitle;
+              return (
+                <>
+                  {banner.subtitle.slice(0, comma + 1)}
+                  <br />
+                  {banner.subtitle.slice(comma + 1).trim()}
+                </>
+              );
+            })()}
+          </p>
           <p className="hero-sky-name">{banner.name}</p>
         </div>
         <img src={banner.bannerImageUrl} alt="" className="hero-mosque-photo" />
