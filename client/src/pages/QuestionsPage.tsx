@@ -136,7 +136,11 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   const [showCreate, setShowCreate] = useState(false);
 
   const pageParam = searchParams.get("page");
-  const page = Math.max(1, Number(pageParam) || 1);
+  const requestedPage = Number(pageParam);
+  const page =
+    Number.isFinite(requestedPage) && requestedPage >= 1
+      ? Math.trunc(requestedPage)
+      : 1;
   const sort = parseSort(searchParams.get("sort"));
   const query = searchParams.get("q") ?? "";
 
@@ -160,6 +164,19 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   useEffect(() => {
     setQueryInput(query);
   }, [query]);
+
+  useEffect(() => {
+    if (
+      pageParam == null ||
+      pageParam === "" ||
+      !/^\d+$/.test(pageParam) ||
+      Number(pageParam) < 1
+    ) {
+      if (pageParam !== "1") {
+        updateParams({ page: "1" }, true);
+      }
+    }
+  }, [pageParam, updateParams]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
