@@ -9625,8 +9625,8 @@ a.course-learn-review-tab {
 /* Устаз бөлүмү — текст сол, сүрөт оң, постердин беж фону, бут кесилген, кыска */
 .ustaz-split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 42%);
-  min-height: 270px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
+  height: 230px;
   border-radius: 1.25rem;
   overflow: hidden;
   background: linear-gradient(90deg, #a89e93 0%, #beb4a8 60%, #c7bdb1 100%);
@@ -9636,14 +9636,22 @@ a.course-learn-review-tab {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: clamp(1.5rem, 3.5vw, 2.75rem);
+  padding: 1.25rem clamp(1.25rem, 3vw, 2.25rem);
 }
 .ustaz-split .ustaz-teaser-label {
+  margin-bottom: 0.5rem;
+  font-size: clamp(1rem, 1.8vw, 1.3rem);
   color: #5f4718;
   text-shadow: none;
 }
 .ustaz-split .ustaz-teaser-text {
+  margin-bottom: 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
   color: #46403a;
+}
+.ustaz-split .ustaz-teaser-text p + p {
+  margin-top: 0.4rem;
 }
 .ustaz-split-photo {
   position: relative;
