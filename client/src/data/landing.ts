@@ -7,7 +7,7 @@ export const SITE = {
   paidTelegramInvite: "https://t.me/+ncXfxR-Xd5Y1Zjky",
   phone: "+996 773 301 185",
   /** WhatsAppка жазуу үчүн (цифралар гана, өлкө коду менен) */
-  whatsappDigits: "996773301185",
+  whatsappDigits: "996707323952",
   email: "info@mualim.academy",
   address: "Бишкек ш., Кыргызстан",
 };

@@ -877,19 +877,19 @@ export function CourseLearnPage() {
                 return (
                   <li
                     key={lesson.id}
-                    className={`course-learn-lesson-block${!unlocked ? ' course-learn-lesson-item-locked' : ''}`}
+                    className={`course-learn-lesson-block${!unlocked ? " course-learn-lesson-item-locked" : ""}`}
                   >
                     <div
                       className={`course-learn-lesson-video-row${
-                        completed ? ' course-learn-lesson-video-row-done' : ''
+                        completed ? " course-learn-lesson-video-row-done" : ""
                       }`}
                     >
                       <button
                         type="button"
                         className={`course-learn-lesson-btn${
-                          active ? ' course-learn-lesson-active' : ''
-                        }${completed ? ' course-learn-lesson-done' : ''}${
-                          !unlocked ? ' course-learn-lesson-locked' : ''
+                          active ? " course-learn-lesson-active" : ""
+                        }${completed ? " course-learn-lesson-done" : ""}${
+                          !unlocked ? " course-learn-lesson-locked" : ""
                         }`}
                         disabled={!unlocked}
                         onClick={openLesson}
@@ -904,19 +904,25 @@ export function CourseLearnPage() {
                           )}
                         </span>
                         <span className="course-learn-lesson-text">
-                          <span className="course-learn-lesson-name">{lesson.title}</span>
+                          <span className="course-learn-lesson-name">
+                            {lesson.title}
+                          </span>
                           <span className="course-learn-lesson-meta">
                             {lesson.duration}
                             <span
                               className={`course-learn-lesson-watch${
                                 completed
-                                  ? ' course-learn-lesson-watch-done'
+                                  ? " course-learn-lesson-watch-done"
                                   : unlocked
-                                    ? ' course-learn-lesson-watch-open'
-                                    : ' course-learn-lesson-watch-locked'
+                                    ? " course-learn-lesson-watch-open"
+                                    : " course-learn-lesson-watch-locked"
                               }`}
                             >
-                              {completed ? 'Көрүлүп бүттү' : unlocked ? 'Бүтө элек' : 'Кулуп'}
+                              {completed
+                                ? "Көрүлүп бүттү"
+                                : unlocked
+                                  ? "Бүтө элек"
+                                  : "Жабык"}
                             </span>
                           </span>
                         </span>
@@ -924,7 +930,9 @@ export function CourseLearnPage() {
                       <button
                         type="button"
                         className={`course-learn-lesson-mini-video${
-                          completed ? ' course-learn-lesson-mini-video-done' : ''
+                          completed
+                            ? " course-learn-lesson-mini-video-done"
+                            : ""
                         }`}
                         disabled={!unlocked}
                         aria-label={`${lesson.title} видеону ачуу`}
@@ -933,11 +941,17 @@ export function CourseLearnPage() {
                         {lesson.videoId ? (
                           <img src={youtubeThumbnail(lesson.videoId)} alt="" />
                         ) : null}
-                        <span className="course-learn-lesson-mini-play" aria-hidden>
+                        <span
+                          className="course-learn-lesson-mini-play"
+                          aria-hidden
+                        >
                           {completed ? (
                             <CheckCircle2 className="h-6 w-6" />
                           ) : (
-                            <PlayCircle className="h-6 w-6" fill="currentColor" />
+                            <PlayCircle
+                              className="h-6 w-6"
+                              fill="currentColor"
+                            />
                           )}
                         </span>
                       </button>
@@ -1007,7 +1021,7 @@ export function CourseLearnPage() {
                 {!activeAccessible ? (
                   <div className="course-learn-locked-msg">
                     <Lock className="h-8 w-8" aria-hidden />
-                    <p>Бул видео кулуп. Мурунку сабакты аяктаңыз.</p>
+                    <p>Бул видео жабык. Мурунку сабакты аяктаңыз.</p>
                   </div>
                 ) : (
                   <div className="course-learn-video-block">

@@ -116,7 +116,7 @@ function PaidLessonsSidebar({
                     {formatCourseDuration(lesson.durationSeconds)}
                   </span>
                 </span>
-                <span className="courses-sidebar-price">{unlocked ? 'Ачылды' : 'Кулуп'}</span>
+                <span className="courses-sidebar-price">{unlocked ? 'Ачылды' : 'Жабык'}</span>
               </button>
             </li>
           );
@@ -262,7 +262,11 @@ export function CourseDetailPage() {
               </div>
 
               <div className="courses-detail-preview">
-                <img src={previewImage} alt="" className="courses-detail-preview-img" />
+                <img
+                  src={previewImage}
+                  alt=""
+                  className={`courses-detail-preview-img${previewVideoId ? '' : ' is-cover'}`}
+                />
                 <div className="courses-detail-preview-overlay">
                   <Play className="h-6 w-6" fill="currentColor" aria-hidden />
                 </div>

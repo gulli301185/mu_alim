@@ -245,7 +245,6 @@ function PaidCoursesSection() {
                     />
                   </div>
                 </div>
-                <span className="video-paid-badge">{course.priceLabel}</span>
                 <span className="course-card-duration">
                   {formatCourseDuration(course.introDurationSeconds)}
                 </span>
@@ -253,10 +252,7 @@ function PaidCoursesSection() {
               <div className="course-card-body">
                 <p className="course-card-title">{course.title}</p>
                 <p className="course-card-intro">Киришүү сабак</p>
-                <CourseMeta
-                  lessons={course.lessonCount}
-                  price={course.priceLabel}
-                />
+                <CourseMeta lessons={course.lessonCount} />
               </div>
             </Link>
           ))

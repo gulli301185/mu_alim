@@ -1796,7 +1796,7 @@ button.header-dropdown-link {
 
 .video-paid-badge {
   @apply absolute top-3 left-3 text-[10px] font-bold px-2 py-1 rounded-md;
-  background: var(--color-navy);
+  background: #e84c8a;
   color: #fff;
 }
 
@@ -1813,6 +1813,10 @@ button.header-dropdown-link {
 
 .courses-detail-preview-img {
   @apply w-full h-full object-cover;
+}
+.courses-detail-preview-img.is-cover {
+  object-fit: contain;
+  background: var(--color-navy);
 }
 
 .courses-detail-preview-overlay {
@@ -2066,14 +2070,14 @@ button.header-dropdown-link {
 
 .course-card-video {
   position: relative;
-  height: 200px;
+  height: 270px;
   flex-shrink: 0;
   background: var(--color-navy);
   overflow: hidden;
 }
 
 .course-card-img {
-  @apply w-full h-full object-cover;
+  @apply w-full h-full object-contain;
 }
 
 .course-card-play {
@@ -10130,4 +10134,19 @@ a.course-learn-review-tab {
   .ustaz-split-img {
     object-position: center 20%;
   }
+}
+
+/* Курс барагы — "Пикирлер" бөлүмү: караңгы фон, алтын аталыш */
+.course-reviews.ui-card {
+  background: linear-gradient(135deg, var(--color-navy-dark) 0%, var(--color-navy) 100%);
+  border: 1px solid rgba(241, 158, 31, 0.24);
+}
+.course-reviews .course-reviews-title {
+  color: var(--color-gold);
+}
+.course-reviews .course-reviews-avg {
+  color: #dbe6fa;
+}
+.course-reviews .course-review-note {
+  color: #c2d0e8;
 }
