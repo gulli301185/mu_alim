@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
-import { FAQ } from '../data/landing';
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { FAQ } from "../data/landing";
 
 type FaqAccordionProps = {
   id?: string;
@@ -8,7 +8,34 @@ type FaqAccordionProps = {
   hideTitle?: boolean;
 };
 
-export function FaqAccordion({ id, className = '', hideTitle = false }: FaqAccordionProps) {
+function renderFaqAnswer(answer: string) {
+  const channelHandle = "@Muhammadalim_Halil";
+  const channelUrl = "https://www.youtube.com/@Muhammadalim_Halil";
+
+  if (answer.includes(channelHandle)) {
+    return (
+      <>
+        Ютуб канал{" "}
+        <a
+          href={channelUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="faq-link"
+        >
+          {channelHandle}
+        </a>
+      </>
+    );
+  }
+
+  return answer;
+}
+
+export function FaqAccordion({
+  id,
+  className = "",
+  hideTitle = false,
+}: FaqAccordionProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
@@ -18,7 +45,10 @@ export function FaqAccordion({ id, className = '', hideTitle = false }: FaqAccor
         {FAQ.map((f, i) => {
           const isOpen = openIndex === i;
           return (
-            <div key={f.q} className={`faq-item ${isOpen ? 'faq-item-open' : ''}`}>
+            <div
+              key={f.q}
+              className={`faq-item ${isOpen ? "faq-item-open" : ""}`}
+            >
               <button
                 type="button"
                 className="faq-trigger"
@@ -27,12 +57,14 @@ export function FaqAccordion({ id, className = '', hideTitle = false }: FaqAccor
               >
                 <span>{f.q}</span>
                 <ChevronDown
-                  className={`faq-chevron ${isOpen ? 'faq-chevron-open' : ''}`}
+                  className={`faq-chevron ${isOpen ? "faq-chevron-open" : ""}`}
                   strokeWidth={2.75}
                 />
               </button>
-              <div className={`faq-content ${isOpen ? 'faq-content-open' : ''}`}>
-                <p>{f.a}</p>
+              <div
+                className={`faq-content ${isOpen ? "faq-content-open" : ""}`}
+              >
+                <p>{renderFaqAnswer(f.a)}</p>
               </div>
             </div>
           );

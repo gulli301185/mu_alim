@@ -5,9 +5,9 @@ export const SITE = {
   instagram: "https://www.instagram.com/mualim.academy/",
   youtubeFree: "https://www.youtube.com/@Muhammadalim_Halil",
   paidTelegramInvite: "https://t.me/+ncXfxR-Xd5Y1Zjky",
-  phone: "+996 500 864 404",
+  phone: "+996 773 301 185",
   /** WhatsAppка жазуу үчүн (цифралар гана, өлкө коду менен) */
-  whatsappDigits: "996500864404",
+  whatsappDigits: "996773301185",
   email: "info@mualim.academy",
   address: "Бишкек ш., Кыргызстан",
 };
@@ -51,6 +51,13 @@ export const FOOTER_SOCIAL = [
     color: "#E4405F",
     href: "https://instagram.com/mualim.academy",
   },
+] as const;
+
+export const SOCIAL = [
+  { name: "WhatsApp", href: `https://wa.me/${SITE.whatsappDigits}` },
+  { name: "YouTube", href: SITE.youtubeFree },
+  { name: "Instagram", href: SITE.instagram },
+  { name: "Telegram", href: SITE.paidTelegramInvite },
 ] as const;
 
 export const NAV_PRIMARY = [
@@ -324,7 +331,7 @@ export const TEACHER = {
     "2021–2023-ж.ж. Иордания мамлекетинде Ханафий фикх усулу бөлүмүнүн жогорку дүйнөлүк ислам илимдери университетинде окуган.",
   ] as const,
   bioParagraphs: [
-    "Мухаммадалим Исаков — Кыргызстанда төрөлгөн жана чоңойгон белгилүү ислам аалымы. Ал 2007-жылдан тарта шейх Абдысаттар дамланын колунда, андан кийин Кызыл-Кыяда, Орто Азияда, Түркияда, Дубайда жана Иорданияда окуп, шариат, фикх, хадис жана тасаввуф боюнча терең билим алган.",
+    "Мухаммадалим Исаков — Кыргызстанда төрөлгөн жана чоңойгон белгилүү ислам аалымы. Ал 2007-жылдан тарта шейх Абдысаттар дамланын колунда, андан кийин Баткен облусу, Кадамжай району, Кара-дөбө айылында Орозали дамланын медресесинде, Орто Азияда, Түркияда, Дубайда жана Иорданияда окуп, шариат, фикх, хадис жана тасаввуф боюнча терең билим алган.",
     "Жөнөкөй жана түшүнүктүү стили  ага заманбап заманда көп аудиторияны жыйноого мүмкүндүк берген.",
     "YouTube жана онлайн платформаларда анын аудиториясы 1000 000+ көрүүгө чейин жетет. 1200+ диний баян — анын визиттик картасы болуп калган.",
     "Устаз «Жакшылык жасаңыз, өзгөлөргө жардам бериңиз, акыретке даярданыңыз» деген терең, бирок жөнөкөй маанини жайып жүрөт.",
@@ -353,8 +360,8 @@ export const TEACHER = {
     {
       period: "2009–2011",
       place: "«Хазрети Осмон» ислам институту",
-      city: "Кызыл-Кыя, Кыргызстан",
-      focus: "Институтту бүтүргөн",
+      city: "Кыргызстан",
+      focus: "⁠Хазрети Осмон ислам инститyтун артыкчылык менен бүтүргөн",
     },
     {
       period: "2011–2016",
@@ -371,9 +378,9 @@ export const TEACHER = {
     },
     {
       period: "2017–2018",
-      place: "Хазирети Дамла",
+      place: "Хазрет Хикматулло дамланын медресеси",
       city: "Орто Азия",
-      focus: "Хазирети Дамланын колунда ислам билимин алган",
+      focus: "Хазрет Хикматулло дамланын медресесин бүтүргөн",
     },
     {
       period: "2018–2021",
@@ -386,7 +393,8 @@ export const TEACHER = {
       period: "2021–2023",
       place: "Жогорку дүйнөлүк ислам илимдери университети",
       city: "Иордания",
-      focus: "Ханафий фикх усулу бөлүмү",
+      focus:
+        "⁠Ханафий Фикхи жана усулу Факультетинде Жогорку дипломду артыкчылык менен бүтүргөн ",
     },
   ] as const,
   workExperience: [
@@ -414,7 +422,7 @@ export const TEACHER = {
     { name: "Орусча", level: "Эркин", dots: 5 },
     { name: "Арабча", level: "Эркин", dots: 5 },
     { name: "Түркчө", level: "Эркин", dots: 5 },
-    { name: "Персче", level: "Эркин", dots: 5 },
+    { name: "Фарсча", level: "Эркин", dots: 5 },
   ] as const,
   interests: [
     { icon: "book" as const, label: "Куран изилдөө" },
@@ -452,25 +460,10 @@ export const TEACHER = {
   ],
 };
 
-export const SOCIAL = [
-  {
-    name: "Ютуб",
-    color: "#FF0000",
-    href: "https://youtube.com/@Muhammadalim_Halil",
-  },
-  { name: "Телеграм", color: "#0088cc", href: "https://t.me" },
-  {
-    name: "Инстаграм",
-    color: "#E4405F",
-    href: "https://instagram.com/mualim.academy",
-  },
-  { name: "Ватсап", color: "#25D366", href: "https://wa.me" },
-] as const;
-
 export const FAQ = [
   {
     q: "Бекер сабактар кайдан алынат?",
-    a: "Ютуб канал @Muhammadalim_Halil.",
+    a: "Ютуб канал @Muhammadalim_Halil",
   },
   {
     q: "Акылуу курстарга кантип киребиз?",

@@ -1,38 +1,38 @@
-import { useState, type FormEvent } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Pencil, Send, Sparkles, User, Users } from 'lucide-react';
-import { useSiteImages } from '../context/SiteImagesContext';
-import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
+import { useState, type FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookOpen, Pencil, Send, Sparkles, User, Users } from "lucide-react";
+import { useSiteImages } from "../context/SiteImagesContext";
+import { SITE_IMAGE_KEYS } from "../lib/site-images-api";
 import {
   fetchNextTeacherQuestionNumber,
   submitTeacherQuestion,
-} from '../lib/teacher-questions-api';
-import { getErrorMessage, toastError, toastSuccess } from '../lib/toast';
+} from "../lib/teacher-questions-api";
+import { getErrorMessage, toastError, toastSuccess } from "../lib/toast";
 
 const FOOTER_VALUES = [
-  { icon: BookOpen, head: 'Илим —', tail: 'пайда алып келсин' },
-  { icon: Users, head: 'Насаат —', tail: 'жүрөктү тазалайт' },
-  { icon: Sparkles, head: 'Адеп —', tail: 'адамды көркөм кылат' },
+  { icon: BookOpen, head: "Илим —", tail: "пайда алып келет" },
+  { icon: Users, head: "Насаат —", tail: "жүрөктү тазалайт" },
+  { icon: Sparkles, head: "Адеп —", tail: "адамды көркөм кылат" },
 ] as const;
 
 export function TeacherQuestionForm() {
   const { image } = useSiteImages();
   const queryClient = useQueryClient();
-  const [question, setQuestion] = useState('');
-  const [name, setName] = useState('');
+  const [question, setQuestion] = useState("");
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
   const { data: nextNumber, isFetching: numberLoading } = useQuery({
-    queryKey: ['teacher-questions', 'next-number'],
+    queryKey: ["teacher-questions", "next-number"],
     queryFn: fetchNextTeacherQuestionNumber,
     staleTime: 30_000,
   });
 
-  const questionLabel = nextNumber != null ? `${nextNumber}-суроо` : 'Сурооңуз';
+  const questionLabel = nextNumber != null ? `${nextNumber}-суроо` : "Сурооңуз";
   const questionPlaceholder =
     nextNumber != null
       ? `${nextNumber}-суроону бул жерге жазыңыз...`
-      : 'Сурооңузду бул жерге жазыңыз...';
+      : "Сурооңузду бул жерге жазыңыз...";
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -43,11 +43,13 @@ export function TeacherQuestionForm() {
         name: name.trim(),
       });
       toastSuccess(result.message);
-      setQuestion('');
-      setName('');
-      await queryClient.invalidateQueries({ queryKey: ['teacher-questions', 'next-number'] });
+      setQuestion("");
+      setName("");
+      await queryClient.invalidateQueries({
+        queryKey: ["teacher-questions", "next-number"],
+      });
     } catch (err) {
-      toastError(getErrorMessage(err, 'Суроо жөнөтүлгөн жок'));
+      toastError(getErrorMessage(err, "Суроо жөнөтүлгөн жок"));
     } finally {
       setLoading(false);
     }
@@ -79,15 +81,17 @@ export function TeacherQuestionForm() {
               </p>
 
               <form
-                className={`teacher-question-form${loading ? ' teacher-question-form-busy' : ''}`}
+                className={`teacher-question-form${loading ? " teacher-question-form-busy" : ""}`}
                 onSubmit={(e) => void handleSubmit(e)}
               >
                 <label className="teacher-question-field">
                   <span className="teacher-question-label-row">
-                    <span className="teacher-question-label">{questionLabel}</span>
+                    <span className="teacher-question-label">
+                      {questionLabel}
+                    </span>
                     {nextNumber != null ? (
                       <span
-                        className={`teacher-question-number-badge${numberLoading ? ' is-loading' : ''}`}
+                        className={`teacher-question-number-badge${numberLoading ? " is-loading" : ""}`}
                       >
                         №{nextNumber}
                       </span>
@@ -103,8 +107,12 @@ export function TeacherQuestionForm() {
                       required
                       minLength={10}
                       maxLength={4000}
+                      dir="ltr"
                     />
-                    <Pencil className="teacher-question-field-icon" aria-hidden />
+                    <Pencil
+                      className="teacher-question-field-icon"
+                      aria-hidden
+                    />
                   </span>
                 </label>
 
@@ -121,15 +129,20 @@ export function TeacherQuestionForm() {
                       minLength={2}
                       maxLength={200}
                       autoComplete="name"
+                      dir="ltr"
                     />
                     <User className="teacher-question-field-icon" aria-hidden />
                   </span>
                 </label>
 
                 <div className="teacher-question-actions">
-                  <button type="submit" className="teacher-question-submit" disabled={loading}>
+                  <button
+                    type="submit"
+                    className="teacher-question-submit"
+                    disabled={loading}
+                  >
                     <Send className="h-4 w-4" aria-hidden />
-                    {loading ? 'Жөнөтүлүүдө...' : 'Жөнөтүү'}
+                    {loading ? "Жөнөтүлүүдө..." : "Жөнөтүү"}
                   </button>
                 </div>
               </form>
@@ -149,9 +162,11 @@ export function TeacherQuestionForm() {
                     “
                   </span>
                   <p className="teacher-question-visual-quote-text">
-                    <span className="teacher-question-visual-quote-gold">Илим үйрөнүү —</span>
+                    <span className="teacher-question-visual-quote-gold">
+                      Илим алуу —
+                    </span>
                     <span className="teacher-question-visual-quote-light">
-                      ар бир мусулмандын милдети.
+                      ар бир мусулмандын милдети.(Хадис)
                     </span>
                   </p>
                 </blockquote>
@@ -178,11 +193,18 @@ export function TeacherQuestionForm() {
                   {FOOTER_VALUES.map(({ icon: Icon, head, tail }) => (
                     <li key={head} className="teacher-question-value">
                       <span className="teacher-question-value-icon">
-                        <Icon className="teacher-question-value-icon-svg" aria-hidden />
+                        <Icon
+                          className="teacher-question-value-icon-svg"
+                          aria-hidden
+                        />
                       </span>
                       <span className="teacher-question-value-text">
-                        <span className="teacher-question-value-head">{head}</span>
-                        <span className="teacher-question-value-tail">{tail}</span>
+                        <span className="teacher-question-value-head">
+                          {head}
+                        </span>
+                        <span className="teacher-question-value-tail">
+                          {tail}
+                        </span>
                       </span>
                     </li>
                   ))}

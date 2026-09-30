@@ -1,29 +1,36 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Search, X } from 'lucide-react';
-import { QaPagination } from '../components/QaPagination';
-import { QaTelegramCard } from '../components/QaTelegramCard';
-import { QaAdminForm } from '../components/QaAdminForm';
-import { TeacherQuestionPendingSection } from '../components/TeacherQuestionPendingSection';
-import { TeacherQuestionForm } from '../components/TeacherQuestionForm';
-import { useAuth } from '../context/AuthContext';
-import { QUESTIONS_PER_PAGE, QUESTION_SORT_OPTIONS } from '../lib/qa-format';
-import { highlightText } from '../lib/search-highlight';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Plus, Search, X } from "lucide-react";
+import { QaPagination } from "../components/QaPagination";
+import { QaTelegramCard } from "../components/QaTelegramCard";
+import { QaAdminForm } from "../components/QaAdminForm";
+import { TeacherQuestionPendingSection } from "../components/TeacherQuestionPendingSection";
+import { TeacherQuestionForm } from "../components/TeacherQuestionForm";
+import { useAuth } from "../context/AuthContext";
+import { QUESTIONS_PER_PAGE, QUESTION_SORT_OPTIONS } from "../lib/qa-format";
+import { highlightText } from "../lib/search-highlight";
 import {
   createQaArticle,
   deleteQaArticle,
   fetchQaList,
   type QuestionArticle,
   type QuestionSort,
-} from '../lib/qa-api';
-import { getErrorMessage, toastError } from '../lib/toast';
-import { useSiteImages } from '../context/SiteImagesContext';
-import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
+} from "../lib/qa-api";
+import { getErrorMessage, toastError } from "../lib/toast";
+import { useSiteImages } from "../context/SiteImagesContext";
+import { SITE_IMAGE_KEYS } from "../lib/site-images-api";
 
-const SORT_VALUES = new Set<QuestionSort>(['default', 'newest', 'oldest', 'popular']);
+const SORT_VALUES = new Set<QuestionSort>([
+  "default",
+  "newest",
+  "oldest",
+  "popular",
+]);
 
 function parseSort(value: string | null): QuestionSort {
-  return value && SORT_VALUES.has(value as QuestionSort) ? (value as QuestionSort) : 'default';
+  return value && SORT_VALUES.has(value as QuestionSort)
+    ? (value as QuestionSort)
+    : "default";
 }
 
 function QaAdminList({
@@ -32,8 +39,8 @@ function QaAdminList({
   error,
   onReload,
   onDelete,
-  searchQuery = '',
-  basePath = '/admin/questions',
+  searchQuery = "",
+  basePath = "/admin/questions",
 }: {
   items: QuestionArticle[];
   loading: boolean;
@@ -47,7 +54,11 @@ function QaAdminList({
     return (
       <div className="qa-empty ui-card">
         <p>Жүктөлбөдү.</p>
-        <button type="button" className="btn-gold qa-admin-btn" onClick={onReload}>
+        <button
+          type="button"
+          className="btn-gold qa-admin-btn"
+          onClick={onReload}
+        >
           Кайра жүктөө
         </button>
       </div>
@@ -73,15 +84,21 @@ function QaAdminList({
   return (
     <ul className="qa-admin-list">
       {items.map((article) => (
-        <li key={article.recordId ?? article.slug ?? article.id} className="qa-admin-row ui-card">
+        <li
+          key={article.recordId ?? article.slug ?? article.id}
+          className="qa-admin-row ui-card"
+        >
           <div className="qa-admin-row-main">
-            <span className="qa-admin-row-num">{article.number ?? '—'}</span>
+            <span className="qa-admin-row-num">{article.number ?? "—"}</span>
             <p className="qa-admin-row-text">
               {highlightText(article.question ?? article.title, searchQuery)}
             </p>
           </div>
           <div className="qa-admin-row-actions">
-            <Link to={`${basePath}/${article.slug ?? article.id}`} className="qa-admin-btn qa-admin-btn-muted">
+            <Link
+              to={`${basePath}/${article.slug ?? article.id}`}
+              className="qa-admin-btn qa-admin-btn-muted"
+            >
               Көрүү
             </Link>
             <Link
@@ -108,7 +125,9 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   const { image } = useSiteImages();
   const { isAdmin, token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [queryInput, setQueryInput] = useState(() => searchParams.get('q') ?? '');
+  const [queryInput, setQueryInput] = useState(
+    () => searchParams.get("q") ?? "",
+  );
   const [items, setItems] = useState<QuestionArticle[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -116,10 +135,10 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
-  const pageParam = searchParams.get('page');
+  const pageParam = searchParams.get("page");
   const page = Math.max(1, Number(pageParam) || 1);
-  const sort = parseSort(searchParams.get('sort'));
-  const query = searchParams.get('q') ?? '';
+  const sort = parseSort(searchParams.get("sort"));
+  const query = searchParams.get("q") ?? "";
 
   const updateParams = useCallback(
     (patch: Record<string, string | null>, replace = true) => {
@@ -127,7 +146,7 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
         (prev) => {
           const next = new URLSearchParams(prev);
           for (const [key, value] of Object.entries(patch)) {
-            if (value == null || value === '') next.delete(key);
+            if (value == null || value === "") next.delete(key);
             else next.set(key, value);
           }
           return next;
@@ -146,7 +165,7 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
     const timer = window.setTimeout(() => {
       const trimmed = queryInput.trim();
       if (trimmed === query) return;
-      updateParams({ q: trimmed || null, page: '1' });
+      updateParams({ q: trimmed || null, page: "1" });
     }, 300);
 
     return () => window.clearTimeout(timer);
@@ -165,12 +184,12 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
       });
 
       if (data.totalPages > 0 && page > data.totalPages) {
-        updateParams({ page: String(data.totalPages) });
+        updateParams({ page: "1" });
         return;
       }
 
-      if (!pageParam && !query && sort === 'default' && data.totalPages > 1) {
-        updateParams({ page: String(data.totalPages) });
+      if (!pageParam && !query && sort === "default" && data.totalPages > 1) {
+        updateParams({ page: "1" });
         return;
       }
 
@@ -178,7 +197,7 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
       setTotal(data.total);
       setTotalPages(data.totalPages);
     } catch {
-      const message = 'Маалымат базасынан жүктөө ийгиликсиз.';
+      const message = "Маалымат базасынан жүктөө ийгиликсиз.";
       toastError(message);
       setItems([]);
       setTotal(0);
@@ -190,30 +209,30 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   }, [page, pageParam, query, sort, updateParams]);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [page, sort, query]);
-
-  useEffect(() => {
     void load();
   }, [load]);
 
-  const handleCreate = async (values: { question: string; answer: string; number?: number }) => {
-    if (!token) throw new Error('Админ кирүү керек');
+  const handleCreate = async (values: {
+    question: string;
+    answer: string;
+    number?: number;
+  }) => {
+    if (!token) throw new Error("Админ кирүү керек");
     await createQaArticle(token, values);
     setShowCreate(false);
-    updateParams({ page: '1' });
+    updateParams({ page: "1" });
     await load();
   };
 
   const handleDelete = async (article: QuestionArticle) => {
     if (!token || !article.recordId) return;
-    const ok = window.confirm('Бул суроону өчүрөсүзбү?');
+    const ok = window.confirm("Бул суроону өчүрөсүзбү?");
     if (!ok) return;
     try {
       await deleteQaArticle(token, article.recordId);
       await load();
     } catch (err) {
-      toastError(getErrorMessage(err, 'Өчүрүү ийгиликсиз'));
+      toastError(getErrorMessage(err, "Өчүрүү ийгиликсиз"));
     }
   };
 
@@ -244,7 +263,11 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
           <TeacherQuestionPendingSection onPublished={() => void load()} />
 
           {showCreate ? (
-            <div className="auth-modal-overlay" role="presentation" onClick={() => setShowCreate(false)}>
+            <div
+              className="auth-modal-overlay"
+              role="presentation"
+              onClick={() => setShowCreate(false)}
+            >
               <div
                 className="auth-modal ui-card admin-qa-modal"
                 role="dialog"
@@ -253,7 +276,10 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <header className="admin-lesson-modal-head">
-                  <h3 id="qa-create-modal-title" className="admin-section-title">
+                  <h3
+                    id="qa-create-modal-title"
+                    className="admin-section-title"
+                  >
                     Жаңы суроо
                   </h3>
                   <button
@@ -292,8 +318,8 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
               <button
                 key={option.value}
                 type="button"
-                className={`qa-sort-btn${sort === option.value ? ' qa-sort-btn-active' : ''}`}
-                onClick={() => updateParams({ sort: option.value, page: '1' })}
+                className={`qa-sort-btn${sort === option.value ? " qa-sort-btn-active" : ""}`}
+                onClick={() => updateParams({ sort: option.value, page: "1" })}
               >
                 {option.label}
               </button>
@@ -313,7 +339,9 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
             <QaPagination
               currentPage={currentPage}
               totalPages={totalPages}
-              onPageChange={(nextPage) => updateParams({ page: String(nextPage) })}
+              onPageChange={(nextPage) =>
+                updateParams({ page: String(nextPage) })
+              }
             />
           )}
         </div>
@@ -324,27 +352,29 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   return (
     <>
       <section className="qa-page">
-      <div className="wrap qa-page-wrap">
-        <div className="qa-sort-row" role="group" aria-label="Сорттоо">
-          {QUESTION_SORT_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`qa-sort-btn${sort === option.value ? ' qa-sort-btn-active' : ''}`}
-              onClick={() => updateParams({ sort: option.value, page: '1' })}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <header className="qa-page-header">
-          <div>
-            <h1 className="qa-page-title">Суроо-жооп</h1>
-            <p className="qa-page-subtitle">Диний суроолорго жооптор — Муалим академиясы</p>
+        <div className="wrap qa-page-wrap">
+          <div className="qa-sort-row" role="group" aria-label="Сорттоо">
+            {QUESTION_SORT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`qa-sort-btn${sort === option.value ? " qa-sort-btn-active" : ""}`}
+                onClick={() => updateParams({ sort: option.value, page: "1" })}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
-        </header>
+          <header className="qa-page-header">
+            <div>
+              <h1 className="qa-page-title">Суроо-жооп</h1>
+              <p className="qa-page-subtitle">
+                Диний суроолорго жооптор — Муалим академиясы
+              </p>
+            </div>
+          </header>
 
-        <div className="qa-toolbar">
+          <div className="qa-toolbar">
             <label className="qa-search">
               <Search className="h-4 w-4 qa-search-icon" aria-hidden />
               <input
@@ -355,72 +385,83 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
                 onChange={(e) => setQueryInput(e.target.value)}
               />
             </label>
-            {!loading && sort !== 'default' && sortLabel ? (
+            {!loading && sort !== "default" && sortLabel ? (
               <p className="qa-sort-note">
-                Бардык {total} суроонун ичинен иреттелди · {sortLabel.toLowerCase()} · {currentPage}-бет
+                Бардык {total} суроонун ичинен иреттелди ·{" "}
+                {sortLabel.toLowerCase()} · {currentPage}-бет
               </p>
             ) : null}
-        </div>
+          </div>
 
-        <div className="qa-main">
-          {error ? (
-            <div className="qa-empty ui-card">
-              <p>{error}</p>
-              <button type="button" className="btn-primary qa-back-btn" onClick={() => void load()}>
-                Кайра аракет кылуу
-              </button>
-            </div>
-          ) : null}
+          <div className="qa-main">
+            {error ? (
+              <div className="qa-empty ui-card">
+                <p>{error}</p>
+                <button
+                  type="button"
+                  className="btn-primary qa-back-btn"
+                  onClick={() => void load()}
+                >
+                  Кайра аракет кылуу
+                </button>
+              </div>
+            ) : null}
 
-          {!error && loading ? (
-            <div className="qa-empty ui-card">
-              <p>Жүктөлүүдө...</p>
-            </div>
-          ) : null}
+            {!error && loading ? (
+              <div className="qa-empty ui-card">
+                <p>Жүктөлүүдө...</p>
+              </div>
+            ) : null}
 
-          {!error && !loading ? (
-            <ul className="qa-articles">
-              {items.map((article) => (
-                <li key={article.slug ?? article.id}>
-                  <Link
-                    to={`/questions/${article.slug ?? article.id}`}
-                    state={{ returnSearch: listReturnSearch }}
-                    className="qa-tg-card-link"
-                  >
-                    <QaTelegramCard article={article} compact searchQuery={query} />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+            {!error && !loading ? (
+              <ul className="qa-articles">
+                {items.map((article) => (
+                  <li key={article.slug ?? article.id}>
+                    <Link
+                      to={`/questions/${article.slug ?? article.id}`}
+                      state={{ returnSearch: listReturnSearch }}
+                      className="qa-tg-card-link"
+                    >
+                      <QaTelegramCard
+                        article={article}
+                        compact
+                        searchQuery={query}
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
-          {!loading && !error && items.length === 0 && (
-            <div className="qa-empty ui-card">
-              <p>Эч нерсе табылган жок.</p>
-            </div>
-          )}
+            {!loading && !error && items.length === 0 && (
+              <div className="qa-empty ui-card">
+                <p>Эч нерсе табылган жок.</p>
+              </div>
+            )}
 
-          {!loading && !error && (
-            <QaPagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={(nextPage) => updateParams({ page: String(nextPage) })}
+            {!loading && !error && (
+              <QaPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={(nextPage) =>
+                  updateParams({ page: String(nextPage) })
+                }
+              />
+            )}
+          </div>
+
+          <aside className="qa-page-visual">
+            <img
+              src={image(SITE_IMAGE_KEYS.qaScene)}
+              alt=""
+              className="qa-page-visual-bg"
+              loading="lazy"
+              decoding="async"
+              aria-hidden
             />
-          )}
+          </aside>
         </div>
-
-        <aside className="qa-page-visual">
-          <img
-            src={image(SITE_IMAGE_KEYS.qaScene)}
-            alt=""
-            className="qa-page-visual-bg"
-            loading="lazy"
-            decoding="async"
-            aria-hidden
-          />
-        </aside>
-      </div>
-    </section>
+      </section>
 
       <TeacherQuestionForm />
     </>

@@ -1,5 +1,5 @@
-import { Mail, MapPin, Phone, X } from 'lucide-react';
-import { SITE, SOCIAL } from '../data/landing';
+import { Mail, MapPin, Phone, X } from "lucide-react";
+import { SITE } from "../data/landing";
 
 type ContactPanelProps = {
   open: boolean;
@@ -8,22 +8,22 @@ type ContactPanelProps = {
 
 const EXTRA_CONTACTS = [
   {
-    label: 'WhatsApp',
+    label: "WhatsApp",
     href: `https://wa.me/${SITE.whatsappDigits}`,
     external: true,
   },
   {
-    label: 'YouTube',
+    label: "YouTube",
     href: SITE.youtubeFree,
     external: true,
   },
   {
-    label: 'Instagram',
+    label: "Instagram",
     href: SITE.instagram,
     external: true,
   },
   {
-    label: 'Telegram (акылуу курстар)',
+    label: "Telegram (акылуу курстар)",
     href: SITE.paidTelegramInvite,
     external: true,
   },
@@ -44,14 +44,22 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
           <h2 id="contact-panel-title" className="contact-panel-title">
             Байланыш
           </h2>
-          <button type="button" className="contact-panel-close" onClick={onClose} aria-label="Жабуу">
+          <button
+            type="button"
+            className="contact-panel-close"
+            onClick={onClose}
+            aria-label="Жабуу"
+          >
             <X className="h-5 w-5" aria-hidden />
           </button>
         </header>
 
         <ul className="contact-panel-list">
           <li>
-            <a href={`tel:${SITE.phone.replace(/\s/g, '')}`} className="contact-panel-item">
+            <a
+              href={`tel:${SITE.phone.replace(/\s/g, "")}`}
+              className="contact-panel-item"
+            >
               <span className="contact-panel-icon">
                 <Phone className="h-5 w-5" aria-hidden />
               </span>
@@ -86,7 +94,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
         </ul>
 
         <div className="contact-panel-section">
-          <p className="contact-panel-section-title">Тез байланыш</p>
+          <p className="contact-panel-section-title">Социалдык тармактар</p>
           <ul className="contact-panel-links">
             {EXTRA_CONTACTS.map((item) => (
               <li key={item.label}>
@@ -103,7 +111,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
           </ul>
         </div>
 
-        <div className="contact-panel-section">
+        {/* <div className="contact-panel-section">
           <p className="contact-panel-section-title">Социалдык тармактар</p>
           <ul className="contact-panel-links">
             {SOCIAL.map((item) => (
@@ -119,7 +127,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
               </li>
             ))}
           </ul>
-        </div>
+        </div> */}
       </aside>
     </div>
   );
