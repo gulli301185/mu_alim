@@ -9626,7 +9626,7 @@ a.course-learn-review-tab {
 .ustaz-split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
-  height: 230px;
+  height: 450px;
   border-radius: 1.25rem;
   overflow: hidden;
   background: linear-gradient(90deg, #a89e93 0%, #beb4a8 60%, #c7bdb1 100%);
