@@ -11,7 +11,7 @@ export type HeroBanner = {
 
 export const DEFAULT_HERO: HeroBanner = {
   title: 'Бийиктикке умтул!',
-  subtitle: 'Билим эркиндикке жол ачат, амал ийгиликке жеткирет.',
+  subtitle: 'Билим эркиндикке жол ачат,  амал ийгиликке жеткирет.',
   name: 'Мухаммадалим',
   skyImageUrl: '/uploads/sky-hero.jpg',
   bannerImageUrl: '/uploads/tunduk-hero.jpg',

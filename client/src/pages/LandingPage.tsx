@@ -1,29 +1,45 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import {
-  Play, Mic, Video, Users, Calendar, Star,
-} from 'lucide-react';
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Play, Mic, Video, Users, Calendar, Star } from "lucide-react";
+import { STATS, QUICK_ACCESS, EVENTS, TEACHER } from "../data/landing";
 import {
-  STATS, QUICK_ACCESS,
-  EVENTS, TEACHER,
-} from '../data/landing';
-import { fetchCourses, fetchFreeLessons, formatCourseDuration, paidCourseCover } from '../lib/course-api';
-import { fetchDailyQa, todayBishkek } from '../lib/qa-api';
-import { DEFAULT_HERO, fetchHeroBanner } from '../lib/hero-api';
-import { youtubeThumbnail } from '../lib/youtube';
-import { FaqAccordion } from '../components/FaqAccordion';
-import { ReviewsFeed } from '../components/ReviewsFeed';
-import { TeacherQuestionForm } from '../components/TeacherQuestionForm';
-import { UzorCorners } from '../components/UzorCorners';
-import { useSiteImages } from '../context/SiteImagesContext';
-import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
+  fetchCourses,
+  fetchFreeLessons,
+  formatCourseDuration,
+  paidCourseCover,
+} from "../lib/course-api";
+import { fetchDailyQa, todayBishkek } from "../lib/qa-api";
+import { DEFAULT_HERO, fetchHeroBanner } from "../lib/hero-api";
+import { youtubeThumbnail } from "../lib/youtube";
+import { FaqAccordion } from "../components/FaqAccordion";
+import { ReviewsFeed } from "../components/ReviewsFeed";
+import { DuasSection } from "../components/DuasSection";
+import { TeacherQuestionForm } from "../components/TeacherQuestionForm";
+import { UzorCorners } from "../components/UzorCorners";
 
 const STAT_ICONS = [Mic, Video, Users, Calendar];
 
 const KY_MONTHS = [
-  'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
-  'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь',
+  "январь",
+  "февраль",
+  "март",
+  "апрель",
+  "май",
+  "июнь",
+  "июль",
+  "август",
+  "сентябрь",
+  "октябрь",
+  "ноябрь",
+  "декабрь",
 ] as const;
 
 function formatVideoDate(iso: string) {
@@ -31,11 +47,27 @@ function formatVideoDate(iso: string) {
   return `${d.getDate()}-${KY_MONTHS[d.getMonth()]}, ${d.getFullYear()}`;
 }
 
-function NavLink({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) {
-  if (href.startsWith('/#')) {
-    return <a href={href} className={className}>{children}</a>;
+function NavLink({
+  href,
+  className,
+  children,
+}: {
+  href: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  if (href.startsWith("/#")) {
+    return (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    );
   }
-  return <Link to={href} className={className}>{children}</Link>;
+  return (
+    <Link to={href} className={className}>
+      {children}
+    </Link>
+  );
 }
 
 type VideoPanelItem = {
@@ -66,15 +98,15 @@ function VideoPanelLink({
   children: ReactNode;
   linkRef?: Ref<HTMLAnchorElement>;
 }) {
-  const isExternal = external || href.startsWith('http');
+  const isExternal = external || href.startsWith("http");
   if (isExternal) {
-    const isYoutube = href.includes('youtube.com') || href.includes('youtu.be');
+    const isYoutube = href.includes("youtube.com") || href.includes("youtu.be");
     return (
       <a
         ref={linkRef}
         href={href}
         className={className}
-        {...(isYoutube ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+        {...(isYoutube ? {} : { target: "_blank", rel: "noopener noreferrer" })}
       >
         {children}
       </a>
@@ -93,8 +125,8 @@ function StarRating({ value }: { value: number }) {
       {Array.from({ length: 5 }, (_, i) => (
         <Star
           key={i}
-          className={`course-star ${i < Math.round(value) ? 'course-star-filled' : ''}`}
-          fill={i < Math.round(value) ? 'currentColor' : 'none'}
+          className={`course-star ${i < Math.round(value) ? "course-star-filled" : ""}`}
+          fill={i < Math.round(value) ? "currentColor" : "none"}
           strokeWidth={1.75}
         />
       ))}
@@ -103,14 +135,24 @@ function StarRating({ value }: { value: number }) {
   );
 }
 
-function CourseMeta({ lessons, rating, price }: { lessons?: number; rating?: number; price?: string }) {
+function CourseMeta({
+  lessons,
+  rating,
+  price,
+}: {
+  lessons?: number;
+  rating?: number;
+  price?: string;
+}) {
   if (!lessons && !rating && !price) return null;
   return (
     <div className="course-meta">
       {(lessons || rating) && (
         <p className="course-meta-row">
           {rating != null && <StarRating value={rating} />}
-          {lessons != null && <span className="course-lessons">{lessons} сабак</span>}
+          {lessons != null && (
+            <span className="course-lessons">{lessons} сабак</span>
+          )}
         </p>
       )}
       {price && <p className="course-price">{price}</p>}
@@ -125,19 +167,23 @@ function FaqAccordionSection() {
 function DailyQaPanels() {
   const dayKey = todayBishkek();
   const { data: item, isLoading } = useQuery({
-    queryKey: ['qa-daily', dayKey, 'queue'],
+    queryKey: ["qa-daily", dayKey, "queue"],
     queryFn: fetchDailyQa,
     staleTime: 30 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000,
   });
 
   const question = (
-    item?.question ?? item?.title ?? (isLoading ? 'Жүктөлүүдө...' : 'Суроо азырынча жок')
+    item?.question ??
+    item?.title ??
+    (isLoading ? "Жүктөлүүдө..." : "Суроо азырынча жок")
   ).trim();
   const answer = (
-    item?.answer ?? item?.excerpt ?? (isLoading ? 'Жүктөлүүдө...' : 'Жооп азырынча жок')
+    item?.answer ??
+    item?.excerpt ??
+    (isLoading ? "Жүктөлүүдө..." : "Жооп азырынча жок")
   ).trim();
-  const href = item ? `/questions/${item.slug ?? item.id}` : '/questions';
+  const href = item ? `/questions/${item.slug ?? item.id}` : "/questions";
 
   return (
     <div className="ayah-hadith-grid">
@@ -161,8 +207,8 @@ function DailyQaPanels() {
 
 function PaidCoursesSection() {
   const { data, isLoading } = useQuery({
-    queryKey: ['courses', 'paid'],
-    queryFn: () => fetchCourses({ type: 'paid', limit: 100 }),
+    queryKey: ["courses", "paid"],
+    queryFn: () => fetchCourses({ type: "paid", limit: 100 }),
   });
   const items = data?.items ?? [];
 
@@ -171,7 +217,9 @@ function PaidCoursesSection() {
       <div className="panel-head">
         <h2 className="panel-title">Акылуу сабактар</h2>
         <span className="panel-head-line" aria-hidden="true" />
-        <Link to="/courses" className="panel-link">Бардык курстар</Link>
+        <Link to="/courses" className="panel-link">
+          Бардык курстар
+        </Link>
       </div>
       <div className="courses-scroll">
         {isLoading ? (
@@ -191,7 +239,10 @@ function PaidCoursesSection() {
                 />
                 <div className="course-card-play">
                   <div className="play-circle-white">
-                    <Play className="h-5 w-5 text-navy ml-0.5" fill="currentColor" />
+                    <Play
+                      className="h-5 w-5 text-navy ml-0.5"
+                      fill="currentColor"
+                    />
                   </div>
                 </div>
                 <span className="video-paid-badge">{course.priceLabel}</span>
@@ -202,7 +253,10 @@ function PaidCoursesSection() {
               <div className="course-card-body">
                 <p className="course-card-title">{course.title}</p>
                 <p className="course-card-intro">Киришүү сабак</p>
-                <CourseMeta lessons={course.lessonCount} price={course.priceLabel} />
+                <CourseMeta
+                  lessons={course.lessonCount}
+                  price={course.priceLabel}
+                />
               </div>
             </Link>
           ))
@@ -236,7 +290,8 @@ function VideoPanel({
     const el = videoMainRef.current;
     if (!el) return;
 
-    const update = () => setSideMaxHeight(el.getBoundingClientRect().height * 0.9);
+    const update = () =>
+      setSideMaxHeight(el.getBoundingClientRect().height * 0.9);
     update();
 
     const observer = new ResizeObserver(update);
@@ -249,8 +304,13 @@ function VideoPanel({
       <div className="panel-head">
         <h2 className="panel-title">{panelTitle}</h2>
         <span className="panel-head-line" aria-hidden="true" />
-        {linkHref.startsWith('http') ? (
-          <a href={linkHref} target="_blank" rel="noopener noreferrer" className="panel-link">
+        {linkHref.startsWith("http") ? (
+          <a
+            href={linkHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="panel-link"
+          >
             {linkLabel}
           </a>
         ) : (
@@ -272,7 +332,9 @@ function VideoPanel({
               <Play className="h-6 w-6 text-navy ml-0.5" fill="currentColor" />
             </div>
           </div>
-          {featured.badge && <span className="video-free-badge">{featured.badge}</span>}
+          {featured.badge && (
+            <span className="video-free-badge">{featured.badge}</span>
+          )}
           <span className="video-duration">{featured.duration}</span>
           <div className="video-main-meta">
             <p className="video-main-meta-title">{featured.title}</p>
@@ -288,31 +350,45 @@ function VideoPanel({
           style={sideMaxHeight ? { maxHeight: sideMaxHeight } : undefined}
         >
           <div className="videos-side-list">
-          {sideItems.map((v) => (
-            <VideoPanelLink
-              key={v.id}
-              href={v.href}
-              external={v.external}
-              className="video-side-item no-underline"
-            >
-              <div className="video-side-thumb-wrap">
-                <img src={v.thumbnail} alt={v.title} className="video-side-thumb" />
-                <div className="video-side-play">
-                  <Play className="h-3 w-3 text-white" fill="currentColor" />
+            {sideItems.map((v) => (
+              <VideoPanelLink
+                key={v.id}
+                href={v.href}
+                external={v.external}
+                className="video-side-item no-underline"
+              >
+                <div className="video-side-thumb-wrap">
+                  <img
+                    src={v.thumbnail}
+                    alt={v.title}
+                    className="video-side-thumb"
+                  />
+                  <div className="video-side-play">
+                    <Play className="h-3 w-3 text-white" fill="currentColor" />
+                  </div>
+                  <span className="video-side-duration">{v.duration}</span>
                 </div>
-                <span className="video-side-duration">{v.duration}</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="video-side-title">{v.title}</p>
-                {v.subtitle && <p className="video-side-subtitle">{v.subtitle}</p>}
-                {(v.lessons || v.rating || v.price) ? (
-                  <CourseMeta lessons={v.lessons} rating={v.rating} price={v.price} />
-                ) : (
-                  v.date && <p className="video-side-date">{formatVideoDate(v.date)}</p>
-                )}
-              </div>
-            </VideoPanelLink>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <p className="video-side-title">{v.title}</p>
+                  {v.subtitle && (
+                    <p className="video-side-subtitle">{v.subtitle}</p>
+                  )}
+                  {v.lessons || v.rating || v.price ? (
+                    <CourseMeta
+                      lessons={v.lessons}
+                      rating={v.rating}
+                      price={v.price}
+                    />
+                  ) : (
+                    v.date && (
+                      <p className="video-side-date">
+                        {formatVideoDate(v.date)}
+                      </p>
+                    )
+                  )}
+                </div>
+              </VideoPanelLink>
+            ))}
           </div>
         </div>
       </div>
@@ -321,9 +397,8 @@ function VideoPanel({
 }
 
 export function LandingPage() {
-  const { image } = useSiteImages();
   const { data: hero } = useQuery({
-    queryKey: ['hero-banner'],
+    queryKey: ["hero-banner"],
     queryFn: fetchHeroBanner,
     staleTime: 5 * 60 * 1000,
     placeholderData: DEFAULT_HERO,
@@ -331,7 +406,7 @@ export function LandingPage() {
   const banner = hero ?? DEFAULT_HERO;
 
   const { data: freeLessonsData, isLoading: freeVideosLoading } = useQuery({
-    queryKey: ['free-lessons'],
+    queryKey: ["free-lessons"],
     queryFn: fetchFreeLessons,
     staleTime: 5 * 60 * 1000,
   });
@@ -347,7 +422,7 @@ export function LandingPage() {
         href: `/courses/${lesson.courseSlug}/learn?lesson=${lesson.id}`,
         external: false,
         date: dateMatch ? dateMatch[0] : undefined,
-        badge: 'Бекер',
+        badge: "Бекер",
       };
     });
   }, [freeLessonsData]);
@@ -363,7 +438,7 @@ export function LandingPage() {
           <p className="hero-sky-title">{banner.title}</p>
           <p className="hero-sky-sub">
             {(() => {
-              const comma = banner.subtitle.indexOf(',');
+              const comma = banner.subtitle.indexOf(",");
               if (comma === -1) return banner.subtitle;
               return (
                 <>
@@ -385,7 +460,9 @@ export function LandingPage() {
             const Icon = STAT_ICONS[i];
             return (
               <div key={s.label} className="flex items-center gap-3">
-                <div className="stat-icon"><Icon className="h-5 w-5" /></div>
+                <div className="stat-icon">
+                  <Icon className="h-5 w-5" />
+                </div>
                 <div>
                   <p className="text-lg font-bold text-navy">{s.value}</p>
                   <p className="text-xs text-muted">{s.label}</p>
@@ -400,9 +477,15 @@ export function LandingPage() {
         <div className="wrap">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {QUICK_ACCESS.map((item) => (
-              <NavLink key={item.label} href={item.href} className="quick-card no-underline">
+              <NavLink
+                key={item.label}
+                href={item.href}
+                className="quick-card no-underline"
+              >
                 <div className="quick-icon">{item.emoji}</div>
-                <span className="text-xs sm:text-sm font-semibold text-navy">{item.label}</span>
+                <span className="text-xs sm:text-sm font-semibold text-navy">
+                  {item.label}
+                </span>
               </NavLink>
             ))}
           </div>
@@ -423,18 +506,20 @@ export function LandingPage() {
               linkHref="/courses/free"
               featured={
                 featured ?? {
-                  id: 'loading',
-                  title: freeVideosLoading ? 'Жүктөлүүдө...' : 'Видеолор жок',
-                  duration: '—',
-                  thumbnail: youtubeThumbnail('ZkpJ1ezB2TI'),
-                  href: '/courses/free',
-                  badge: 'Бекер',
+                  id: "loading",
+                  title: freeVideosLoading ? "Жүктөлүүдө..." : "Видеолор жок",
+                  duration: "—",
+                  thumbnail: youtubeThumbnail("ZkpJ1ezB2TI"),
+                  href: "/courses/free",
+                  badge: "Бекер",
                 }
               }
               sideItems={sideVideos}
             />
 
             <PaidCoursesSection />
+
+            <DuasSection />
           </div>
         </div>
       </section>
@@ -456,7 +541,9 @@ export function LandingPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="event-row-title">{e.title}</p>
-                      <p className="event-row-meta">{e.location} · {e.time}</p>
+                      <p className="event-row-meta">
+                        {e.location} · {e.time}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -470,40 +557,30 @@ export function LandingPage() {
 
       <section className="ustaz-section">
         <div className="wrap">
-          <div className="ustaz-teaser-card">
-            <div className="ustaz-teaser-content">
-              <img
-                src={image(SITE_IMAGE_KEYS.landingUstazBg)}
-                alt=""
-                className="ustaz-teaser-content-bg"
-                aria-hidden
-              />
-              <div className="ustaz-teaser-content-wash" aria-hidden />
-              <div className="ustaz-teaser-body-copy">
-                <p className="ustaz-teaser-label">УСТАЗ ЖӨНҮНДӨ</p>
-                <div className="ustaz-teaser-text">
-                  <p>
-                    Мухаммадалим Исаков — ислам билимин заманбап окутуу менен айкалыштырып,
-                    терең жана системалуу окутуу менен бирге адамдын руханий өсүшүнө жана
-                    үй-бүлөлөрдүн бекем болушуна салым кошуп келет.
-                  </p>
-                  <p>
-                    Ал Кыргызстандагы алгачкы «Үй-бүлө бактысы» курсун түптөп, үй-бүлө
-                    баалуулуктарын бекемдөө менен бирге, бул багытты мамлекеттик деңгээлде
-                    өнүктүрүүгө жана коомдун бекем пайдубалын түзүүгө умтулат.
-                  </p>
-                </div>
-                <Link to="/ustaz" className="btn-gold ustaz-teaser-btn">
-                  Кененирээк
-                </Link>
+          <div className="ustaz-split">
+            <div className="ustaz-split-text">
+              <p className="ustaz-teaser-label">УСТАЗ ЖӨНҮНДӨ</p>
+              <div className="ustaz-teaser-text">
+                <p>
+                  Мухаммадалим Исаков — ислам билимин заманбап окутуу менен
+                  айкалыштырып, терең жана системалуу окутуу менен бирге адамдын
+                  руханий өсүшүнө жана үй-бүлөлөрдүн бекем болушуна салым кошуп келет.
+                </p>
+                <p>
+                  Ал Кыргызстандагы алгачкы «Үй-бүлө бактысы» курсун түптөп, үй-бүлө
+                  баалуулуктарын бекемдөө менен бирге, бул багытты мамлекеттик
+                  деңгээлде өнүктүрүүгө умтулат.
+                </p>
               </div>
+              <Link to="/ustaz" className="btn-gold ustaz-teaser-btn">
+                Кененирээк
+              </Link>
             </div>
-
-            <div className="ustaz-teaser-portrait-panel">
+            <div className="ustaz-split-photo">
               <img
-                src={image(SITE_IMAGE_KEYS.landingUstazTeaser)}
+                src="/ustaz-stool-poster.jpg"
                 alt={TEACHER.name}
-                className="ustaz-teaser-banner"
+                className="ustaz-split-img"
               />
             </div>
           </div>
