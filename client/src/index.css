@@ -10173,3 +10173,17 @@ a.course-learn-review-tab {
     font-size: 1.05rem;
   }
 }
+
+/* Колдонуучу дропдауну — караңгы фондо алтын текст */
+.header-user-dropdown-name {
+  color: var(--color-gold);
+}
+.header-user-dropdown-email {
+  color: rgba(241, 158, 31, 0.8);
+}
+.header-user-dropdown-link {
+  color: var(--color-gold);
+}
+.header-user-dropdown-link:hover {
+  color: #ffd27a;
+}
