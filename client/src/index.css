@@ -4898,6 +4898,18 @@ button.footer-link {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Make dropdown text gold in dark mode for better contrast */
+.dark .header-user-dropdown-name,
+.dark .header-user-dropdown-email,
+.dark .header-user-dropdown-link {
+  color: var(--color-gold-light);
+}
+
+.dark .header-user-dropdown-link:hover {
+  color: var(--color-gold);
+  background: rgba(241, 158, 31, 0.06);
+}
+
 .dark .profile-page-title,
 .dark .profile-summary-name,
 .dark .profile-form-title,
