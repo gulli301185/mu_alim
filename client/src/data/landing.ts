@@ -2,7 +2,7 @@ export const SITE = {
   name: "Ислам Булагы",
   tagline: "Куран жана Сүннөт ордосу",
   subtitle: "Нур академиясы · Муалим академиясы",
-  instagram: "https://www.instagram.com/mualim.academy/",
+  instagram: "https://www.instagram.com/mualim.kg/",
   youtubeFree: "https://www.youtube.com/@Muhammadalim_Halil",
   paidTelegramInvite: "https://t.me/+ncXfxR-Xd5Y1Zjky",
   phone: "+996 773 301 185",
@@ -49,7 +49,7 @@ export const FOOTER_SOCIAL = [
   {
     name: "Инстаграм",
     color: "#E4405F",
-    href: "https://instagram.com/mualim.academy",
+    href: "https://instagram.com/mualim.kg/",
   },
 ] as const;
 
