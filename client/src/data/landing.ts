@@ -91,7 +91,7 @@ export const STATS = [
 export const QUICK_ACCESS = [
   { label: "Пикирлер", href: "/#reviews", emoji: "⭐" },
   { label: "Курстар", href: "/courses", emoji: "📖" },
-  { label: "Дубалар", href: "/#ayah", emoji: "🤲" },
+  { label: "Дубалар", href: "/#duas", emoji: "🤲" },
   { label: "Акыркы баян", href: "/#videos", emoji: "▶️" },
   { label: "Суроо-жооп", href: "/questions", emoji: "💬" },
   { label: "Устаз", href: "/ustaz", emoji: "👤" },
