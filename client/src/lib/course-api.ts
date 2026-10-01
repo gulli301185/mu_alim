@@ -76,10 +76,10 @@ export async function fetchCourseByRef(courseRef: string): Promise<CourseSummary
   return data.course;
 }
 
-export const PAID_COURSE_COVER = '/ustaz-teaser.jpg';
+export const PAID_COURSE_COVER = '/course-mukaba.webp';
 
-export function paidCourseCover(course: Pick<CourseSummary, 'coverImage'>) {
-  return course.coverImage || PAID_COURSE_COVER;
+export function paidCourseCover(_course: Pick<CourseSummary, 'coverImage'>) {
+  return PAID_COURSE_COVER;
 }
 
 export function isFreeCourse(course: Pick<CourseSummary, 'courseType' | 'slug'>) {

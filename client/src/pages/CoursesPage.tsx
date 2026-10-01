@@ -215,7 +215,7 @@ export function CoursePaymentBlock({
       </div>
       <p className="courses-payment-price">{coursePrice}</p>
       <p className="courses-payment-hint">
-        {lessonCount} сабак · «Оплатить» баскычын басып WhatsAppка өтүңүз, төлөп чекти жибериңиз
+        {lessonCount} сабак · «Төлөө» баскычын басып WhatsAppка өтүңүз, төлөп чекти жибериңиз
       </p>
 
       <div className="courses-payment-terms">
@@ -251,7 +251,7 @@ export function CoursePaymentBlock({
             WhatsApp ачылууда...
           </>
         ) : (
-          'Оплатить'
+          'Төлөө'
         )}
       </button>
     </div>

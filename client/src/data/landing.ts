@@ -82,7 +82,7 @@ export const LANG_OPTIONS = [
 export type LangCode = (typeof LANG_OPTIONS)[number]["value"];
 
 export const STATS = [
-  { value: "1200+", label: "Баяндар" },
+  // { value: "1200+", label: "Баяндар" },
   { value: "350+", label: "Видеолор" },
   { value: "85 000+", label: "Көрүүчүлөр" },
   { value: "15+", label: "Жылдык кызмат" },

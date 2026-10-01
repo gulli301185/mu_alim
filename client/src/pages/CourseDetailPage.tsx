@@ -228,10 +228,7 @@ export function CourseDetailPage() {
 
   const activeLesson =
     publishedLessons.find((lesson) => lesson.id === activeLessonId) ?? publishedLessons[0];
-  const previewVideoId = paid ? activeLesson?.youtubeVideoId ?? course.introVideoId : null;
-  const previewImage = previewVideoId
-    ? youtubeThumbnail(previewVideoId)
-    : paidCourseCover(course);
+  const previewImage = paidCourseCover(course);
   const previewDuration = activeLesson?.durationSeconds ?? course.introDurationSeconds;
   const learnPath = `/courses/${course.slug}/learn`;
 
@@ -262,11 +259,7 @@ export function CourseDetailPage() {
               </div>
 
               <div className="courses-detail-preview">
-                <img
-                  src={previewImage}
-                  alt=""
-                  className={`courses-detail-preview-img${previewVideoId ? '' : ' is-cover'}`}
-                />
+                <img src={previewImage} alt="" className="courses-detail-preview-img" />
                 <div className="courses-detail-preview-overlay">
                   <Play className="h-6 w-6" fill="currentColor" aria-hidden />
                 </div>

@@ -8,8 +8,8 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Play, Mic, Video, Users, Calendar, Star } from "lucide-react";
-import { STATS, QUICK_ACCESS, EVENTS, TEACHER } from "../data/landing";
+import { Play, Star } from "lucide-react";
+import { QUICK_ACCESS, EVENTS, TEACHER } from "../data/landing";
 import {
   fetchCourses,
   fetchFreeLessons,
@@ -25,7 +25,6 @@ import { DuasSection } from "../components/DuasSection";
 import { TeacherQuestionForm } from "../components/TeacherQuestionForm";
 import { UzorCorners } from "../components/UzorCorners";
 
-const STAT_ICONS = [Mic, Video, Users, Calendar];
 
 const KY_MONTHS = [
   "январь",
@@ -450,26 +449,7 @@ export function LandingPage() {
         <img src={banner.bannerImageUrl} alt="" className="hero-mosque-photo" />
       </section>
 
-      <div className="wrap">
-        <div className="stats-bar grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {STATS.map((s, i) => {
-            const Icon = STAT_ICONS[i];
-            return (
-              <div key={s.label} className="flex items-center gap-3">
-                <div className="stat-icon">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-navy">{s.value}</p>
-                  <p className="text-xs text-muted">{s.label}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <section className="landing-band">
+      <section className="landing-band landing-band-quick">
         <div className="wrap">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {QUICK_ACCESS.map((item) => (

@@ -1813,10 +1813,7 @@ button.header-dropdown-link {
 
 .courses-detail-preview-img {
   @apply w-full h-full object-cover;
-}
-.courses-detail-preview-img.is-cover {
-  object-fit: contain;
-  background: var(--color-navy);
+  object-position: left center;
 }
 
 .courses-detail-preview-overlay {
@@ -2070,14 +2067,14 @@ button.header-dropdown-link {
 
 .course-card-video {
   position: relative;
-  height: 270px;
+  height: 200px;
   flex-shrink: 0;
   background: var(--color-navy);
   overflow: hidden;
 }
 
 .course-card-img {
-  @apply w-full h-full object-contain;
+  @apply w-full h-full object-cover;
 }
 
 .course-card-play {
@@ -10059,7 +10056,7 @@ a.course-learn-review-tab {
 .ustaz-split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
-  height: 400px;
+  height: 380px;
   border-radius: 1.25rem;
   overflow: hidden;
   background:
@@ -10088,16 +10085,16 @@ a.course-learn-review-tab {
   padding: 1.25rem clamp(1.25rem, 3vw, 2.25rem);
 }
 .ustaz-split .ustaz-teaser-label {
-  margin-bottom: 0.5rem;
-  font-size: clamp(1rem, 1.8vw, 1.3rem);
+  margin-bottom: 0.65rem;
+  font-size: clamp(1.25rem, 2.3vw, 1.7rem);
   font-weight: 900;
   color: #6b5334;
   text-shadow: none;
 }
 .ustaz-split .ustaz-teaser-text {
-  margin-bottom: 0.85rem;
-  font-size: 0.82rem;
-  line-height: 1.45;
+  margin-bottom: 1rem;
+  font-size: clamp(0.9rem, 1.2vw, 1.02rem);
+  line-height: 1.55;
   color: #4a3f2e;
 }
 .ustaz-split .ustaz-teaser-btn {
@@ -10105,6 +10102,9 @@ a.course-learn-review-tab {
   color: #f4e8d0;
   border: none;
   box-shadow: 0 6px 16px rgba(74, 56, 26, 0.32);
+  font-size: clamp(0.95rem, 1.3vw, 1.1rem);
+  padding: 0.8rem 1.9rem;
+  border-radius: 0.8rem;
 }
 .ustaz-split .ustaz-teaser-btn:hover {
   background: #5a4528;
@@ -10136,17 +10136,9 @@ a.course-learn-review-tab {
   }
 }
 
-/* Курс барагы — "Пикирлер" бөлүмү: караңгы фон, алтын аталыш */
-.course-reviews.ui-card {
-  background: linear-gradient(135deg, var(--color-navy-dark) 0%, var(--color-navy) 100%);
-  border: 1px solid rgba(241, 158, 31, 0.24);
-}
-.course-reviews .course-reviews-title {
-  color: var(--color-gold);
-}
-.course-reviews .course-reviews-avg {
-  color: #dbe6fa;
-}
-.course-reviews .course-review-note {
-  color: #c2d0e8;
+/* Quick-access бөлүмү — өчүрүлгөн статистиканын ордунда, hero'нун астына кирип турат */
+.landing-band-quick {
+  position: relative;
+  z-index: 10;
+  margin-top: -84px;
 }
