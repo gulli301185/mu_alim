@@ -21,7 +21,7 @@ export function validateChoiceQuestion(question: QuestionInput) {
   const correctCount = question.options.filter((o) => o.isCorrect).length;
   if (correctCount !== 1) return 'Тандоо суроосунда бир гана туура жооп болушу керек';
   const orders = new Set(question.options.map((o) => o.optionOrder));
-  if (orders.size !== 4) return 'А, Б, В, Г варианттарынын баары керек';
+  if (orders.size !== question.options.length) return 'А, Б, В, Г варианттарынын баары керек';
   return null;
 }
 

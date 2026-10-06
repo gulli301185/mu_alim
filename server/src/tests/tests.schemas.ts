@@ -11,7 +11,7 @@ export const questionInputSchema = z.discriminatedUnion('questionType', [
     questionType: z.literal('choice'),
     questionText: z.string().trim().min(1),
     explanation: z.string().trim().optional(),
-    options: z.array(choiceOptionSchema).length(4),
+    options: z.array(choiceOptionSchema).min(2).max(4),
   }),
   z.object({
     questionType: z.literal('text'),
