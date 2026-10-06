@@ -52,6 +52,14 @@ function isIosLike(): boolean {
   );
 }
 
+/** Desktop Chrome/macOS also implements navigator.share, which would pop the
+ * OS share sheet instead of downloading — restrict the share-sheet path to
+ * actual phones/tablets so desktop always gets a plain file download. */
+function isMobileLike(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || isIosLike();
+}
+
 function ensureCertificateFonts(): Promise<void> {
   if (fontsReady) return fontsReady;
 
@@ -116,7 +124,11 @@ function wrapCenteredText(
 async function savePdfBlob(blob: Blob, filename: string): Promise<'ok' | 'cancelled'> {
   const file = new File([blob], filename, { type: 'application/pdf' });
 
-  if (typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] })) {
+  if (
+    isMobileLike() &&
+    typeof navigator.share === 'function' &&
+    navigator.canShare?.({ files: [file] })
+  ) {
     try {
       await navigator.share({
         files: [file],
