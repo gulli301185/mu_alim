@@ -35,6 +35,7 @@ import { AdminLoginPage } from "./pages/AdminLoginPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { AdminDashboardPage } from "./pages/admin/AdminDashboardPage";
 import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
+import { AdminCertificatesPage } from "./pages/admin/AdminCertificatesPage";
 import { AdminUserDetailPage } from "./pages/admin/AdminUserDetailPage";
 import { AdminCoursesPage } from "./pages/admin/AdminCoursesPage";
 import { AdminCourseDetailPage } from "./pages/admin/AdminCourseDetailPage";
@@ -147,9 +148,7 @@ export default function App() {
                     <Route path="tests" element={<AdminTestsPage />} />
                     <Route
                       path="certificates"
-                      element={
-                        <AdminSectionPlaceholder section="certificates" />
-                      }
+                      element={<AdminCertificatesPage />}
                     />
                     <Route
                       path="hadiths"

@@ -253,6 +253,49 @@ export class AdminUsersService {
     return { user: toPublicUser(updated) };
   }
 
+  async listCertificates({ page, limit, search }: z.infer<typeof listQuerySchema>) {
+    const qb = this.ds
+      .getRepository(Certificate)
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.user', 'u')
+      .leftJoinAndSelect('c.course', 'co')
+      .orderBy('c.issuedAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (search) {
+      qb.andWhere(
+        anyContains(
+          ['u.email', 'u.firstName', 'u.lastName', 'co.title', 'c.certificateNumber', 'c.recipientName'],
+          'search',
+          search,
+        ),
+      );
+    }
+
+    const [certificates, total] = await qb.getManyAndCount();
+
+    return {
+      items: certificates.map((item) => ({
+        id: item.id,
+        certificateNumber: item.certificateNumber,
+        verificationCode: item.verificationCode,
+        recipientName: item.recipientName ?? null,
+        issuedAt: item.issuedAt.toISOString(),
+        user: {
+          id: item.user.id,
+          email: item.user.email,
+          firstName: item.user.firstName,
+          lastName: item.user.lastName,
+        },
+        course: toCourseSummary(item.course),
+      })),
+      total,
+      page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
   async remove(id: string) {
     const existing = await this.requireLearner(id);
 

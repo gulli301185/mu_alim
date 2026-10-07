@@ -66,6 +66,23 @@ export type AdminUsersListResponse = {
   totalPages: number;
 };
 
+export type AdminCertificateListItem = {
+  id: string;
+  certificateNumber: string;
+  verificationCode: string;
+  recipientName: string | null;
+  issuedAt: string;
+  user: { id: string; email: string; firstName: string; lastName: string };
+  course: AdminUserCourse;
+};
+
+export type AdminCertificatesListResponse = {
+  items: AdminCertificateListItem[];
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
 export type AdminUserDetailResponse = {
   user: AdminUser;
   enrollments: AdminUserEnrollment[];
@@ -103,6 +120,22 @@ export async function fetchAdminUsers(
   });
   if (!res.ok) throw await parseApiError(res, 'Колдонуучуларды жүктөө ийгиликсиз');
   return res.json() as Promise<AdminUsersListResponse>;
+}
+
+export async function fetchAdminCertificates(
+  token: string,
+  params: { page?: number; limit?: number; search?: string },
+): Promise<AdminCertificatesListResponse> {
+  const query = new URLSearchParams();
+  if (params.page) query.set('page', String(params.page));
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.search?.trim()) query.set('search', params.search.trim());
+
+  const res = await fetch(`${API_BASE}/api/admin/certificates?${query.toString()}`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw await parseApiError(res, 'Сертификаттарды жүктөө ийгиликсиз');
+  return res.json() as Promise<AdminCertificatesListResponse>;
 }
 
 export async function fetchAdminUserDetail(
