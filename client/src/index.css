@@ -2464,11 +2464,14 @@ button.header-dropdown-link {
   transform: scale(1.015);
 }
 
-@media (min-width: 900px) {
-  /* The 2-column layout's visual panel is much narrower than it is tall,
-     so object-fit:cover's crop window is too narrow to fit all three
-     people no matter the horizontal bias. Show the whole photo instead,
-     letterboxed on a navy fill (matches the icon-row footer below it). */
+@media (min-width: 900px), (max-width: 449px) {
+  /* Cover's crop window only fits all three people when the card is
+     wide enough relative to its fixed height (true for single-column
+     phone widths down to ~450px, and for the >=900px two-column
+     layout). Below 450px the card narrows past that point and the
+     elder on the photo's right edge gets cut off again. Show the
+     whole photo instead, letterboxed on a navy fill (matches the
+     icon-row footer below it). */
   .teacher-question-visual {
     background: var(--color-navy-dark);
   }
