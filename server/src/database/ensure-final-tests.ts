@@ -1,12 +1,18 @@
-import { Logger } from '@nestjs/common';
-import { IsNull } from 'typeorm';
-import type { DataSource, EntityManager } from 'typeorm';
+import { Logger } from "@nestjs/common";
+import { IsNull } from "typeorm";
+import type { DataSource, EntityManager } from "typeorm";
 import {
   buildGenericFinalTest,
   FINAL_TESTS_BY_SLUG,
   type SeedChoiceQuestion,
-} from '../data/final-tests-seed';
-import { Course, Question, QuestionOption, Test, TestQuestion } from './entities';
+} from "../data/final-tests-seed";
+import {
+  Course,
+  Question,
+  QuestionOption,
+  Test,
+  TestQuestion,
+} from "./entities";
 
 async function createQuestionsForTest(
   em: EntityManager,
@@ -19,7 +25,7 @@ async function createQuestionsForTest(
       em.create(Question, {
         courseId,
         questionText: questionInput.questionText,
-        questionType: 'choice',
+        questionType: "choice",
         correctTextAnswer: null,
         explanation: questionInput.explanation ?? null,
         isActive: true,
@@ -37,17 +43,24 @@ async function createQuestionsForTest(
       ),
     );
 
-    await em.save(em.create(TestQuestion, { testId, questionId: question.id, questionOrder: index + 1 }));
+    await em.save(
+      em.create(TestQuestion, {
+        testId,
+        questionId: question.id,
+        questionOrder: index + 1,
+      }),
+    );
   }
 }
 
 /**
- * Creates an active final test for each published paid course that does not have one yet.
+ * Creates final tests only for courses that have an explicit test seed configured.
+ * Generic auto-generated tests are skipped so certificate-only courses stay test-free.
  */
 export async function ensureFinalTests(ds: DataSource): Promise<boolean> {
-  const logger = new Logger('Database');
+  const logger = new Logger("Database");
   const courses = await ds.getRepository(Course).find({
-    where: { courseType: 'paid', isPublished: true },
+    where: { courseType: "paid", isPublished: true },
     select: { id: true, slug: true, title: true },
   });
   if (!courses.length) return false;
@@ -56,26 +69,42 @@ export async function ensureFinalTests(ds: DataSource): Promise<boolean> {
   let created = 0;
 
   for (const course of courses) {
+    const seed = FINAL_TESTS_BY_SLUG[course.slug];
+    if (!seed) {
+      // No seed configured for this course — leave whatever test (or lack of
+      // one) is already there alone. An admin may have created a real final
+      // test by hand for this course; a course with no final test simply
+      // can't issue a certificate (see ProgressService.issueCertificate),
+      // which is the desired "no test configured" behavior here too.
+      continue;
+    }
+
     const existing = await tests.findOne({
-      where: { courseId: course.id, testType: 'final', lessonId: IsNull(), isActive: true },
+      where: {
+        courseId: course.id,
+        testType: "final",
+        lessonId: IsNull(),
+        isActive: true,
+      },
       select: { id: true },
     });
     if (existing) continue;
 
-    const seed = FINAL_TESTS_BY_SLUG[course.slug] ?? buildGenericFinalTest(course.title);
     const test = await tests.save(
       tests.create({
         courseId: course.id,
         lessonId: null,
         title: seed.title,
-        testType: 'final',
+        testType: "final",
         questionsCount: seed.questions.length,
         passingScore: seed.passingScore,
         maxAttempts: null,
         isActive: true,
       }),
     );
-    await ds.transaction((em) => createQuestionsForTest(em, course.id, test.id, seed.questions));
+    await ds.transaction((em) =>
+      createQuestionsForTest(em, course.id, test.id, seed.questions),
+    );
     created += 1;
   }
 

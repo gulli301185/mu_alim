@@ -1,5 +1,5 @@
-export const PAID_COURSES_KEY = 'mualim-paid-courses';
-export const COURSE_PROGRESS_KEY = 'mualim-course-progress';
+export const PAID_COURSES_KEY = "mualim-paid-courses";
+export const COURSE_PROGRESS_KEY = "mualim-course-progress";
 
 /** Акылуу курстар үчүн WhatsApp төлөмү керек — доступ сервердеги enrollment аркылуу */
 export const COURSE_PAYMENT_REQUIRED = true;
@@ -23,7 +23,9 @@ export function loadPaidCourses(): string[] {
     const raw = localStorage.getItem(PAID_COURSES_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((id) => typeof id === "string")
+      : [];
   } catch {
     return [];
   }
@@ -41,7 +43,10 @@ export function isCoursePaid(_courseId: string): boolean {
   return false;
 }
 
-export function hasCourseLearningAccess(_courseId: string, isFree: boolean): boolean {
+export function hasCourseLearningAccess(
+  _courseId: string,
+  isFree: boolean,
+): boolean {
   if (!COURSE_PAYMENT_REQUIRED) return true;
   return isFree;
 }
@@ -55,7 +60,7 @@ function readProgressMap(storageKey: string): AllCourseProgress {
     const raw = localStorage.getItem(storageKey);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed ? parsed : {};
+    return typeof parsed === "object" && parsed ? parsed : {};
   } catch {
     return {};
   }
@@ -67,7 +72,9 @@ export function loadAllProgress(userId?: string | null): AllCourseProgress {
   return readProgressMap(key);
 }
 
-function mergeProgressRecords(records: Array<CourseProgress | undefined>): CourseProgress {
+function mergeProgressRecords(
+  records: Array<CourseProgress | undefined>,
+): CourseProgress {
   const completed = new Set<string>();
   let merged: CourseProgress = { completedLessonIds: [] };
 
@@ -80,11 +87,19 @@ function mergeProgressRecords(records: Array<CourseProgress | undefined>): Cours
       ...merged,
       ...record,
       completedLessonIds: [...completed],
-      lessonScores: { ...(merged.lessonScores ?? {}), ...(record.lessonScores ?? {}) },
-      finalTestPassed: Boolean(merged.finalTestPassed || record.finalTestPassed),
-      finalTestScore: Math.max(merged.finalTestScore ?? 0, record.finalTestScore ?? 0) || record.finalTestScore,
+      lessonScores: {
+        ...(merged.lessonScores ?? {}),
+        ...(record.lessonScores ?? {}),
+      },
+      finalTestPassed: Boolean(
+        merged.finalTestPassed || record.finalTestPassed,
+      ),
+      finalTestScore:
+        Math.max(merged.finalTestScore ?? 0, record.finalTestScore ?? 0) ||
+        record.finalTestScore,
       certificateNumber: merged.certificateNumber ?? record.certificateNumber,
-      certificateIssuedAt: merged.certificateIssuedAt ?? record.certificateIssuedAt,
+      certificateIssuedAt:
+        merged.certificateIssuedAt ?? record.certificateIssuedAt,
     };
   }
 
@@ -140,25 +155,36 @@ export function calcTestScorePercent(correct: number, total: number): number {
   return Math.round((correct / total) * 100);
 }
 
-export function getAverageScore(progress: CourseProgress, lessonIds: string[]): number | null {
+export function getAverageScore(
+  progress: CourseProgress,
+  lessonIds: string[],
+): number | null {
   const scores = lessonIds
     .map((id) => progress.lessonScores?.[id])
-    .filter((score): score is number => typeof score === 'number');
+    .filter((score): score is number => typeof score === "number");
   if (!scores.length) return null;
-  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+  return Math.round(
+    scores.reduce((sum, score) => sum + score, 0) / scores.length,
+  );
 }
 
-export function isCourseFullyComplete(progress: CourseProgress, totalLessons: number): boolean {
+export function isCourseFullyComplete(
+  progress: CourseProgress,
+  totalLessons: number,
+): boolean {
   return progress.completedLessonIds.length >= totalLessons;
 }
 
 export function isCertificateEligible(
   progress: CourseProgress,
   totalLessons: number,
+  hasFinalTest = false,
 ): boolean {
-  if (!isCourseFullyComplete(progress, totalLessons)) return false;
-  const score = progress.finalTestScore ?? 0;
-  return Boolean(progress.finalTestPassed) && score >= CERTIFICATE_THRESHOLD * 100;
+  if (!hasFinalTest) return false;
+  return (
+    isCourseFullyComplete(progress, totalLessons) &&
+    Boolean(progress.finalTestPassed)
+  );
 }
 
 export function markFinalTestResult(
@@ -168,7 +194,8 @@ export function markFinalTestResult(
   userId?: string | null,
 ): CourseProgress {
   const progress = loadCourseProgress(courseId, userId);
-  const certificatePassed = passed && scorePercent >= CERTIFICATE_THRESHOLD * 100;
+  const certificatePassed =
+    passed && scorePercent >= CERTIFICATE_THRESHOLD * 100;
   const next: CourseProgress = {
     ...progress,
     finalTestPassed: certificatePassed,
