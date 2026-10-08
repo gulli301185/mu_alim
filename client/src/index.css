@@ -3711,7 +3711,7 @@ button.footer-link {
 
 .events-faq-grid {
   display: grid;
-  gap: 84px;
+  gap: 28px;
   grid-template-columns: 1fr;
   align-items: stretch;
 }
