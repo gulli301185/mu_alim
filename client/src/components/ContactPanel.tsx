@@ -18,6 +18,11 @@ const EXTRA_CONTACTS = [
     external: true,
   },
   {
+    label: "Telegram",
+    href: `https://t.me/+${SITE.telegramDigits}`,
+    external: true,
+  },
+  {
     label: "YouTube",
     href: SITE.youtubeFree,
     external: true,

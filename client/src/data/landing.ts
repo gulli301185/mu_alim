@@ -10,6 +10,8 @@ export const SITE = {
   whatsappDigits: "996707323952",
   /** Сайттын техникалык суроолоруна жооп алуу үчүн WhatsApp */
   techSupportWhatsappDigits: "996773301185",
+  /** Байланыш үчүн Telegram номери (цифралар гана, өлкө коду менен) */
+  telegramDigits: "996707080308",
   email: "info@mualim.academy",
   address: "Бишкек ш., Кыргызстан",
 };
