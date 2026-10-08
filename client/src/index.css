@@ -2464,14 +2464,23 @@ button.header-dropdown-link {
   transform: scale(1.015);
 }
 
-@media (min-width: 900px), (max-width: 449px) {
+@media (min-width: 900px) {
+  /* The 2-column layout's visual panel is much narrower than it is
+     tall, so cover's crop window only shows ~half the photo's width.
+     Centered, that window cuts off the elder on the photo's right
+     edge; bias right so all three people stay in frame. */
+  .teacher-question-visual-img {
+    object-position: 72% 32%;
+  }
+}
+
+@media (max-width: 449px) {
   /* Cover's crop window only fits all three people when the card is
-     wide enough relative to its fixed height (true for single-column
-     phone widths down to ~450px, and for the >=900px two-column
-     layout). Below 450px the card narrows past that point and the
-     elder on the photo's right edge gets cut off again. Show the
-     whole photo instead, letterboxed on a navy fill (matches the
-     icon-row footer below it). */
+     wide enough relative to its fixed height (true from ~450px up).
+     Below 450px the card narrows past that point and the elder on the
+     photo's right edge gets cut off again. Show the whole photo
+     instead, letterboxed on a navy fill (matches the icon-row footer
+     below it). */
   .teacher-question-visual {
     background: var(--color-navy-dark);
   }
