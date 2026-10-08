@@ -3925,9 +3925,6 @@ button.footer-link {
 
 .events-faq-section .faq-trigger {
   color: rgba(255, 255, 255, 0.92);
-  column-gap: 96px;
-  width: max-content;
-  max-width: 100%;
 }
 
 .events-faq-section .faq-trigger:hover {
@@ -4262,15 +4259,12 @@ button.footer-link {
 
 .faq-trigger {
   @apply w-full grid py-4 text-left font-semibold text-base text-navy bg-transparent border-0 cursor-pointer;
-  grid-template-columns: auto auto;
-  column-gap: 96px;
+  grid-template-columns: 1fr auto;
+  column-gap: 24px;
   align-items: start;
-  width: max-content;
-  max-width: 100%;
 }
 
 .faq-trigger span {
-  min-width: 18.5em;
   line-height: 1.45;
 }
 
