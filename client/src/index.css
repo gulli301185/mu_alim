@@ -2466,11 +2466,20 @@ button.header-dropdown-link {
 
 @media (min-width: 900px) {
   /* The 2-column layout's visual panel is much narrower than it is tall,
-     so object-fit:cover keeps only the horizontal center ~half of the
-     photo. Centered, that crop cut off the elder on the photo's right
-     edge entirely; bias the crop right so he stays in frame. */
+     so object-fit:cover's crop window is too narrow to fit all three
+     people no matter the horizontal bias. Show the whole photo instead,
+     letterboxed on a navy fill (matches the icon-row footer below it). */
+  .teacher-question-visual {
+    background: var(--color-navy-dark);
+  }
+
+  .teacher-question-visual::before {
+    display: none;
+  }
+
   .teacher-question-visual-img {
-    object-position: 95% 32%;
+    object-fit: contain;
+    object-position: center;
   }
 }
 
