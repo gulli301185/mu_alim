@@ -5098,19 +5098,18 @@ button.footer-link {
 }
 
 .courses-page-grid {
-  @apply grid gap-5 lg:gap-6 items-stretch;
+  @apply grid gap-5 lg:gap-6 items-start;
   grid-template-columns: 1fr;
 }
 
 @media (min-width: 1024px) {
   .courses-page-grid {
     grid-template-columns: 7fr 3fr;
-    min-height: calc(100vh - 220px);
   }
 }
 
 .courses-sidebar {
-  @apply p-4 sm:p-5 flex flex-col min-h-[520px];
+  @apply p-4 sm:p-5 flex flex-col;
 }
 
 @media (min-width: 1024px) {
@@ -5678,9 +5677,7 @@ button.footer-link {
 @media (min-width: 1024px) {
   .course-learn-grid {
     grid-template-columns: 1fr 1fr;
-    align-items: stretch;
-    height: calc(100vh + 44px);
-    min-height: calc(100vh + 44px);
+    align-items: start;
   }
 }
 
@@ -5690,7 +5687,8 @@ button.footer-link {
 
 @media (min-width: 1024px) {
   .course-learn-sidebar {
-    @apply sticky top-[84px] h-full order-1 min-h-0 overflow-hidden;
+    @apply sticky top-[84px] order-1 min-h-0 overflow-hidden;
+    max-height: calc(100vh - 100px);
   }
 }
 
@@ -5852,13 +5850,7 @@ button.footer-link {
 }
 
 .course-learn-main {
-  @apply p-5 sm:p-6 order-1 lg:order-2 flex flex-col min-h-0 max-h-full overflow-hidden gap-3;
-}
-
-@media (min-width: 1024px) {
-  .course-learn-main {
-    @apply h-full;
-  }
+  @apply p-5 sm:p-6 order-1 lg:order-2 flex flex-col min-h-0 overflow-hidden gap-3;
 }
 
 .course-learn-main-head {
