@@ -19,10 +19,9 @@ function AuthLoading() {
 }
 
 function getInitialDark(): boolean {
-  const saved = localStorage.getItem('theme');
-  if (saved === 'dark') return true;
-  if (saved === 'light') return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  // Default to light regardless of the device's system theme; dark mode
+  // only turns on if the visitor explicitly picks it with the toggle.
+  return localStorage.getItem('theme') === 'dark';
 }
 
 function PublicThemeShell() {
