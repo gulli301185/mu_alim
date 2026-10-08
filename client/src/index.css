@@ -1077,8 +1077,9 @@ button.header-dropdown-link {
   }
   .hero-mosque-photo {
     width: min(68%, 620px);
-    object-fit: cover;
-    object-position: 62% center;
+    height: 100%;
+    object-fit: contain;
+    object-position: right center;
   }
   .hero-sky-text {
     left: 4.5%;
