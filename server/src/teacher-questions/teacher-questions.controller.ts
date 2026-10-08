@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import type { z } from 'zod';
 import { AdminGuard, AuthUser, CurrentUser } from '../common/auth';
 import { ZodPipe } from '../common/zod.pipe';
@@ -30,6 +30,12 @@ export class TeacherQuestionsController {
     query: z.infer<typeof adminListQuerySchema>,
   ) {
     return this.questions.adminList(query);
+  }
+
+  @Delete('admin/teacher-questions/:id')
+  @UseGuards(AdminGuard)
+  remove(@Param('id') id: string) {
+    return this.questions.remove(id);
   }
 
   @Post('admin/teacher-questions/:id/publish')

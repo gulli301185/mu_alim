@@ -167,6 +167,19 @@ export class TeacherQuestionsService {
     return article;
   }
 
+  async remove(id: string) {
+    const submission = await this.submissions.findOneBy({ id });
+    if (!submission) throw new AppError(404, 'Суроо табылган жок');
+
+    await this.ds.transaction(async (em) => {
+      if (submission.qaArticleId) await em.delete(QaArticle, { id: submission.qaArticleId });
+      await em.delete(TeacherQuestionSubmission, { id });
+    });
+
+    if (submission.qaArticleId) await this.cache.invalidate('qa:');
+    return { ok: true };
+  }
+
   async publish(id: string, answer: string, adminId?: string) {
     const article = await this.ds.transaction((em) => this.publishSubmission(em, id, answer, adminId));
     await this.cache.invalidate('qa:');
