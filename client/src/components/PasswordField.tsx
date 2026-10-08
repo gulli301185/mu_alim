@@ -1,4 +1,5 @@
 import { useState, type InputHTMLAttributes } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
 type PasswordFieldProps = {
@@ -22,6 +23,7 @@ export function PasswordField({
   error,
   hint,
 }: PasswordFieldProps) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   return (
@@ -46,7 +48,7 @@ export function PasswordField({
           type="button"
           className="auth-modal-password-toggle"
           onClick={() => setVisible((v) => !v)}
-          aria-label={visible ? 'Сыр сөздү жашыруу' : 'Сыр сөздү көрсөтүү'}
+          aria-label={visible ? t('auth.hidePassword') : t('auth.showPassword')}
           tabIndex={-1}
         >
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

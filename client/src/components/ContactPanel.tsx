@@ -1,4 +1,5 @@
 import { Mail, MapPin, Phone, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { SITE } from "../data/landing";
 
 type ContactPanelProps = {
@@ -6,40 +7,45 @@ type ContactPanelProps = {
   onClose: () => void;
 };
 
-const EXTRA_CONTACTS = [
-  {
-    label: "WhatsApp",
-    href: `https://wa.me/${SITE.whatsappDigits}`,
-    external: true,
-  },
-  {
-    label: "WhatsApp (техникалык суроолор)",
-    href: `https://wa.me/${SITE.techSupportWhatsappDigits}`,
-    external: true,
-  },
-  {
-    label: "Telegram",
-    href: `https://t.me/+${SITE.telegramDigits}`,
-    external: true,
-  },
-  {
-    label: "YouTube",
-    href: SITE.youtubeFree,
-    external: true,
-  },
-  {
-    label: "Instagram",
-    href: SITE.instagram,
-    external: true,
-  },
-  {
-    label: "Telegram (акылуу курстар)",
-    href: SITE.paidTelegramInvite,
-    external: true,
-  },
-] as const;
+function useExtraContacts() {
+  const { t } = useTranslation();
+  return [
+    {
+      label: "WhatsApp",
+      href: `https://wa.me/${SITE.whatsappDigits}`,
+      external: true,
+    },
+    {
+      label: t("contact.techSupportWhatsapp"),
+      href: `https://wa.me/${SITE.techSupportWhatsappDigits}`,
+      external: true,
+    },
+    {
+      label: "Telegram",
+      href: `https://t.me/+${SITE.telegramDigits}`,
+      external: true,
+    },
+    {
+      label: "YouTube",
+      href: SITE.youtubeFree,
+      external: true,
+    },
+    {
+      label: "Instagram",
+      href: SITE.instagram,
+      external: true,
+    },
+    {
+      label: t("contact.paidTelegram"),
+      href: SITE.paidTelegramInvite,
+      external: true,
+    },
+  ] as const;
+}
 
 export function ContactPanel({ open, onClose }: ContactPanelProps) {
+  const { t } = useTranslation();
+  const EXTRA_CONTACTS = useExtraContacts();
   if (!open) return null;
 
   return (
@@ -52,13 +58,13 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
       <aside className="contact-panel">
         <header className="contact-panel-head">
           <h2 id="contact-panel-title" className="contact-panel-title">
-            Байланыш
+            {t("nav.contact")}
           </h2>
           <button
             type="button"
             className="contact-panel-close"
             onClick={onClose}
-            aria-label="Жабуу"
+            aria-label={t("contact.close")}
           >
             <X className="h-5 w-5" aria-hidden />
           </button>
@@ -74,7 +80,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
                 <Phone className="h-5 w-5" aria-hidden />
               </span>
               <span className="contact-panel-copy">
-                <span className="contact-panel-label">Телефон</span>
+                <span className="contact-panel-label">{t("contact.phone")}</span>
                 <span className="contact-panel-value">{SITE.phone}</span>
               </span>
             </a>
@@ -96,7 +102,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
                 <MapPin className="h-5 w-5" aria-hidden />
               </span>
               <span className="contact-panel-copy">
-                <span className="contact-panel-label">Дарек</span>
+                <span className="contact-panel-label">{t("contact.address")}</span>
                 <span className="contact-panel-value">{SITE.address}</span>
               </span>
             </div>
@@ -104,7 +110,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
         </ul>
 
         <div className="contact-panel-section">
-          <p className="contact-panel-section-title">Социалдык тармактар</p>
+          <p className="contact-panel-section-title">{t("contact.social")}</p>
           <ul className="contact-panel-links">
             {EXTRA_CONTACTS.map((item) => (
               <li key={item.label}>
