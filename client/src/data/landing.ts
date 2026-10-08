@@ -80,7 +80,6 @@ export const NAV_MENU = [
 export const LANG_OPTIONS = [
   { value: "kg", label: "KG" },
   { value: "ru", label: "RU" },
-  { value: "en", label: "EN" },
 ] as const;
 
 export type LangCode = (typeof LANG_OPTIONS)[number]["value"];

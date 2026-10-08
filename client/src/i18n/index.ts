@@ -3,7 +3,6 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import kg from "./locales/kg.json";
 import ru from "./locales/ru.json";
-import en from "./locales/en.json";
 
 void i18n
   .use(LanguageDetector)
@@ -12,10 +11,9 @@ void i18n
     resources: {
       kg: { translation: kg },
       ru: { translation: ru },
-      en: { translation: en },
     },
     fallbackLng: "kg",
-    supportedLngs: ["kg", "ru", "en"],
+    supportedLngs: ["kg", "ru"],
     detection: {
       order: ["localStorage", "navigator"],
       lookupLocalStorage: "lang",
