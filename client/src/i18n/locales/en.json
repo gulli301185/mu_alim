@@ -1,0 +1,34 @@
+{
+  "nav": {
+    "home": "Home",
+    "teacher": "Teacher",
+    "courses": "Courses",
+    "questions": "Q&A",
+    "contact": "Contact",
+    "videos": "Lectures",
+    "register": "Sign up",
+    "sections": "Sections",
+    "info": "Information"
+  },
+  "header": {
+    "menu": "Menu",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeAria": "Theme",
+    "langAria": "Language selection",
+    "login": "Log in",
+    "logout": "Log out",
+    "loggingOut": "Logging out...",
+    "admin": "Admin",
+    "adminPanel": "Admin panel",
+    "administrator": "Administrator",
+    "profile": "Profile",
+    "qaSection": "Q&A section"
+  },
+  "footer": {
+    "mottoLine1": "KNOWLEDGE IS FREEDOM,",
+    "mottoLine2": "SEEKING IS LIFE.",
+    "rights": "All rights reserved.",
+    "scrollTop": "Scroll to top"
+  }
+}

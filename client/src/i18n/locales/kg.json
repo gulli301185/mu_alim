@@ -1,0 +1,34 @@
+{
+  "nav": {
+    "home": "Башкы бет",
+    "teacher": "Устаз",
+    "courses": "Курстар",
+    "questions": "Суроо-жооп",
+    "contact": "Байланыш",
+    "videos": "Баяндар",
+    "register": "Катталуу",
+    "sections": "Бөлүмдөр",
+    "info": "Маалымат"
+  },
+  "header": {
+    "menu": "Меню",
+    "themeLight": "Жарык",
+    "themeDark": "Караңгы",
+    "themeAria": "Тема",
+    "langAria": "Тил тандоо",
+    "login": "Кирүү",
+    "logout": "Чыгуу",
+    "loggingOut": "Чыгууда...",
+    "admin": "Админ",
+    "adminPanel": "Админ панель",
+    "administrator": "Администратор",
+    "profile": "Профиль",
+    "qaSection": "Суроо-жооп бөлүмү"
+  },
+  "footer": {
+    "mottoLine1": "БИЛИМ – ЭРКИНДИК,",
+    "mottoLine2": "ИЗДЕНҮҮ – ӨМҮР.",
+    "rights": "Бардык укуктар корголгон.",
+    "scrollTop": "Жогору"
+  }
+}

@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, type RefObject } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Moon, Sun, Globe, Menu, X, ChevronDown, User, LogOut, Shield } from 'lucide-react';
 import { NAV_PRIMARY, NAV_MENU, LANG_OPTIONS, type LangCode } from '../data/landing';
+import { navLabelKey } from '../i18n/navKeys';
 import { useAuthModal } from '../context/AuthModalContext';
 import { useContactPanel } from '../context/ContactPanelContext';
 import { useAuth } from '../context/AuthContext';
@@ -80,6 +82,7 @@ function MenuDropdown({
   onOpenContact?: () => void;
   contactOpen?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="header-menu-wrap" ref={menuRef}>
       <button
@@ -89,7 +92,7 @@ function MenuDropdown({
         aria-haspopup="true"
         onClick={onToggle}
       >
-        Меню
+        {t('header.menu')}
         <ChevronDown className="h-4 w-4 header-menu-chevron" />
       </button>
       {open && (
@@ -105,7 +108,7 @@ function MenuDropdown({
                   onClose();
                 }}
               >
-                {item.label}
+                {t(navLabelKey(item.label))}
               </button>
             ) : item.href.startsWith('/#') ? (
               <a
@@ -114,7 +117,7 @@ function MenuDropdown({
                 className={`header-dropdown-link${isHashActive(item.href) ? ' header-dropdown-link-active' : ''}`}
                 onClick={onClose}
               >
-                {item.label}
+                {t(navLabelKey(item.label))}
               </a>
             ) : (
               <NavLink
@@ -125,7 +128,7 @@ function MenuDropdown({
                 }
                 onClick={onClose}
               >
-                {item.label}
+                {t(navLabelKey(item.label))}
               </NavLink>
             ),
           )}
@@ -152,6 +155,8 @@ function AuthButtons({
   onRegister: () => void;
   onLogout: () => void;
 }) {
+  const { t } = useTranslation();
+
   if (loading) {
     return <span className="header-auth-loading">...</span>;
   }
@@ -161,7 +166,7 @@ function AuthButtons({
       <>
         <Link to="/admin" className="header-login-btn">
           <Shield className="h-4 w-4" />
-          Админ
+          {t('header.admin')}
         </Link>
         <button
           type="button"
@@ -170,7 +175,7 @@ function AuthButtons({
           disabled={isLoggingOut}
         >
           <LogOut className="h-4 w-4" />
-          {isLoggingOut ? 'Чыгууда...' : 'Чыгуу'}
+          {isLoggingOut ? t('header.loggingOut') : t('header.logout')}
         </button>
       </>
     );
@@ -187,7 +192,7 @@ function AuthButtons({
           disabled={isLoggingOut}
         >
           <LogOut className="h-4 w-4" />
-          {isLoggingOut ? 'Чыгууда...' : 'Logout'}
+          {isLoggingOut ? t('header.loggingOut') : t('header.logout')}
         </button>
       </>
     );
@@ -197,16 +202,17 @@ function AuthButtons({
     <>
       <button type="button" className="header-login-btn" onClick={onLogin}>
         <User className="h-4 w-4" />
-        Кирүү
+        {t('header.login')}
       </button>
       <button type="button" className="header-register-btn" onClick={onRegister}>
-        Катталуу
+        {t('nav.register')}
       </button>
     </>
   );
 }
 function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const { user, isAdmin, logout } = useAuth();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -242,7 +248,7 @@ function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
         {isAdmin ? (
           <span className="header-user-admin hidden lg:inline-flex">
             <Shield className="h-3.5 w-3.5" />
-            Админ
+            {t('header.admin')}
           </span>
         ) : null}
         <ChevronDown className="h-4 w-4 header-user-chevron" />
@@ -253,22 +259,22 @@ function UserMenu({ onCloseMobile }: { onCloseMobile?: () => void }) {
           <div className="header-user-dropdown-head">
             <p className="header-user-dropdown-name">{getUserDisplayName(user)}</p>
             <p className="header-user-dropdown-email">{user.email}</p>
-            {isAdmin ? <span className="header-user-dropdown-role">Администратор</span> : null}
+            {isAdmin ? <span className="header-user-dropdown-role">{t('header.administrator')}</span> : null}
           </div>
           {isAdmin ? (
             <Link to="/admin" className="header-user-dropdown-link" onClick={closeAll}>
               <Shield className="h-4 w-4" />
-              Админ панель
+              {t('header.adminPanel')}
             </Link>
           ) : (
             <Link to="/profile" className="header-user-dropdown-link" onClick={closeAll}>
               <User className="h-4 w-4" />
-              Профиль
+              {t('header.profile')}
             </Link>
           )}
           <button type="button" className="header-user-dropdown-link" onClick={() => { logout(); closeAll(); }}>
             <LogOut className="h-4 w-4" />
-            Чыгуу
+            {t('header.logout')}
           </button>
         </div>
       )}
@@ -291,12 +297,11 @@ export function Header({
   const { openAuth } = useAuthModal();
   const { contactOpen, openContact, closeContact } = useContactPanel();
   const { image } = useSiteImages();
+  const { t, i18n: i18next } = useTranslation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [lang, setLang] = useState<LangCode>(() => {
-    const saved = localStorage.getItem('lang');
-    return saved === 'ru' || saved === 'en' || saved === 'kg' ? saved : 'kg';
-  });
+  const lang = (i18next.language as LangCode) || 'kg';
+  const setLang = (next: LangCode) => void i18next.changeLanguage(next);
   const menuRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
 
@@ -320,7 +325,6 @@ export function Header({
   }, [pathname, closeContact]);
 
   useEffect(() => {
-    localStorage.setItem('lang', lang);
     document.documentElement.lang = lang === 'kg' ? 'ky' : lang;
   }, [lang]);
 
@@ -345,7 +349,7 @@ export function Header({
       <HeaderNavLink
         key={item.label}
         href={item.href}
-        label={item.label}
+        label={t(navLabelKey(item.label))}
         onClick={onClick}
         isHashActive={isHashActive}
         onOpenContact={openContactPanel}
@@ -377,7 +381,7 @@ export function Header({
                 <HeaderNavLink
                   key={item.label}
                   href={item.href}
-                  label={item.label}
+                  label={t(navLabelKey(item.label))}
                   isHashActive={isHashActive}
                 />
               ))}
@@ -392,15 +396,15 @@ export function Header({
               />
             </nav>
           ) : (
-            <p className="header-admin-label hidden sm:block">Суроо-жооп бөлүмү</p>
+            <p className="header-admin-label hidden sm:block">{t('header.qaSection')}</p>
           )}
 
           <div className="header-actions">
             {!adminSimple ? (
               <>
-                <button type="button" onClick={onToggle} className="theme-btn hidden lg:flex" aria-label="Тема">
+                <button type="button" onClick={onToggle} className="theme-btn hidden lg:flex" aria-label={t('header.themeAria')}>
                   {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-                  <span className="hidden md:inline">{dark ? 'Жарык' : 'Караңгы'}</span>
+                  <span className="hidden md:inline">{dark ? t('header.themeLight') : t('header.themeDark')}</span>
                 </button>
 
                 <div className="header-lang-wrap hidden lg:inline-flex">
@@ -408,7 +412,7 @@ export function Header({
                   <select
                     className="header-lang-select"
                     value={lang}
-                    aria-label="Тил тандоо"
+                    aria-label={t('header.langAria')}
                     onChange={(e) => setLang(e.target.value as LangCode)}
                   >
                     {LANG_OPTIONS.map((option) => (
@@ -448,7 +452,7 @@ export function Header({
             <button
               type="button"
               className="header-mobile-toggle lg:hidden"
-              aria-label="Меню"
+              aria-label={t('header.menu')}
               onClick={() => !adminSimple && setMobileOpen(!mobileOpen)}
               style={adminSimple ? { visibility: 'hidden' } : undefined}
             >
@@ -464,13 +468,13 @@ export function Header({
                 <HeaderNavLink
                   key={item.label}
                   href={item.href}
-                  label={item.label}
+                  label={t(navLabelKey(item.label))}
                   onClick={closeAll}
                   isHashActive={isHashActive}
                 />
               ))}
             </div>
-            <p className="header-mobile-label">Меню</p>
+            <p className="header-mobile-label">{t('header.menu')}</p>
             <div className="header-mobile-group">{renderMenuLinks(closeAll)}</div>
             <div className="header-mobile-tools">
               <div className="header-lang-wrap header-lang-wrap-mobile">
@@ -478,7 +482,7 @@ export function Header({
                 <select
                   className="header-lang-select"
                   value={lang}
-                  aria-label="Тил тандоо"
+                  aria-label={t('header.langAria')}
                   onChange={(e) => setLang(e.target.value as LangCode)}
                 >
                   {LANG_OPTIONS.map((option) => (
@@ -492,10 +496,10 @@ export function Header({
                 type="button"
                 onClick={() => { onToggle(); closeAll(); }}
                 className="theme-btn theme-btn-mobile"
-                aria-label="Тема"
+                aria-label={t('header.themeAria')}
               >
                 {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-                {dark ? 'Жарык' : 'Караңгы'}
+                {dark ? t('header.themeLight') : t('header.themeDark')}
               </button>
             </div>
             {!loading && user && !isAdmin ? (
@@ -503,7 +507,7 @@ export function Header({
                 <UserMenu onCloseMobile={closeAll} />
                 <Link to="/profile" className="header-login-btn header-login-btn-mobile" onClick={closeAll}>
                   <User className="h-4 w-4" />
-                  Профиль
+                  {t('header.profile')}
                 </Link>
                 <button
                   type="button"
@@ -512,14 +516,14 @@ export function Header({
                   disabled={isLoggingOut}
                 >
                   <LogOut className="h-4 w-4" />
-                  {isLoggingOut ? 'Чыгууда...' : 'Logout'}
+                  {isLoggingOut ? t('header.loggingOut') : t('header.logout')}
                 </button>
               </div>
             ) : !loading && user && isAdmin ? (
               <div className="header-mobile-auth">
                 <Link to="/admin" className="header-login-btn header-login-btn-mobile" onClick={closeAll}>
                   <Shield className="h-4 w-4" />
-                  Админ панель
+                  {t('header.adminPanel')}
                 </Link>
                 <button
                   type="button"
@@ -528,17 +532,17 @@ export function Header({
                   disabled={isLoggingOut}
                 >
                   <LogOut className="h-4 w-4" />
-                  {isLoggingOut ? 'Чыгууда...' : 'Чыгуу'}
+                  {isLoggingOut ? t('header.loggingOut') : t('header.logout')}
                 </button>
               </div>
             ) : (
               <div className="header-mobile-auth">
                 <button type="button" className="header-login-btn header-login-btn-mobile" onClick={() => openAuthModal('login')}>
                   <User className="h-4 w-4" />
-                  Кирүү
+                  {t('header.login')}
                 </button>
                 <button type="button" className="header-register-btn header-login-btn-mobile" onClick={() => openAuthModal('register')}>
-                  Катталуу
+                  {t('nav.register')}
                 </button>
               </div>
             )}

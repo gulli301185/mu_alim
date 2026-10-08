@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ChevronUp, Mail, MapPin, Phone } from "lucide-react";
 import { SITE, FOOTER_COLUMNS, SOCIAL } from "../data/landing";
+import { navLabelKey } from "../i18n/navKeys";
 import { useAuthModal } from "../context/AuthModalContext";
 import { useContactPanel } from "../context/ContactPanelContext";
 import { useSiteImages } from "../context/SiteImagesContext";
@@ -48,15 +50,20 @@ function SocialLogo({ name }: { name: string }) {
 function FooterLink({
   href,
   label,
+  originalLabel,
   onRegister,
   onContact,
 }: {
   href: string;
   label: string;
+  /** Untranslated Kyrgyz label text, used only to pick the link's behavior
+   * (register/contact share the same href, so it can't be distinguished
+   * by href once the display label is translated). */
+  originalLabel: string;
   onRegister?: () => void;
   onContact?: () => void;
 }) {
-  if (label === "Катталуу") {
+  if (originalLabel === "Катталуу") {
     return (
       <button type="button" className="footer-link" onClick={onRegister}>
         {label}
@@ -64,7 +71,7 @@ function FooterLink({
     );
   }
 
-  if (label === "Байланыш") {
+  if (originalLabel === "Байланыш") {
     return (
       <button type="button" className="footer-link" onClick={onContact}>
         {label}
@@ -95,6 +102,7 @@ export function Footer() {
   const { image } = useSiteImages();
   const { openAuth } = useAuthModal();
   const { openContact } = useContactPanel();
+  const { t } = useTranslation();
   const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   return (
@@ -144,10 +152,10 @@ export function Footer() {
               </Link>
               <p className="footer-brand-motto">
                 <span className="footer-brand-motto-line footer-brand-motto-gold">
-                  БИЛИМ – ЭРКИНДИК,
+                  {t('footer.mottoLine1')}
                 </span>
                 <span className="footer-brand-motto-line footer-brand-motto-sky">
-                  ИЗДЕНҮҮ – ӨМҮР.
+                  {t('footer.mottoLine2')}
                 </span>
               </p>
               <div className="footer-social-row">
@@ -169,13 +177,14 @@ export function Footer() {
 
             {FOOTER_COLUMNS.map((col) => (
               <div key={col.title} className="footer-col">
-                <h3 className="footer-heading">{col.title}</h3>
+                <h3 className="footer-heading">{t(navLabelKey(col.title))}</h3>
                 <ul className="footer-links">
                   {col.links.map((item) => (
                     <li key={item.label}>
                       <FooterLink
                         href={item.href}
-                        label={item.label}
+                        label={t(navLabelKey(item.label))}
+                        originalLabel={item.label}
                         onRegister={() => openAuth("register")}
                         onContact={openContact}
                       />
@@ -186,7 +195,7 @@ export function Footer() {
             ))}
 
             <div className="footer-col footer-col-contact">
-              <h3 className="footer-heading">Байланыш</h3>
+              <h3 className="footer-heading">{t('nav.contact')}</h3>
               <ul className="footer-contact-list">
                 <li>
                   <a
@@ -218,14 +227,13 @@ export function Footer() {
 
           <div className="footer-bottom">
             <p className="footer-copyright">
-              © {new Date().getFullYear()} {FOOTER_BRAND}. Бардык укуктар
-              корголгон.
+              © {new Date().getFullYear()} {FOOTER_BRAND}. {t('footer.rights')}
             </p>
             <button
               type="button"
               className="footer-top-btn"
               onClick={scrollTop}
-              aria-label="Жогору"
+              aria-label={t('footer.scrollTop')}
             >
               <ChevronUp className="h-4 w-4" />
             </button>
