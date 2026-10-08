@@ -2464,6 +2464,16 @@ button.header-dropdown-link {
   transform: scale(1.015);
 }
 
+@media (min-width: 900px) {
+  /* The 2-column layout's visual panel is much narrower than it is tall,
+     so object-fit:cover keeps only the horizontal center ~half of the
+     photo. Centered, that crop cut off the elder on the photo's right
+     edge entirely; bias the crop right so he stays in frame. */
+  .teacher-question-visual-img {
+    object-position: 95% 32%;
+  }
+}
+
 .teacher-question-visual-quote {
   @apply absolute z-10 m-0;
   top: clamp(2rem, 5vw, 3rem);
