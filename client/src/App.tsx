@@ -167,7 +167,7 @@ export default function App() {
                   </Route>
                 </Route>
 
-                <Route path="*" element={<Navigate to="login" replace />} />
+                <Route path="*" element={<Navigate to="/admin/login" replace />} />
               </Route>
             </Routes>
           </AuthProvider>
