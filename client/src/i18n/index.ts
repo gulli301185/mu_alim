@@ -22,6 +22,12 @@ void i18n
       caches: ["localStorage"],
     },
     interpolation: { escapeValue: false },
+    // Several translation keys are built from source text that contains a
+    // literal ":" (e.g. "events.Семинар: ..."); i18next's default nsSeparator
+    // is ":", which would otherwise split those keys at the colon and treat
+    // everything before it as a namespace. Disable it since this app only
+    // ever uses the single default namespace.
+    nsSeparator: false,
   });
 
 export default i18n;

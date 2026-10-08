@@ -13,7 +13,22 @@ export const NAV_LABEL_KEY_BY_TEXT: Record<string, string> = {
   Катталуу: "nav.register",
   Бөлүмдөр: "nav.sections",
   Маалымат: "nav.info",
+  // QUICK_ACCESS reuses some of the labels above plus these extra ones.
+  Пикирлер: "quick.Пикирлер",
+  Дубалар: "quick.Дубалар",
+  "Акыркы баян": "quick.Акыркы баян",
 };
+
+/** Looks up an EVENTS item's title/location, or a short month abbreviation,
+ * by its exact Kyrgyz text. Falls back to the text itself (unmapped
+ * strings render as their original Kyrgyz). */
+export function eventTextKey(text: string): string {
+  return `events.${text}`;
+}
+
+export function monthAbbrKey(text: string): string {
+  return `months.${text}`;
+}
 
 export function navLabelKey(label: string): string {
   return NAV_LABEL_KEY_BY_TEXT[label] ?? label;

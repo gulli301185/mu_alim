@@ -30,5 +30,45 @@
     "mottoLine2": "SEEKING IS LIFE.",
     "rights": "All rights reserved.",
     "scrollTop": "Scroll to top"
+  },
+  "common": {
+    "loading": "Loading...",
+    "free": "Free",
+    "readMore": "Read more",
+    "lessonsWord": "lessons"
+  },
+  "landing": {
+    "dailyQuestion": "Question of the day",
+    "dailyAnswer": "Answer of the day",
+    "noQuestionYet": "No question yet",
+    "noAnswerYet": "No answer yet",
+    "paidLessons": "Paid courses",
+    "allCourses": "All courses",
+    "introLesson": "Intro lesson",
+    "recentTalks": "Recent lectures",
+    "allVideos": "All videos",
+    "noVideos": "No videos",
+    "upcomingEvents": "Upcoming events",
+    "aboutTeacherLabel": "ABOUT THE TEACHER",
+    "aboutTeacherP1": "Mukhammadalim Isakov combines modern teaching methods with deep, systematic Islamic education, contributing to people's spiritual growth and to building strong families.",
+    "aboutTeacherP2": "He founded Kyrgyzstan's first \"Family Happiness\" course and, while strengthening family values, seeks to develop this direction at the national level."
+  },
+  "events": {
+    "Семинар: Үй-бүлө баалуулуктары": "Seminar: Family values",
+    "Онлайн курс: Ислам негиздери": "Online course: Basics of Islam",
+    "Рамазан даярдыгы": "Ramadan preparation",
+    "Талас": "Talas",
+    "Онлайн": "Online",
+    "Бишкек": "Bishkek"
+  },
+  "months": {
+    "Июн": "Jun",
+    "Мар": "Mar",
+    "Апр": "Apr"
+  },
+  "quick": {
+    "Пикирлер": "Reviews",
+    "Дубалар": "Duas",
+    "Акыркы баян": "Latest talk"
   }
 }

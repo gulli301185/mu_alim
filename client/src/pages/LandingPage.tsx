@@ -8,8 +8,10 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Play, Star } from "lucide-react";
 import { QUICK_ACCESS, EVENTS, TEACHER } from "../data/landing";
+import { navLabelKey, eventTextKey, monthAbbrKey } from "../i18n/navKeys";
 import {
   fetchCourses,
   fetchFreeLessons,
@@ -25,25 +27,25 @@ import { DuasSection } from "../components/DuasSection";
 import { TeacherQuestionForm } from "../components/TeacherQuestionForm";
 import { UzorCorners } from "../components/UzorCorners";
 
+const KY_MONTHS_BY_LANG: Record<string, readonly string[]> = {
+  kg: [
+    "январь", "февраль", "март", "апрель", "май", "июнь",
+    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+  ],
+  ru: [
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+  ],
+  en: [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ],
+};
 
-const KY_MONTHS = [
-  "январь",
-  "февраль",
-  "март",
-  "апрель",
-  "май",
-  "июнь",
-  "июль",
-  "август",
-  "сентябрь",
-  "октябрь",
-  "ноябрь",
-  "декабрь",
-] as const;
-
-function formatVideoDate(iso: string) {
+function formatVideoDate(iso: string, lang: string) {
   const d = new Date(iso);
-  return `${d.getDate()}-${KY_MONTHS[d.getMonth()]}, ${d.getFullYear()}`;
+  const months = KY_MONTHS_BY_LANG[lang] ?? KY_MONTHS_BY_LANG.kg;
+  return `${d.getDate()}-${months[d.getMonth()]}, ${d.getFullYear()}`;
 }
 
 function NavLink({
@@ -143,6 +145,7 @@ function CourseMeta({
   rating?: number;
   price?: string;
 }) {
+  const { t } = useTranslation();
   if (!lessons && !rating && !price) return null;
   return (
     <div className="course-meta">
@@ -150,7 +153,9 @@ function CourseMeta({
         <p className="course-meta-row">
           {rating != null && <StarRating value={rating} />}
           {lessons != null && (
-            <span className="course-lessons">{lessons} сабак</span>
+            <span className="course-lessons">
+              {lessons} {t("common.lessonsWord")}
+            </span>
           )}
         </p>
       )}
@@ -164,6 +169,7 @@ function FaqAccordionSection() {
 }
 
 function DailyQaPanels() {
+  const { t } = useTranslation();
   const dayKey = todayBishkek();
   const { data: item, isLoading } = useQuery({
     queryKey: ["qa-daily", dayKey, "queue"],
@@ -175,36 +181,37 @@ function DailyQaPanels() {
   const question = (
     item?.question ??
     item?.title ??
-    (isLoading ? "Жүктөлүүдө..." : "Суроо азырынча жок")
+    (isLoading ? t("common.loading") : t("landing.noQuestionYet"))
   ).trim();
   const answer = (
     item?.answer ??
     item?.excerpt ??
-    (isLoading ? "Жүктөлүүдө..." : "Жооп азырынча жок")
+    (isLoading ? t("common.loading") : t("landing.noAnswerYet"))
   ).trim();
   const href = item ? `/questions/${item.slug ?? item.id}` : "/questions";
 
   return (
     <div className="ayah-hadith-grid">
       <Link to={href} id="ayah" className="ayah-panel no-underline">
-        <h2 className="ayah-panel-title">Күндүн суроосу</h2>
+        <h2 className="ayah-panel-title">{t("landing.dailyQuestion")}</h2>
         <div className="ayah-panel-body">
           <p className="ayah-translation">{question}</p>
         </div>
       </Link>
 
       <Link to={href} id="hadith" className="hadith-panel no-underline">
-        <h2 className="hadith-panel-title">Күндүн жообу</h2>
+        <h2 className="hadith-panel-title">{t("landing.dailyAnswer")}</h2>
         <div className="hadith-panel-body">
           <p className="hadith-text">{answer}</p>
         </div>
-        <p className="hadith-sign">Мухаммадалим</p>
+        <p className="hadith-sign">{TEACHER.shortName}</p>
       </Link>
     </div>
   );
 }
 
 function PaidCoursesSection() {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ["courses", "paid"],
     queryFn: () => fetchCourses({ type: "paid", limit: 100 }),
@@ -214,15 +221,15 @@ function PaidCoursesSection() {
   return (
     <div id="paid" className="ui-card p-5 sm:p-6 courses-section">
       <div className="panel-head">
-        <h2 className="panel-title">Акылуу сабактар</h2>
+        <h2 className="panel-title">{t("landing.paidLessons")}</h2>
         <span className="panel-head-line" aria-hidden="true" />
         <Link to="/courses" className="panel-link">
-          Бардык курстар
+          {t("landing.allCourses")}
         </Link>
       </div>
       <div className="courses-scroll">
         {isLoading ? (
-          <p className="course-review-note m-0 px-1 py-6">Жүктөлүүдө...</p>
+          <p className="course-review-note m-0 px-1 py-6">{t("common.loading")}</p>
         ) : (
           items.map((course) => (
             <Link
@@ -250,7 +257,7 @@ function PaidCoursesSection() {
               </div>
               <div className="course-card-body">
                 <p className="course-card-title">{course.title}</p>
-                <p className="course-card-intro">Киришүү сабак</p>
+                <p className="course-card-intro">{t("landing.introLesson")}</p>
                 <CourseMeta lessons={course.lessonCount} />
               </div>
             </Link>
@@ -276,6 +283,7 @@ function VideoPanel({
   featured: VideoPanelItem;
   sideItems: VideoPanelItem[];
 }) {
+  const { i18n: i18next } = useTranslation();
   const videoMainRef = useRef<HTMLAnchorElement>(null);
   // The side list's scroll height follows the featured video's own rendered height (90% of it),
   // so it stays proportional at every screen width instead of a guessed fixed pixel value.
@@ -377,7 +385,7 @@ function VideoPanel({
                   ) : (
                     v.date && (
                       <p className="video-side-date">
-                        {formatVideoDate(v.date)}
+                        {formatVideoDate(v.date, i18next.language)}
                       </p>
                     )
                   )}
@@ -392,6 +400,7 @@ function VideoPanel({
 }
 
 export function LandingPage() {
+  const { t } = useTranslation();
   const { data: hero } = useQuery({
     queryKey: ["hero-banner"],
     queryFn: fetchHeroBanner,
@@ -417,10 +426,10 @@ export function LandingPage() {
         href: `/courses/${lesson.courseSlug}/learn?lesson=${lesson.id}`,
         external: false,
         date: dateMatch ? dateMatch[0] : undefined,
-        badge: "Бекер",
+        badge: t("common.free"),
       };
     });
-  }, [freeLessonsData]);
+  }, [freeLessonsData, t]);
 
   const featured = freeVideoItems[0];
   const sideVideos = freeVideoItems.slice(1);
@@ -460,7 +469,7 @@ export function LandingPage() {
               >
                 <div className="quick-icon">{item.emoji}</div>
                 <span className="text-xs sm:text-sm font-semibold text-navy">
-                  {item.label}
+                  {t(navLabelKey(item.label))}
                 </span>
               </NavLink>
             ))}
@@ -477,17 +486,19 @@ export function LandingPage() {
 
             <VideoPanel
               id="videos"
-              panelTitle="Акыркы баяндар"
-              linkLabel="Бардык видеолор"
+              panelTitle={t("landing.recentTalks")}
+              linkLabel={t("landing.allVideos")}
               linkHref="/courses/free"
               featured={
                 featured ?? {
                   id: "loading",
-                  title: freeVideosLoading ? "Жүктөлүүдө..." : "Видеолор жок",
+                  title: freeVideosLoading
+                    ? t("common.loading")
+                    : t("landing.noVideos"),
                   duration: "—",
                   thumbnail: youtubeThumbnail("ZkpJ1ezB2TI"),
                   href: "/courses/free",
-                  badge: "Бекер",
+                  badge: t("common.free"),
                 }
               }
               sideItems={sideVideos}
@@ -507,18 +518,18 @@ export function LandingPage() {
         <div className="wrap events-faq-inner">
           <div className="events-faq-grid">
             <div id="events" className="events-panel">
-              <h2 className="events-panel-title">Жакынкы иш-чаралар</h2>
+              <h2 className="events-panel-title">{t("landing.upcomingEvents")}</h2>
               <div className="events-panel-body">
                 {EVENTS.map((e) => (
                   <div key={e.title} className="event-row">
                     <div className="event-date">
                       <span className="event-date-num">{e.date}</span>
-                      <span className="event-date-month">{e.month}</span>
+                      <span className="event-date-month">{t(monthAbbrKey(e.month))}</span>
                     </div>
                     <div className="min-w-0">
-                      <p className="event-row-title">{e.title}</p>
+                      <p className="event-row-title">{t(eventTextKey(e.title))}</p>
                       <p className="event-row-meta">
-                        {e.location} · {e.time}
+                        {t(eventTextKey(e.location))} · {e.time}
                       </p>
                     </div>
                   </div>
@@ -535,21 +546,13 @@ export function LandingPage() {
         <div className="wrap">
           <div className="ustaz-split">
             <div className="ustaz-split-text">
-              <p className="ustaz-teaser-label">УСТАЗ ЖӨНҮНДӨ</p>
+              <p className="ustaz-teaser-label">{t("landing.aboutTeacherLabel")}</p>
               <div className="ustaz-teaser-text">
-                <p>
-                  Мухаммадалим Исаков — ислам билимин заманбап окутуу менен
-                  айкалыштырып, терең жана системалуу окутуу менен бирге адамдын
-                  руханий өсүшүнө жана үй-бүлөлөрдүн бекем болушуна салым кошуп келет.
-                </p>
-                <p>
-                  Ал Кыргызстандагы алгачкы «Үй-бүлө бактысы» курсун түптөп, үй-бүлө
-                  баалуулуктарын бекемдөө менен бирге, бул багытты мамлекеттик
-                  деңгээлде өнүктүрүүгө умтулат.
-                </p>
+                <p>{t("landing.aboutTeacherP1")}</p>
+                <p>{t("landing.aboutTeacherP2")}</p>
               </div>
               <Link to="/ustaz" className="btn-gold ustaz-teaser-btn">
-                Кененирээк
+                {t("common.readMore")}
               </Link>
             </div>
             <div className="ustaz-split-photo">
