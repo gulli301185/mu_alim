@@ -2482,7 +2482,12 @@ button.header-dropdown-link {
 
   .teacher-question-visual-img {
     object-fit: contain;
-    object-position: center;
+    /* Align the (shorter, letterboxed) photo to the top instead of
+       centering it, so the quote text -- anchored near the top of the
+       card -- still lands on the photo instead of floating over empty
+       navy fill above it. Any leftover slack sits below, out of the
+       way, closer to the icon-row footer. */
+    object-position: center top;
   }
 }
 
