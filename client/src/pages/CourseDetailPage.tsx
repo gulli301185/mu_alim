@@ -239,7 +239,7 @@ export function CourseDetailPage() {
           <p className="courses-page-label">Муалим академиясы</p>
           <h1 className="courses-page-title">{course.title}</h1>
           <p className="courses-page-subtitle">
-            WhatsApp аркылуу төлөп, чекти жибериңиз — андан кийин 1-сабактан баштап катар-каatar ачылат.
+            WhatsApp аркылуу төлөп, чекти жибериңиз — андан кийин 1-сабактан баштап катар-каатар ачылат.
           </p>
         </div>
 
@@ -270,7 +270,7 @@ export function CourseDetailPage() {
               {paid ? (
                 <div className="courses-detail-paid-actions">
                   <p className="courses-payment-hint">
-                    Төлөм ырасталды. 1-сабактан баштап катар-каatar көрүңүз.
+                    Төлөм ырасталды. 1-сабактан баштап катар-каатар көрүңүз.
                   </p>
                   <Link to={learnPath} className="btn-primary courses-payment-btn w-full">
                     Сабактарга өтүү
