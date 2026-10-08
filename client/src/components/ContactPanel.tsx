@@ -13,6 +13,11 @@ const EXTRA_CONTACTS = [
     external: true,
   },
   {
+    label: "WhatsApp (техникалык суроолор)",
+    href: `https://wa.me/${SITE.techSupportWhatsappDigits}`,
+    external: true,
+  },
+  {
     label: "YouTube",
     href: SITE.youtubeFree,
     external: true,

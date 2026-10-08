@@ -8,6 +8,8 @@ export const SITE = {
   phone: "+996 773 301 185",
   /** WhatsAppка жазуу үчүн (цифралар гана, өлкө коду менен) */
   whatsappDigits: "996707323952",
+  /** Сайттын техникалык суроолоруна жооп алуу үчүн WhatsApp */
+  techSupportWhatsappDigits: "996773301185",
   email: "info@mualim.academy",
   address: "Бишкек ш., Кыргызстан",
 };
