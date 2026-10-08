@@ -3567,7 +3567,7 @@ button.footer-link {
   .events-faq-section {
     margin-top: 30px;
     margin-bottom: 30px;
-    padding: 28px 0 56px;
+    padding: 28px 0 80px;
     overflow: visible;
   }
 
@@ -3657,7 +3657,7 @@ button.footer-link {
   );
 }
 
-@media (max-width: 767px) {
+@media (max-width: 991px) {
   .events-faq-bg {
     clip-path: polygon(
       0 0,
@@ -3669,7 +3669,7 @@ button.footer-link {
   }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 992px) {
   .events-faq-bg {
     clip-path: polygon(
       0 0,
