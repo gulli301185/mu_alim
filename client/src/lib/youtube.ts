@@ -2,8 +2,11 @@ export function youtubeWatchUrl(videoId: string): string {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
-export function youtubeThumbnail(videoId: string, quality: 'default' | 'hq' = 'hq'): string {
-  return quality === 'hq'
+export function youtubeThumbnail(
+  videoId: string,
+  quality: "default" | "hq" = "hq",
+): string {
+  return quality === "hq"
     ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
     : `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
 }
@@ -14,16 +17,20 @@ export function parseYoutubeVideoId(input: string): string | null {
 
   try {
     const url = new URL(trimmed);
-    if (url.hostname.includes('youtu.be')) {
-      return url.pathname.slice(1).split('/')[0] || null;
+    const parts = url.pathname.split("/").filter(Boolean);
+
+    if (url.hostname.includes("youtu.be")) {
+      return parts[0] || null;
     }
-    const v = url.searchParams.get('v');
+
+    const v = url.searchParams.get("v");
     if (v) return v;
-    const parts = url.pathname.split('/');
-    const embedIndex = parts.indexOf('embed');
-    if (embedIndex >= 0 && parts[embedIndex + 1]) return parts[embedIndex + 1];
-    const videoIndex = parts.indexOf('video');
-    if (videoIndex >= 0 && parts[videoIndex + 1]) return parts[videoIndex + 1];
+
+    const segmentMap = ["shorts", "embed", "video", "live"];
+    for (const segment of segmentMap) {
+      const index = parts.indexOf(segment);
+      if (index >= 0 && parts[index + 1]) return parts[index + 1];
+    }
   } catch {
     return null;
   }
