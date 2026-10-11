@@ -20,6 +20,7 @@ import {
   assertUserRole,
 } from '../common/auth';
 import { ZodPipe } from '../common/zod.pipe';
+import { toStudentGradeResult } from './tests.helpers';
 import { TestsService } from './tests.service';
 import { createTestSchema, gradeSchema, updateTestSchema } from './tests.schemas';
 
@@ -72,12 +73,12 @@ export class TestsController {
   @Post('courses/:courseRef/final-test/grade')
   @UseGuards(JwtAuthGuard)
   @HttpCode(200)
-  grade(
+  async grade(
     @Param('courseRef') ref: string,
     @CurrentUser() user: AuthUser | undefined,
     @Body(new ZodPipe(gradeSchema, testBody)) body: z.infer<typeof gradeSchema>,
   ) {
     assertUserRole(user);
-    return this.tests.gradeFinalTest(ref, user, body.answers);
+    return toStudentGradeResult(await this.tests.gradeFinalTest(ref, user, body.answers));
   }
 }

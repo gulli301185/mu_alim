@@ -850,19 +850,10 @@ export function CourseLearnPage() {
         </p>
         <div className="course-learn-test-scroll">
           {test.questions.map((question, qIndex) => {
-            const questionResult =
-              testSubmitted && gradeResult && !gradeResult.passed
-                ? gradeResult.details.find(
-                    (item) => item.questionId === question.id,
-                  )
-                : undefined;
-            const isWrong = questionResult?.isCorrect === false;
-
+            // Per-question right/wrong is intentionally not shown: the API only
+            // returns the overall score (QA H-1).
             return (
-              <fieldset
-                key={question.id}
-                className={`course-learn-test-q${isWrong ? " course-learn-test-q-wrong" : ""}`}
-              >
+              <fieldset key={question.id} className="course-learn-test-q">
                 <legend>
                   {qIndex + 1}. {question.questionText}
                 </legend>
@@ -906,11 +897,6 @@ export function CourseLearnPage() {
                     disabled={testSubmitted && testPassed}
                   />
                 )}
-                {isWrong ? (
-                  <p className="course-learn-test-wrong-hint" role="alert">
-                    {t("learn.wrongAnswer")}
-                  </p>
-                ) : null}
               </fieldset>
             );
           })}

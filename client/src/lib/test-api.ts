@@ -29,25 +29,12 @@ export type GradeTestAnswer = {
   textAnswer?: string;
 };
 
-export type GradeTestDetail = {
-  questionId: string;
-  questionType: 'choice' | 'text';
-  questionText: string;
-  isCorrect: boolean;
-  selectedOptionId: string | null;
-  textAnswer: string | null;
-  correctOptionId: string | null;
-  correctTextAnswer: string | null;
-  correctOptionText: string | null;
-};
-
+/** The API only reports the overall result — never per-question correctness or
+ * the answer key (QA H-1). */
 export type GradeTestResult = {
   scorePercent: number;
   passed: boolean;
-  correct: number;
   total: number;
-  passingScore: number;
-  details: GradeTestDetail[];
   locked?: boolean;
   lockedUntil?: string | null;
   remainingAttempts?: number;
