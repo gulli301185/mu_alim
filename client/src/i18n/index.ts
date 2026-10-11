@@ -28,4 +28,19 @@ void i18n
     nsSeparator: false,
   });
 
+// Tell the API which language to answer in: the server translates its
+// error/success messages based on Accept-Language (server/src/common/i18n.ts).
+// Done once here instead of in each of the many fetch() calls in lib/*-api.ts.
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const url =
+    typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!url.includes("/api/")) return nativeFetch(input, init);
+  const headers = new Headers(
+    init?.headers ?? (input instanceof Request ? input.headers : undefined),
+  );
+  headers.set("Accept-Language", i18n.resolvedLanguage ?? i18n.language ?? "kg");
+  return nativeFetch(input, { ...init, headers });
+};
+
 export default i18n;

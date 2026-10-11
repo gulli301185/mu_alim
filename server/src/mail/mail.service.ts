@@ -1,5 +1,44 @@
 import { Injectable, Logger } from "@nestjs/common";
 import nodemailer from "nodemailer";
+import { currentLang, type Lang } from "../common/i18n";
+
+/** Auth-code email text per site language (see common/i18n.ts). */
+const AUTH_CODE_COPY: Record<
+  Lang,
+  {
+    registerSubject: string;
+    resetSubject: string;
+    registerPurpose: string;
+    resetPurpose: string;
+    greeting: string;
+    validity: string;
+    plainValidity: string;
+    plainIgnore: string;
+  }
+> = {
+  kg: {
+    registerSubject: "Mu Alim каттоо коду",
+    resetSubject: "Mu Alim сыр сөз коду",
+    registerPurpose: "Каттоону ырастоо үчүн код:",
+    resetPurpose: "Сыр сөзүңүздү калыбына келтирүү үчүн код:",
+    greeting: "Ассаламу алейкум!",
+    validity:
+      "Код 15 мүнөткө чейин жарактуу. Эгер сиз бул сурамды жасабаган болсоңуз, катты этибарга албаңыз.",
+    plainValidity: "Kod 15 mungotko cheyin jarakttu.",
+    plainIgnore: "Eger siz bul suramdy jasabagan bolsonuz, kattı etibarga albanyz.",
+  },
+  ru: {
+    registerSubject: "Mu Alim: код регистрации",
+    resetSubject: "Mu Alim: код для сброса пароля",
+    registerPurpose: "Код для подтверждения регистрации:",
+    resetPurpose: "Код для восстановления пароля:",
+    greeting: "Ассаламу алейкум!",
+    validity:
+      "Код действителен 15 минут. Если вы не отправляли этот запрос, просто проигнорируйте письмо.",
+    plainValidity: "Код действителен 15 минут.",
+    plainIgnore: "Если вы не отправляли этот запрос, просто проигнорируйте письмо.",
+  },
+};
 
 function smtpUser() {
   return process.env.SMTP_USER?.trim() || "";
@@ -61,12 +100,9 @@ export class MailService {
     const from = process.env.SMTP_FROM?.trim() || `Mu Alim <${fromUser}>`;
     const transporter = this.createTransport();
     const register = kind === "register";
-    const subject = register
-      ? `Mu Alim каттоо коду: ${code}`
-      : `Mu Alim сыр сөз коду: ${code}`;
-    const purpose = register
-      ? "Каттоону ырастоо үчүн код:"
-      : "Сыр сөзүңүздү калыбына келтирүү үчүн код:";
+    const copy = AUTH_CODE_COPY[currentLang()];
+    const subject = `${register ? copy.registerSubject : copy.resetSubject}: ${code}`;
+    const purpose = register ? copy.registerPurpose : copy.resetPurpose;
 
     const info = await transporter.sendMail({
       from,
@@ -80,16 +116,16 @@ export class MailService {
         purpose,
         code,
         "",
-        "Kod 15 mungotko cheyin jarakttu.",
-        "Eger siz bul suramdy jasabagan bolsonuz, kattı etibarga albanyz.",
+        copy.plainValidity,
+        copy.plainIgnore,
         "",
         "Mu Alim",
       ].join("\n"),
       html: `
-      <p>Ассаламу алейкум!</p>
+      <p>${copy.greeting}</p>
       <p>${purpose}</p>
       <p style="font-size:28px;letter-spacing:0.28em;font-weight:700">${code}</p>
-      <p>Код 15 мүнөткө чейин жарактуу. Эгер сиз бул сурамды жасабаган болсоңуз, катты этибарга албаңыз.</p>
+      <p>${copy.validity}</p>
       <p>Mu Alim</p>
     `,
     });

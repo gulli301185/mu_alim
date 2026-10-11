@@ -10,6 +10,7 @@ import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { CacheService } from './cache/cache.service';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { langMiddleware } from './common/i18n';
 import { ensureSchema } from './database/bootstrap-schema';
 import { MailService } from './mail/mail.service';
 import { SmsService } from './mail/sms.service';
@@ -50,6 +51,7 @@ async function bootstrap() {
 
   app.enableCors({ origin: (origin, callback) => callback(null, isAllowedOrigin(origin)) });
   app.use(json());
+  app.use(langMiddleware);
   app.useStaticAssets(resolve(__dirname, '../uploads'), { prefix: '/uploads' });
   if (docsEnabled) {
     const openapiDocument = JSON.parse(readFileSync(resolve(__dirname, 'openapi.json'), 'utf8'));
