@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { CheckCircle2, Loader2, MessageCircle, RefreshCw } from 'lucide-react';
 import { PAYMENT_TERMS, SITE } from '../data/landing';
 import { useAuth } from '../context/AuthContext';
 import { useCourseEnrollment } from '../hooks/useMyEnrollments';
 import { UserAuthModal } from '../components/UserAuthModal';
+import { localizedList } from '../i18n/localizedList';
 
 const PAYMENT_PENDING_KEY = 'mualim-payment-pending';
 
@@ -14,7 +17,7 @@ function savePaymentPending(courseRef: string, pending: boolean) {
   else sessionStorage.removeItem(key);
 }
 
-function buildWhatsappPayUrl(input: {
+function buildWhatsappPayUrl(t: TFunction, input: {
   courseTitle: string;
   coursePrice: string;
   userName: string;
@@ -22,13 +25,13 @@ function buildWhatsappPayUrl(input: {
   userPhone: string;
 }) {
   const text = [
-    'Ассаламу алейкум!',
-    `${input.courseTitle} курсун төлөөгө кайрылуудам.`,
-    `Баасы: ${input.coursePrice}`,
-    `Аты-жөнүм: ${input.userName}`,
+    t('payment.msgGreeting'),
+    t('payment.msgIntro', { title: input.courseTitle }),
+    t('payment.msgPrice', { price: input.coursePrice }),
+    t('payment.msgName', { name: input.userName }),
     `Email: ${input.userEmail}`,
     input.userPhone ? `WhatsApp: ${input.userPhone}` : null,
-    'Төлөм реквизиттерин жибериңиз. Төлөгөндөн кийин чекти/scrinshotту тиркеп жиберем.',
+    t('payment.msgOutro'),
   ]
     .filter(Boolean)
     .join('\n');
@@ -55,6 +58,7 @@ export function CoursePaymentBlock({
   learnPath,
   onEnrolled,
 }: CoursePaymentBlockProps) {
+  const { t, i18n } = useTranslation();
   const { user, isUser } = useAuth();
   const { enrolled, isLoading, isFetching, refetch, needsLogin } = useCourseEnrollment({
     id: courseRef,
@@ -84,14 +88,14 @@ export function CoursePaymentBlock({
   const handlePay = () => {
     if (!user || paying) return;
     if (!termsAccepted) {
-      setError('Төлөм шарттары менен макул болуңуз');
+      setError(t('payment.termsRequired'));
       return;
     }
 
     setError('');
     setPaying(true);
 
-    const url = buildWhatsappPayUrl({
+    const url = buildWhatsappPayUrl(t, {
       courseTitle,
       coursePrice,
       userName: `${user.firstName} ${user.lastName}`.trim() || user.email,
@@ -108,7 +112,7 @@ export function CoursePaymentBlock({
   if (isLoading) {
     return (
       <div className="courses-payment-block">
-        <p className="courses-payment-hint m-0">Жүктөлүүдө...</p>
+        <p className="courses-payment-hint m-0">{t('common.loading')}</p>
       </div>
     );
   }
@@ -119,15 +123,12 @@ export function CoursePaymentBlock({
         <div className="courses-payment-block">
           <div className="courses-payment-top">
             <MessageCircle className="h-4 w-4" aria-hidden />
-            <span className="courses-payment-title">WhatsApp менен төлөм</span>
+            <span className="courses-payment-title">{t('payment.whatsappTitle')}</span>
           </div>
           <p className="courses-payment-price">{coursePrice}</p>
-          <p className="courses-payment-hint">
-            Төлөм үчүн аккаунтуңузга кирүү же катталуу керек. Менеджер чекти текшерип, админ панель аркылуу
-            сабактарга доступ берет.
-          </p>
+          <p className="courses-payment-hint">{t('payment.needLogin')}</p>
           <button type="button" className="btn-primary courses-payment-btn w-full" onClick={() => setAuthOpen(true)}>
-            Кирүү / катталуу
+            {t('payment.loginOrRegister')}
           </button>
         </div>
         <UserAuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab="login" />
@@ -139,19 +140,19 @@ export function CoursePaymentBlock({
     return (
       <div className="courses-payment-success">
         <CheckCircle2 className="courses-payment-success-icon" aria-hidden />
-        <p className="courses-payment-success-title">Доступ ачылды!</p>
+        <p className="courses-payment-success-title">{t('payment.accessOpened')}</p>
         <p className="courses-payment-success-text">
-          {courseTitle} — 1-сабак ачылды. Кийинки сабактар мурункусу бүткөндөн кийин ачылат.
+          {t('payment.accessOpenedText', { title: courseTitle })}
         </p>
         <Link to={learnPath} className="btn-primary courses-payment-btn w-full">
-          Сабактарга өтүү
+          {t('payment.goToLessons')}
         </Link>
       </div>
     );
   }
 
   const reopenUrl = user
-    ? buildWhatsappPayUrl({
+    ? buildWhatsappPayUrl(t, {
         courseTitle,
         coursePrice,
         userName: `${user.firstName} ${user.lastName}`.trim() || user.email,
@@ -164,15 +165,14 @@ export function CoursePaymentBlock({
     return (
       <div className="courses-payment-success courses-enroll-pending">
         <MessageCircle className="courses-payment-success-icon" aria-hidden />
-        <p className="courses-payment-success-title">Төлөм күтүлүүдө</p>
+        <p className="courses-payment-success-title">{t('payment.pendingTitle')}</p>
         <p className="courses-payment-success-text">
-          WhatsApp аркылуу төлөмдү жүргүзүп, чекти жибериңиз. Менеджер чекти текшергенден кийин гана сабактар
-          ачылат.
+          {t('payment.pendingText')}
         </p>
         <ol className="courses-enroll-steps">
-          <li>WhatsAppтан төлөм реквизиттерин алыңыз.</li>
-          <li>Төлөгөндөн кийин чекти (скриншот) WhatsAppка жибериңиз.</li>
-          <li>Менеджер админ панель аркылуу доступ берет.</li>
+          <li>{t('payment.step1')}</li>
+          <li>{t('payment.step2')}</li>
+          <li>{t('payment.step3')}</li>
         </ol>
         <a
           href={reopenUrl}
@@ -180,7 +180,7 @@ export function CoursePaymentBlock({
           rel="noopener noreferrer"
           className="btn-gold courses-payment-btn w-full text-center no-underline"
         >
-          WhatsAppты кайра ачуу
+          {t('payment.reopenWhatsapp')}
         </a>
         <button
           type="button"
@@ -191,17 +191,17 @@ export function CoursePaymentBlock({
           {isFetching ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Текшерилүүдө...
+              {t('payment.checking')}
             </>
           ) : (
             <>
               <RefreshCw className="h-4 w-4" aria-hidden />
-              Доступ берилдиби? Текшерүү
+              {t('payment.checkAccess')}
             </>
           )}
         </button>
         <p className="courses-payment-success-note">
-          Эгер менеджер чекти ырастаса, «Текшерүү» баскычын басыңыз.
+          {t('payment.checkNote')}
         </p>
       </div>
     );
@@ -211,17 +211,17 @@ export function CoursePaymentBlock({
     <div className="courses-payment-block">
       <div className="courses-payment-top">
         <MessageCircle className="h-4 w-4" aria-hidden />
-        <span className="courses-payment-title">WhatsApp менен төлөм</span>
+        <span className="courses-payment-title">{t('payment.whatsappTitle')}</span>
       </div>
       <p className="courses-payment-price">{coursePrice}</p>
       <p className="courses-payment-hint">
-        {lessonCount} сабак · «Төлөө» баскычын басып WhatsAppка өтүңүз, төлөп чекти жибериңиз
+        {t('payment.hint', { count: lessonCount })}
       </p>
 
       <div className="courses-payment-terms">
-        <p className="courses-payment-terms-title">Катталуу жана төлөм шарттары</p>
+        <p className="courses-payment-terms-title">{t('payment.termsTitle')}</p>
         <ul className="courses-payment-terms-list">
-          {PAYMENT_TERMS.map((term) => (
+          {localizedList(i18n, 'payment.terms', PAYMENT_TERMS, { phone: SITE.phone }).map((term) => (
             <li key={term}>{term}</li>
           ))}
         </ul>
@@ -235,7 +235,7 @@ export function CoursePaymentBlock({
           className="courses-payment-terms-checkbox"
           disabled={paying}
         />
-        <span>Шарттар менен макулмун</span>
+        <span>{t('payment.termsAgree')}</span>
       </label>
       {error ? <p className="courses-enroll-whatsapp-error">{error}</p> : null}
 
@@ -248,10 +248,10 @@ export function CoursePaymentBlock({
         {paying ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            WhatsApp ачылууда...
+            {t('payment.opening')}
           </>
         ) : (
-          'Төлөө'
+          t('payment.pay')
         )}
       </button>
     </div>

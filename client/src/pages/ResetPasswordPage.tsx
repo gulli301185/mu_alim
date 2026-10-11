@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AuthApiError } from '../lib/auth-api';
 import { getErrorMessage, toastError, toastSuccess } from '../lib/toast';
 import { useAuth } from '../context/AuthContext';
@@ -12,9 +13,8 @@ import {
   type FieldErrors,
 } from '../lib/auth-validation';
 
-const PASSWORD_HINT = 'Кеминде 8 символ, тамга жана сан';
-
 export function ResetPasswordPage() {
+  const { t } = useTranslation();
   const { resetPassword } = useAuth();
   const navigate = useNavigate();
 
@@ -48,7 +48,7 @@ export function ResetPasswordPage() {
       setTimeout(() => navigate('/', { replace: true }), 2000);
     } catch (err) {
       if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
-      toastError(getErrorMessage(err, 'Сыр сөздү өзгөртүү ийгиликсиз'));
+      toastError(getErrorMessage(err, t('auth.passwordChangeFailed')));
     } finally {
       setLoading(false);
     }
@@ -59,15 +59,15 @@ export function ResetPasswordPage() {
       <div className="wrap admin-login-wrap">
         <div className="ui-card admin-login-card">
           <div className="admin-login-head">
-            <h1 className="admin-login-title">Жаңы сыр сөз</h1>
-            <p className="admin-login-subtitle">Почта, почтадагы код жана жаңы сыр сөздү киргизиңиз. Спамды да текшериңиз.</p>
+            <h1 className="admin-login-title">{t('resetPage.title')}</h1>
+            <p className="admin-login-subtitle">{t('resetPage.subtitle')}</p>
           </div>
 
           {success ? <p className="auth-modal-success">{success}</p> : null}
 
           <form className="auth-modal-form" onSubmit={(e) => void handleSubmit(e)} noValidate>
             <AuthTextField
-              label="Электрондук почта"
+              label={t('auth.emailLabel')}
               icon={Mail}
               type="email"
               name="email"
@@ -78,7 +78,7 @@ export function ResetPasswordPage() {
               error={fieldErrors.email}
             />
             <AuthTextField
-              label="Код"
+              label={t('auth.codeLabel')}
               icon={KeyRound}
               name="token"
               placeholder="000000"
@@ -90,19 +90,19 @@ export function ResetPasswordPage() {
                 setForm((f) => ({ ...f, token: e.target.value.replace(/\D/g, '').slice(0, 6) }))
               }
               error={fieldErrors.token}
-              hint="Почтаңызга келген 6 сандуу код. Кирүүчү жана Спам папкаларын караңыз."
+              hint={t('auth.resetCodeHint')}
             />
             <PasswordField
-              label="Жаңы сыр сөз"
+              label={t('auth.newPassword')}
               name="password"
               autoComplete="new-password"
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
               error={fieldErrors.password}
-              hint={PASSWORD_HINT}
+              hint={t('auth.passwordHint')}
             />
             <PasswordField
-              label="Сыр сөздү кайталаңыз"
+              label={t('auth.confirmPasswordLabel')}
               name="confirmPassword"
               autoComplete="new-password"
               value={form.confirmPassword}
@@ -110,12 +110,12 @@ export function ResetPasswordPage() {
               error={fieldErrors.confirmPassword}
             />
             <button type="submit" className="btn-gold auth-modal-submit w-full" disabled={loading || Boolean(success)}>
-              {loading ? 'Сакталууда...' : 'Сактоо'}
+              {loading ? t('common.saving') : t('common.save')}
             </button>
           </form>
 
           <p className="admin-login-back">
-            <Link to="/">← Башкы бетке кайтуу</Link>
+            <Link to="/">← {t('common.back')}</Link>
           </p>
         </div>
       </div>

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { FAQ } from "../data/landing";
+import { localizedList } from "../i18n/localizedList";
 
 type FaqAccordionProps = {
   id?: string;
@@ -8,14 +10,14 @@ type FaqAccordionProps = {
   hideTitle?: boolean;
 };
 
-function renderFaqAnswer(answer: string) {
+function renderFaqAnswer(answer: string, channelLabel: string) {
   const channelHandle = "@Muhammadalim_Halil";
   const channelUrl = "https://www.youtube.com/@Muhammadalim_Halil";
 
   if (answer.includes(channelHandle)) {
     return (
       <>
-        Ютуб канал{" "}
+        {channelLabel}{" "}
         <a
           href={channelUrl}
           target="_blank"
@@ -36,13 +38,15 @@ export function FaqAccordion({
   className = "",
   hideTitle = false,
 }: FaqAccordionProps) {
+  const { t, i18n } = useTranslation();
+  const items = localizedList(i18n, "faq.items", FAQ);
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
     <div id={id} className={`faq-panel ui-card ${className}`.trim()}>
-      {!hideTitle && <h2 className="faq-panel-title">Суроо-жооп</h2>}
+      {!hideTitle && <h2 className="faq-panel-title">{t("faq.title")}</h2>}
       <div className="faq-accordion">
-        {FAQ.map((f, i) => {
+        {items.map((f, i) => {
           const isOpen = openIndex === i;
           return (
             <div
@@ -64,7 +68,7 @@ export function FaqAccordion({
               <div
                 className={`faq-content ${isOpen ? "faq-content-open" : ""}`}
               >
-                <p>{renderFaqAnswer(f.a)}</p>
+                <p>{renderFaqAnswer(f.a, t("faq.youtubeChannel"))}</p>
               </div>
             </div>
           );

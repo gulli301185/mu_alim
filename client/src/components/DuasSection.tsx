@@ -1,8 +1,10 @@
 import { useRef } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { DUAS, DUAS_TITLE } from '../data/duas';
 
 export function DuasSection() {
+  const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scrollByRow = (direction: -1 | 1) => {
@@ -18,7 +20,7 @@ export function DuasSection() {
             type="button"
             className="duas-nav-btn"
             onClick={() => scrollByRow(-1)}
-            aria-label="Жогору"
+            aria-label={t('common.up')}
           >
             <ChevronUp className="h-5 w-5" />
           </button>
@@ -26,7 +28,7 @@ export function DuasSection() {
             type="button"
             className="duas-nav-btn"
             onClick={() => scrollByRow(1)}
-            aria-label="Төмөн"
+            aria-label={t('common.down')}
           >
             <ChevronDown className="h-5 w-5" />
           </button>

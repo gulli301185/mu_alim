@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Mail, User, Phone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getUserDisplayName } from '../lib/auth-api';
@@ -8,6 +9,7 @@ import { PasswordField } from '../components/PasswordField';
 import { emailSchema, firstZodError, formatZodErrors, requiredPhoneSchema } from '../lib/auth-validation';
 
 export function ProfilePage() {
+  const { t } = useTranslation();
   const { user, loading, updateProfile, refreshUser, logout } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -53,7 +55,7 @@ export function ProfilePage() {
       <section className="profile-page">
         <div className="wrap profile-page-wrap">
           <div className="ui-card profile-card">
-            <p>Жүктөлүүдө...</p>
+            <p>{t('common.loading')}</p>
           </div>
         </div>
       </section>
@@ -69,7 +71,7 @@ export function ProfilePage() {
     setSuccess(null);
 
     if (newPassword && newPassword !== confirmPassword) {
-      toastError('Жаңы сыр сөздөр дал келген жок');
+      toastError(t('profile.passwordsMismatch'));
       return;
     }
 
@@ -106,10 +108,10 @@ export function ProfilePage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setSuccess('Профиль ийгиликтүү жаңыртылды');
-      toastSuccess('Профиль ийгиликтүү жаңыртылды');
+      setSuccess(t('profile.updated'));
+      toastSuccess(t('profile.updated'));
     } catch (err) {
-      toastError(getErrorMessage(err, 'Жаңыртуу ийгиликсиз'));
+      toastError(getErrorMessage(err, t('profile.updateFailed')));
     } finally {
       setSaving(false);
     }
@@ -120,7 +122,7 @@ export function ProfilePage() {
       <div className="wrap profile-page-wrap">
         <header className="profile-page-header">
           <div>
-            <p className="profile-page-kicker">Жеке кабинет</p>
+            <p className="profile-page-kicker">{t('profile.kicker')}</p>
             <h1 className="profile-page-title">{getUserDisplayName(user)}</h1>
             <p className="profile-page-subtitle">{user.email}</p>
           </div>
@@ -132,23 +134,23 @@ export function ProfilePage() {
             <h2 className="profile-summary-name">{getUserDisplayName(user)}</h2>
             <p className="profile-summary-email">{user.email}</p>
             {user.phone ? <p className="profile-summary-phone">{user.phone}</p> : null}
-            <p className="profile-summary-role">Колдонуучу</p>
+            <p className="profile-summary-role">{t('profile.role')}</p>
             <button type="button" className="profile-logout-btn" onClick={logout}>
-              Чыгуу (Logout)
+              {t('profile.logout')}
             </button>
             <Link to="/questions" className="profile-link-btn">
-              Суроо-жооп бөлүмүнө
+              {t('profile.toQa')}
             </Link>
           </aside>
 
           <form className="ui-card profile-form" onSubmit={(e) => void handleSubmit(e)}>
-            <h2 className="profile-form-title">Профиль маалыматтары</h2>
+            <h2 className="profile-form-title">{t('profile.formTitle')}</h2>
 
             {success ? <p className="profile-success">{success}</p> : null}
 
             <div className="profile-form-grid">
               <label className="auth-modal-field">
-                <span className="auth-modal-label">Атыңыз</span>
+                <span className="auth-modal-label">{t('auth.firstNameLabel')}</span>
                 <span className="auth-modal-input-group">
                   <span className="auth-modal-input-icon-box" aria-hidden>
                     <User className="h-4 w-4" />
@@ -163,7 +165,7 @@ export function ProfilePage() {
               </label>
 
               <label className="auth-modal-field">
-                <span className="auth-modal-label">Фамилияңыз</span>
+                <span className="auth-modal-label">{t('auth.lastNameLabel')}</span>
                 <span className="auth-modal-input-group">
                   <span className="auth-modal-input-icon-box" aria-hidden>
                     <User className="h-4 w-4" />
@@ -178,7 +180,7 @@ export function ProfilePage() {
               </label>
 
               <label className="auth-modal-field profile-form-full">
-                <span className="auth-modal-label">Электрондук почта</span>
+                <span className="auth-modal-label">{t('auth.emailLabel')}</span>
                 <span className="auth-modal-input-group">
                   <span className="auth-modal-input-icon-box" aria-hidden>
                     <Mail className="h-4 w-4" />
@@ -195,7 +197,7 @@ export function ProfilePage() {
               </label>
 
               <label className="auth-modal-field profile-form-full">
-                <span className="auth-modal-label">Телефон</span>
+                <span className="auth-modal-label">{t('auth.phoneLabel')}</span>
                 <span className="auth-modal-input-group">
                   <span className="auth-modal-input-icon-box" aria-hidden>
                     <Phone className="h-4 w-4" />
@@ -213,16 +215,16 @@ export function ProfilePage() {
             </div>
 
             <div className="profile-password-block">
-              <h3 className="profile-form-subtitle">Сыр сөздү өзгөртүү (милдеттүү эмес)</h3>
+              <h3 className="profile-form-subtitle">{t('profile.changePasswordTitle')}</h3>
               <PasswordField
-                label="Учурдагы сыр сөз"
+                label={t('profile.currentPassword')}
                 name="currentPassword"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 autoComplete="current-password"
               />
               <PasswordField
-                label="Жаңы сыр сөз"
+                label={t('profile.newPassword')}
                 name="newPassword"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -230,7 +232,7 @@ export function ProfilePage() {
                 autoComplete="new-password"
               />
               <PasswordField
-                label="Жаңы сыр сөздү кайталаңыз"
+                label={t('profile.confirmNewPassword')}
                 name="confirmPassword"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -240,7 +242,7 @@ export function ProfilePage() {
             </div>
 
             <button type="submit" className="btn-gold profile-save-btn" disabled={saving}>
-              {saving ? 'Сакталууда...' : 'Сактоо'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </form>
         </div>

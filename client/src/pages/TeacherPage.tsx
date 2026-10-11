@@ -12,17 +12,19 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { TEACHER } from "../data/landing";
+import { localizedList } from "../i18n/localizedList";
 import { useSiteImages } from "../context/SiteImagesContext";
 import { SITE_IMAGE_KEYS } from "../lib/site-images-api";
 
 const WORK_ICONS = [BookOpen, Users, Briefcase] as const;
 
 const USTAZ_HERO_STATS = [
-  { icon: Calendar, primary: `${TEACHER.birthYear}-жылы`, secondary: "төрөлгөн" },
-  { icon: Users, primary: "3 баланын", secondary: "атасы" },
-  { icon: GraduationCap, primary: "15+ жыл", secondary: "тажрыйба" },
-  { icon: Globe, primary: "5 тилде", secondary: "эркин сүйлөйт" },
+  { icon: Calendar, key: "Born" },
+  { icon: Users, key: "Kids" },
+  { icon: GraduationCap, key: "Exp" },
+  { icon: Globe, key: "Langs" },
 ] as const;
 
 const INTEREST_ICONS = {
@@ -35,6 +37,20 @@ const INTEREST_ICONS = {
 
 export function TeacherPage() {
   const { image } = useSiteImages();
+  const { t, i18n } = useTranslation();
+  const bioParagraphs = localizedList(i18n, "teacherData.bioParagraphs", TEACHER.bioParagraphs);
+  const eduText = localizedList(i18n, "teacherData.education", TEACHER.education);
+  const workText = localizedList(i18n, "teacherData.workExperience", TEACHER.workExperience);
+  const langNames = localizedList(
+    i18n,
+    "teacherData.languages",
+    TEACHER.languages.map((l) => l.name),
+  );
+  const interestLabels = localizedList(
+    i18n,
+    "teacherData.interests",
+    TEACHER.interests.map((i) => i.label),
+  );
 
   return (
     <>
@@ -44,13 +60,15 @@ export function TeacherPage() {
           alt={TEACHER.name}
           className="ustaz-page-banner-img"
         />
-        <div className="ustaz-page-stats wrap" aria-label="Негизги фактылар">
-          {USTAZ_HERO_STATS.map(({ icon: Icon, primary, secondary }) => (
-            <div key={secondary} className="ustaz-page-stat">
+        <div className="ustaz-page-stats wrap" aria-label={t("teacher.factsAria")}>
+          {USTAZ_HERO_STATS.map(({ icon: Icon, key }) => (
+            <div key={key} className="ustaz-page-stat">
               <Icon className="ustaz-page-stat-icon" aria-hidden />
               <div className="ustaz-page-stat-copy">
-                <span className="ustaz-page-stat-primary">{primary}</span>
-                <span className="ustaz-page-stat-secondary">{secondary}</span>
+                <span className="ustaz-page-stat-primary">
+                  {t(`teacher.stat${key}Primary`, { year: TEACHER.birthYear })}
+                </span>
+                <span className="ustaz-page-stat-secondary">{t(`teacher.stat${key}Secondary`)}</span>
               </div>
             </div>
           ))}
@@ -60,20 +78,22 @@ export function TeacherPage() {
       <section id="ustaz-profile" className="ustaz-page-body">
         <div className="wrap ustaz-page-grid">
           <article className="ustaz-page-card ustaz-page-card-bio">
-            <h2 className="ustaz-page-card-title">Кыскача маалымат</h2>
+            <h2 className="ustaz-page-card-title">{t("teacher.bioTitle")}</h2>
             <div className="ustaz-page-card-divider" aria-hidden />
             <div className="ustaz-page-bio">
-              {TEACHER.bioParagraphs.map((paragraph) => (
+              {bioParagraphs.map((paragraph) => (
                 <p key={paragraph.slice(0, 40)}>{paragraph}</p>
               ))}
             </div>
           </article>
 
           <article className="ustaz-page-card ustaz-page-card-timeline">
-            <h2 className="ustaz-page-card-title">Билим алуу жолу</h2>
+            <h2 className="ustaz-page-card-title">{t("teacher.eduTitle")}</h2>
             <div className="ustaz-page-card-divider" aria-hidden />
             <ol className="ustaz-page-edu-timeline">
-              {TEACHER.education.map((item) => (
+              {TEACHER.education.map((source, index) => {
+                const item = { ...source, ...eduText[index] };
+                return (
                 <li
                   key={`${item.period}-${item.place}`}
                   className="ustaz-page-edu-item"
@@ -89,15 +109,17 @@ export function TeacherPage() {
                     <p className="ustaz-page-edu-focus">{item.focus}</p>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ol>
           </article>
 
           <article className="ustaz-page-card ustaz-page-card-work">
-            <h2 className="ustaz-page-card-title">Илим тажрыйбасы</h2>
+            <h2 className="ustaz-page-card-title">{t("teacher.workTitle")}</h2>
             <div className="ustaz-page-card-divider" aria-hidden />
             <ol className="ustaz-page-work-list">
-              {TEACHER.workExperience.map((item, index) => {
+              {TEACHER.workExperience.map((source, index) => {
+                const item = { ...source, ...workText[index] };
                 const Icon = WORK_ICONS[index % WORK_ICONS.length];
                 return (
                   <li
@@ -121,12 +143,12 @@ export function TeacherPage() {
           </article>
 
           <article className="ustaz-page-card ustaz-page-card-langs">
-            <h2 className="ustaz-page-card-title">Тилдер</h2>
+            <h2 className="ustaz-page-card-title">{t("teacher.langsTitle")}</h2>
             <div className="ustaz-page-card-divider" aria-hidden />
             <ul className="ustaz-page-lang-list">
-              {TEACHER.languages.map((lang) => (
+              {TEACHER.languages.map((lang, index) => (
                 <li key={lang.name} className="ustaz-page-lang-item">
-                  <span className="ustaz-page-lang-name">{lang.name}</span>
+                  <span className="ustaz-page-lang-name">{langNames[index] ?? lang.name}</span>
                   <span className="ustaz-page-lang-dots" aria-hidden>
                     {Array.from({ length: 5 }).map((_, i) => (
                       <span
@@ -145,17 +167,17 @@ export function TeacherPage() {
           </article>
 
           <article className="ustaz-page-card ustaz-page-card-interests">
-            <h2 className="ustaz-page-card-title">Кызыккан багыттар</h2>
+            <h2 className="ustaz-page-card-title">{t("teacher.interestsTitle")}</h2>
             <div className="ustaz-page-card-divider" aria-hidden />
             <ul className="ustaz-page-interest-list">
-              {TEACHER.interests.map((item) => {
+              {TEACHER.interests.map((item, index) => {
                 const Icon = INTEREST_ICONS[item.icon];
                 return (
                   <li key={item.label} className="ustaz-page-interest-item">
                     <span className="ustaz-page-interest-icon-wrap">
                       <Icon className="h-4 w-4" aria-hidden />
                     </span>
-                    <span>{item.label}</span>
+                    <span>{interestLabels[index] ?? item.label}</span>
                   </li>
                 );
               })}
@@ -166,7 +188,7 @@ export function TeacherPage() {
         <div className="wrap">
           <Link to="/" className="ustaz-page-back">
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            Башкы бетке кайтуу
+            {t("common.back")}
           </Link>
         </div>
       </section>
