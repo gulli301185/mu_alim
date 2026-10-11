@@ -99,7 +99,11 @@
     "passwordChangeFailed": "Сыр сөздү өзгөртүү ийгиликсиз",
     "registeredSuccess": "Сиз ийгиликтүү катталдыңыз!",
     "hidePassword": "Сыр сөздү жашыруу",
-    "showPassword": "Сыр сөздү көрсөтүү"
+    "showPassword": "Сыр сөздү көрсөтүү",
+    "sessionInvalid": "Сессия жараксыз",
+    "useUserLogin": "Колдонуучу кирүүсүн колдонуңуз",
+    "noAdminRights": "Админ укугу жок",
+    "loginRequired": "Кирүү талап кылынат"
   },
   "landing": {
     "dailyQuestion": "Күндүн суроосу",
@@ -339,5 +343,33 @@
     "watchToEnd": "Видеону аягына чейин көрүңүз.",
     "watchToEndBtn": "Видеону аягына чейин көрүңүз...",
     "watchedContinue": "Көрүү аяктады — улантуу"
+  },
+  "validation": {
+    "passwordMin": "Сыр сөз кеминде 8 символдон турушу керек",
+    "passwordMax": "Сыр сөз өтө узун",
+    "passwordLetter": "Сыр сөздө жок дегенде бир тамга болушу керек",
+    "passwordDigit": "Сыр сөздө жок дегенде бир сан болушу керек",
+    "emailRequired": "Электрондук почтаны толтуруңуз",
+    "emailMax": "Электрондук почта өтө узун",
+    "emailInvalidExample": "Электрондук почта туура эмес. Мисалы: aty@gmail.com",
+    "emailInvalid": "Электрондук почта туура эмес",
+    "phoneRequired": "Телефон номерин толтуруңуз",
+    "phoneInvalid": "Телефон туура эмес. Мисалы: +996 700 123 456",
+    "passwordRequired": "Сыр сөздү киргизиңиз",
+    "firstNameMin": "Аты кеминде 2 тамгадан турушу керек",
+    "firstNameMax": "Аты өтө узун",
+    "firstNameLetters": "Атта тек тамгалар болушу керек",
+    "lastNameMin": "Фамилия кеминде 2 тамгадан турушу керек",
+    "lastNameMax": "Фамилия өтө узун",
+    "lastNameLetters": "Фамилияда тек тамгалар болушу керек",
+    "confirmRequired": "Сыр сөздү кайталаңыз",
+    "passwordsMismatch": "Сыр сөздөр дал келген жок",
+    "code6": "Код 6 сандан турушу керек",
+    "invalidData": "Маалымат туура эмес"
+  },
+  "adminLogin": {
+    "title": "Админ кирүү",
+    "subtitle": "Суроо-жооп бөлүмүн башкаруу",
+    "email": "Админ электрондук почтасы"
   }
 }

@@ -1,34 +1,42 @@
 import { z } from 'zod';
 import { normalizeKgPhone } from './phone';
+import i18n from '../i18n';
+
+// Schema messages are translation keys under "validation" in the locale
+// files; they're resolved at display time so a language switch applies
+// without rebuilding the (module-level) schemas.
+function translateIssue(message: string) {
+  return i18n.t(`validation.${message}`, { defaultValue: message });
+}
 
 const nameRegex = /^[\p{L}\s'-]+$/u;
 
 export const passwordSchema = z
   .string()
-  .min(8, 'Сыр сөз кеминде 8 символдон турушу керек')
-  .max(128, 'Сыр сөз өтө узун')
-  .regex(/[a-zA-Zа-яА-ЯёЁөӨүҮңҢ]/, 'Сыр сөздө жок дегенде бир тамга болушу керек')
-  .regex(/[0-9]/, 'Сыр сөздө жок дегенде бир сан болушу керек');
+  .min(8, 'passwordMin')
+  .max(128, 'passwordMax')
+  .regex(/[a-zA-Zа-яА-ЯёЁөӨүҮңҢ]/, 'passwordLetter')
+  .regex(/[0-9]/, 'passwordDigit');
 
 export const emailSchema = z
   .string()
   .trim()
-  .min(1, 'Электрондук почтаны толтуруңуз')
-  .max(255, 'Электрондук почта өтө узун')
+  .min(1, 'emailRequired')
+  .max(255, 'emailMax')
   .toLowerCase()
-  .email('Электрондук почта туура эмес. Мисалы: aty@gmail.com')
-  .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value), 'Электрондук почта туура эмес');
+  .email('emailInvalidExample')
+  .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value), 'emailInvalid');
 
 export const requiredPhoneSchema = z
   .string()
   .trim()
-  .min(1, 'Телефон номерин толтуруңуз')
+  .min(1, 'phoneRequired')
   .transform((value, ctx) => {
     const phone = normalizeKgPhone(value);
     if (!phone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Телефон туура эмес. Мисалы: +996 700 123 456',
+        message: 'phoneInvalid',
       });
       return z.NEVER;
     }
@@ -37,7 +45,7 @@ export const requiredPhoneSchema = z
 
 export const loginSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, 'Сыр сөздү киргизиңиз'),
+  password: z.string().min(1, 'passwordRequired'),
 });
 
 export const registerSchema = z
@@ -45,22 +53,22 @@ export const registerSchema = z
     firstName: z
       .string()
       .trim()
-      .min(2, 'Аты кеминде 2 тамгадан турушу керек')
-      .max(100, 'Аты өтө узун')
-      .regex(nameRegex, 'Атта тек тамгалар болушу керек'),
+      .min(2, 'firstNameMin')
+      .max(100, 'firstNameMax')
+      .regex(nameRegex, 'firstNameLetters'),
     lastName: z
       .string()
       .trim()
-      .min(2, 'Фамилия кеминде 2 тамгадан турушу керек')
-      .max(100, 'Фамилия өтө узун')
-      .regex(nameRegex, 'Фамилияда тек тамгалар болушу керек'),
+      .min(2, 'lastNameMin')
+      .max(100, 'lastNameMax')
+      .regex(nameRegex, 'lastNameLetters'),
     email: emailSchema,
     phone: requiredPhoneSchema,
     password: passwordSchema,
-    confirmPassword: z.string().min(1, 'Сыр сөздү кайталаңыз'),
+    confirmPassword: z.string().min(1, 'confirmRequired'),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Сыр сөздөр дал келген жок',
+    message: 'passwordsMismatch',
     path: ['confirmPassword'],
   });
 
@@ -73,7 +81,7 @@ export const confirmCodeSchema = z.object({
   code: z
     .string()
     .trim()
-    .regex(/^\d{6}$/, 'Код 6 сандан турушу керек'),
+    .regex(/^\d{6}$/, 'code6'),
 });
 
 export const resetPasswordSchema = z
@@ -81,13 +89,13 @@ export const resetPasswordSchema = z
     token: z
       .string()
       .trim()
-      .regex(/^\d{6}$/, 'Код 6 сандан турушу керек'),
+      .regex(/^\d{6}$/, 'code6'),
     email: emailSchema,
     password: passwordSchema,
-    confirmPassword: z.string().min(1, 'Сыр сөздү кайталаңыз'),
+    confirmPassword: z.string().min(1, 'confirmRequired'),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Сыр сөздөр дал келген жок',
+    message: 'passwordsMismatch',
     path: ['confirmPassword'],
   });
 
@@ -98,12 +106,12 @@ export function formatZodErrors(error: z.ZodError): FieldErrors {
   for (const issue of error.issues) {
     const key = issue.path[0];
     if (typeof key === 'string' && !fields[key]) {
-      fields[key] = issue.message;
+      fields[key] = translateIssue(issue.message);
     }
   }
   return fields;
 }
 
 export function firstZodError(error: z.ZodError) {
-  return error.issues[0]?.message ?? 'Маалымат туура эмес';
+  return translateIssue(error.issues[0]?.message ?? 'invalidData');
 }

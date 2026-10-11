@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import i18n from '../i18n';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   adminLoginRequest,
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const user = await fetchMe(token);
       if (!isSessionValid(sessionKind, user)) {
         clearStoredAuth(sessionKind);
-        throw new Error('Сессия жараксыз');
+        throw new Error(i18n.t('auth.sessionInvalid'));
       }
       saveStoredAuth(sessionKind, { token, user });
       return user;
@@ -129,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     onSuccess: (session) => {
       if (session.user.role !== 'user') {
-        throw new Error('Колдонуучу кирүүсүн колдонуңуз');
+        throw new Error(i18n.t('auth.useUserLogin'));
       }
       applySession('user', session.token, session.user);
     },
@@ -143,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     onSuccess: (session) => {
       if (session.user.role !== 'admin') {
-        throw new Error('Админ укугу жок');
+        throw new Error(i18n.t('auth.noAdminRights'));
       }
       applySession('admin', session.token, session.user);
     },
@@ -169,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfileMutation = useMutation({
     mutationFn: (input: UpdateProfileInput) => {
-      if (!token) throw new Error('Кирүү талап кылынат');
+      if (!token) throw new Error(i18n.t('auth.loginRequired'));
       return updateProfileRequest(token, input);
     },
     onSuccess: (user) => {
@@ -251,7 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await fetchMe(token);
         if (!isSessionValid(sessionKind, me)) {
           clearStoredAuth(sessionKind);
-          throw new Error('Сессия жараксыз');
+          throw new Error(i18n.t('auth.sessionInvalid'));
         }
         saveStoredAuth(sessionKind, { token, user: me });
         return me;

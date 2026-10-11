@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Mail, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PasswordField } from '../components/PasswordField';
@@ -9,6 +10,7 @@ import { formatZodErrors, firstZodError, loginSchema, type FieldErrors } from '.
 import { getErrorMessage, toastError } from '../lib/toast';
 
 export function AdminLoginPage() {
+  const { t } = useTranslation();
   const { loginAdmin, isAdmin, loading, isLoggingIn } = useAuth();
   const navigate = useNavigate();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -34,7 +36,7 @@ export function AdminLoginPage() {
       navigate('/admin', { replace: true });
     } catch (err) {
       if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
-      toastError(getErrorMessage(err, 'Кирүү ийгиликсиз'));
+      toastError(getErrorMessage(err, t('auth.loginFailed')));
     }
   };
 
@@ -46,13 +48,13 @@ export function AdminLoginPage() {
             <span className="admin-login-icon" aria-hidden>
               <Shield className="h-8 w-8" />
             </span>
-            <h1 className="admin-login-title">Админ кирүү</h1>
-            <p className="admin-login-subtitle">Суроо-жооп бөлүмүн башкаруу</p>
+            <h1 className="admin-login-title">{t('adminLogin.title')}</h1>
+            <p className="admin-login-subtitle">{t('adminLogin.subtitle')}</p>
           </div>
 
           <form className="auth-modal-form" onSubmit={(e) => void handleSubmit(e)} noValidate>
             <AuthTextField
-              label="Админ электрондук почтасы"
+              label={t('adminLogin.email')}
               icon={Mail}
               type="email"
               name="email"
@@ -63,7 +65,7 @@ export function AdminLoginPage() {
               error={fieldErrors.email}
             />
             <PasswordField
-              label="Сыр сөз"
+              label={t('auth.passwordLabel')}
               name="password"
               autoComplete="current-password"
               value={form.password}
@@ -71,7 +73,7 @@ export function AdminLoginPage() {
               error={fieldErrors.password}
             />
             <button type="submit" className="btn-gold auth-modal-submit w-full" disabled={isLoggingIn || loading}>
-              {isLoggingIn ? 'Кирүүдө...' : 'Кирүү'}
+              {isLoggingIn ? t('auth.loggingIn') : t('auth.login')}
             </button>
           </form>
 
