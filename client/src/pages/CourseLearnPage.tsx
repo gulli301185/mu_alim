@@ -444,7 +444,7 @@ export function CourseLearnPage() {
   } = useQuery({
     queryKey: ["course-final-test", courseId, progressUserId],
     queryFn: () => fetchCourseFinalTest(courseId!, token),
-    enabled: false,
+    enabled: Boolean(courseId && course && !isFree),
   });
 
   const allTestQuestionsAnswered = useMemo(() => {

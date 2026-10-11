@@ -81,15 +81,18 @@ export function gradeTestAnswers(
   }
 
   const total = questionItems.length;
-  const scorePercent = total > 0 ? Math.round((correct / total) * 100) : 0;
-  const passed = scorePercent >= Number(test.passingScore);
+  const passingScore = Number(test.passingScore);
+  // Shown to 2 decimals (fits test_attempts.score numeric(5,2)); pass/fail compares the exact
+  // fraction instead of a rounded percentage, so e.g. 26/29 = 89.66% never rounds up to a 90% pass.
+  const scorePercent = total > 0 ? Math.round((correct / total) * 10000) / 100 : 0;
+  const passed = total > 0 && correct * 100 >= passingScore * total;
 
   return {
     scorePercent,
     passed,
     correct,
     total,
-    passingScore: Number(test.passingScore),
+    passingScore,
   };
 }
 

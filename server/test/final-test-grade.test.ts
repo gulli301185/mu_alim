@@ -181,3 +181,63 @@ describe('POST /courses/:courseRef/final-test/grade (TestsController.grade) — 
     assert.equal(body.locked, false);
   });
 });
+
+/** A choice-only test with `n` questions; the correct option of question i is `q{i}-ok`. */
+function choiceTest(n: number, passingScore = 90) {
+  return {
+    passingScore,
+    testQuestions: Array.from({ length: n }, (_, i) => ({
+      question: {
+        id: `q${i}`,
+        questionText: `Question ${i}?`,
+        questionType: 'choice' as const,
+        correctTextAnswer: null,
+        options: [
+          { id: `q${i}-ok`, optionText: 'right', isCorrect: true },
+          { id: `q${i}-no`, optionText: 'wrong', isCorrect: false },
+        ],
+      },
+    })),
+  };
+}
+const answerRight = (n: number, right: number): GradeAnswers =>
+  Array.from({ length: n }, (_, i) => ({ questionId: `q${i}`, selectedOptionId: i < right ? `q${i}-ok` : `q${i}-no` }));
+
+describe('90% threshold — exact comparison, no rounding up (QA E2E finding)', () => {
+  for (const [n, right, passed, score] of [
+    [29, 26, false, 89.66], // 89.66% must NOT round up to a pass
+    [10, 9, true, 90],
+    [10, 8, false, 80],
+    [30, 27, true, 90],
+    [30, 26, false, 86.67],
+    [40, 36, true, 90],
+    [54, 49, true, 90.74],
+    [54, 48, false, 88.89],
+    [48, 43, false, 89.58],
+    [5, 5, true, 100],
+    [5, 4, false, 80],
+  ] as const) {
+    it(`${right}/${n} → ${score}%, passed=${passed}`, () => {
+      const r = gradeTestAnswers(choiceTest(n), answerRight(n, right));
+      assert.equal(r.passed, passed);
+      assert.equal(r.scorePercent, score);
+      assert.equal(r.correct, right);
+      assert.equal(r.total, n);
+    });
+  }
+
+  it('no question can be passed with less than the threshold for any test size 1..120', () => {
+    for (let n = 1; n <= 120; n++) {
+      for (let right = 0; right <= n; right++) {
+        const r = gradeTestAnswers(choiceTest(n), answerRight(n, right));
+        assert.equal(r.passed, right / n >= 0.9, `${right}/${n}`);
+      }
+    }
+  });
+
+  it('an empty test never passes', () => {
+    const r = gradeTestAnswers(choiceTest(0), []);
+    assert.equal(r.passed, false);
+    assert.equal(r.scorePercent, 0);
+  });
+});
