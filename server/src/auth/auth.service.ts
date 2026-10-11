@@ -5,9 +5,8 @@ import { randomInt } from 'node:crypto';
 import { AppError } from '../common/app-error';
 import { AuthUser } from '../common/auth';
 import { MailService } from '../mail/mail.service';
-import { SmsService } from '../mail/sms.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, MoreThan, Repository } from 'typeorm';
 import { PasswordResetToken, User, UserProfile } from '../database/entities';
 import { findUserByKgPhone } from '../lib/user-phone';
 import type {
@@ -15,12 +14,16 @@ import type {
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resendCodeSchema,
   resetPasswordSchema,
   updateProfileSchema,
 } from '../lib/auth-validation';
 import type { z } from 'zod';
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+/** A code confirms a registration or resets a password — never the other (QA F15). */
+type AuthCodePurpose = 'register' | 'reset';
 
 type PublicUserSource = {
   id: string;
@@ -42,13 +45,12 @@ export function toPublicUser(user: PublicUserSource) {
   };
 }
 
-function deliveryMessage(delivered: 'email' | 'sms') {
-  return delivered === 'sms'
-    ? 'Код телефонуңузга SMS менен жөнөтүлдү.'
-    : 'Код почтаңызга жөнөтүлдү. Почтаңызды текшериңиз.';
-}
+const CODE_EMAILED = 'Код почтаңызга жөнөтүлдү. Почтаңызды текшериңиз.';
+const CODE_NOT_SENT = 'Код почтага жөнөтүлгөн жок. Кийинчерээк кайра кайталап көрүңүз.';
 
 const CODE_INVALID = 'Код жараксыз же мөөнөтү өткөн';
+const RESEND_SENT = 'Эгер бул почта менен ырастала элек аккаунт болсо, ага код жөнөтүлдү.';
+const MAIL_NOT_CONNECTED = 'Код почтага жөнөтүлгөн жок. Почта сервиси туташа элек.';
 
 @Injectable()
 export class AuthService {
@@ -60,14 +62,14 @@ export class AuthService {
     private readonly ds: DataSource,
     private readonly jwt: JwtService,
     private readonly mail: MailService,
-    private readonly sms: SmsService,
   ) {}
 
   signToken(user: AuthUser) {
     return this.jwt.sign({ id: user.id, role: user.role });
   }
 
-  private async issueAuthCode(userId: string) {
+  /** Issues a fresh code for `purpose`; every older unused code of the user stops working. */
+  private async issueAuthCode(userId: string, purpose: AuthCodePurpose) {
     await this.tokens.update({ userId, usedAt: IsNull() }, { usedAt: new Date() });
 
     let code = String(randomInt(100000, 1000000));
@@ -78,6 +80,7 @@ export class AuthService {
           this.tokens.create({
             userId,
             token: code,
+            purpose,
             expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
             usedAt: null,
           }),
@@ -92,37 +95,52 @@ export class AuthService {
     return { code, tokenId };
   }
 
-  private async deliverAuthCode(
-    email: string,
-    phone: string | null,
-    code: string,
-    kind: 'reset' | 'register',
-  ) {
-    if (this.mail.isConfigured()) {
-      try {
-        await this.mail.sendAuthCode(email, code, kind);
-        return 'email' as const;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger.error(`[auth-code] mail failed ${message}`);
-      }
+  /**
+   * Emails the code; `false` when it could not be sent. Codes never go by SMS: the phone on
+   * an account is not verified and is chosen by whoever registered it, so a code sent there
+   * would prove nothing about the email (QA R1).
+   */
+  private async deliverAuthCode(email: string, code: string, kind: AuthCodePurpose) {
+    if (!this.mail.isConfigured()) return false;
+    try {
+      await this.mail.sendAuthCode(email, code, kind);
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[auth-code] mail failed ${message}`);
+      return false;
     }
-
-    if (this.sms.isConfigured() && phone) {
-      try {
-        await this.sms.sendPasswordResetSms(phone, code);
-        return 'sms' as const;
-      } catch (err) {
-        this.logger.error(`[auth-code] sms failed ${err instanceof Error ? err.message : err}`);
-      }
-    }
-
-    return null;
   }
 
   private async revokeToken(tokenId: string | null) {
     if (!tokenId) return;
     await this.tokens.update({ id: tokenId }, { usedAt: new Date() });
+  }
+
+  /** Cheap pre-check before hashing a password: is there a live code like this? */
+  private hasLiveAuthCode(userId: string, code: string, purpose: AuthCodePurpose) {
+    return this.tokens.existsBy({
+      userId,
+      token: code,
+      purpose,
+      usedAt: IsNull(),
+      expiresAt: MoreThan(new Date()),
+    });
+  }
+
+  /** Marks the matching live code as used. A single conditional UPDATE, so of several
+   * concurrent requests with the same code exactly one gets `true`. Codes without a
+   * purpose (issued before it existed) never match. */
+  private async consumeAuthCode(em: EntityManager, userId: string, code: string, purpose: AuthCodePurpose) {
+    const now = new Date();
+    const result = await em
+      .createQueryBuilder()
+      .update(PasswordResetToken)
+      .set({ usedAt: now })
+      .where('user_id = :userId AND token = :code AND purpose = :purpose', { userId, code, purpose })
+      .andWhere('used_at IS NULL AND expires_at > :now', { now })
+      .execute();
+    return result.affected === 1;
   }
 
   private findByEmailInsensitive(email: string) {
@@ -177,22 +195,21 @@ export class AuthService {
     const emailTaken = new AppError(409, 'Бул электрондук почта менен аккаунт бар', {
       fields: { email: 'Бул электрондук почта менен аккаунт бар' },
     });
-    const codeNotSent = () =>
-      new AppError(503, 'Код почтага жөнөтүлгөн жок. Кийинчерээк кайра кайталап көрүңүз.');
+    const codeNotSent = () => new AppError(503, CODE_NOT_SENT);
 
     const exists = await this.users.findOneBy({ email });
     if (exists) {
       if (exists.role === 'admin' || !exists.isActive || exists.isVerified) throw emailTaken;
 
-      const { code, tokenId } = await this.issueAuthCode(exists.id);
-      const delivered = await this.deliverAuthCode(email, exists.phone, code, 'register');
+      const { code, tokenId } = await this.issueAuthCode(exists.id, 'register');
+      const delivered = await this.deliverAuthCode(email, code, 'register');
       if (!delivered) {
         await this.revokeToken(tokenId);
         throw codeNotSent();
       }
       return {
         status: 200,
-        body: { needsConfirmation: true, email, message: deliveryMessage(delivered) },
+        body: { needsConfirmation: true, email, message: CODE_EMAILED },
       };
     }
 
@@ -222,8 +239,8 @@ export class AuthService {
       return created;
     });
 
-    const { code } = await this.issueAuthCode(user.id);
-    const delivered = await this.deliverAuthCode(email, phone, code, 'register');
+    const { code } = await this.issueAuthCode(user.id, 'register');
+    const delivered = await this.deliverAuthCode(email, code, 'register');
     if (!delivered) {
       await this.users.delete({ id: user.id });
       throw codeNotSent();
@@ -231,7 +248,7 @@ export class AuthService {
 
     return {
       status: 201,
-      body: { needsConfirmation: true, email, message: deliveryMessage(delivered) },
+      body: { needsConfirmation: true, email, message: CODE_EMAILED },
     };
   }
 
@@ -245,39 +262,80 @@ export class AuthService {
       });
     }
 
-    const { code, tokenId } = await this.issueAuthCode(user.id);
-    const delivered = await this.deliverAuthCode(email, user.phone, code, 'reset');
+    const { code, tokenId } = await this.issueAuthCode(user.id, 'reset');
+    const delivered = await this.deliverAuthCode(email, code, 'reset');
     if (!delivered) {
       await this.revokeToken(tokenId);
       throw new AppError(
         503,
-        this.mail.isConfigured()
-          ? 'Код почтага жөнөтүлгөн жок. Кийинчерээк кайра кайталап көрүңүз.'
-          : 'Код почтага жөнөтүлгөн жок. Почта сервиси туташа элек.',
+        this.mail.isConfigured() ? CODE_NOT_SENT : MAIL_NOT_CONNECTED,
       );
     }
 
-    return { message: deliveryMessage(delivered) };
+    return { message: CODE_EMAILED };
   }
 
+  /**
+   * Confirms a not-yet-verified registration with a `register` code. The password (and
+   * name/phone, when sent) are set here, so the account belongs to whoever received the
+   * code — an earlier registration of the same email by someone else is overwritten (QA F6).
+   */
   async confirmCode(data: z.infer<typeof confirmCodeSchema>) {
     const invalid = () => new AppError(400, CODE_INVALID, { fields: { code: CODE_INVALID } });
     const code = data.code.trim();
     const user = await this.findByEmailInsensitive(data.email);
-    if (!user || !user.isActive || user.role === 'admin') throw invalid();
+    if (!user || !user.isActive || user.role === 'admin' || user.isVerified) throw invalid();
+    if (!(await this.hasLiveAuthCode(user.id, code, 'register'))) throw invalid();
 
-    const record = await this.tokens.findOneBy({ token: code, usedAt: IsNull(), userId: user.id });
-    if (!record || record.expiresAt < new Date()) throw invalid();
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const now = new Date();
+    await this.ds.transaction(async (em) => {
+      if (!(await this.consumeAuthCode(em, user.id, code, 'register'))) throw invalid();
 
-    const updated = await this.ds.transaction(async (em) => {
-      user.isVerified = true;
-      user.lastLoginAt = new Date();
-      const saved = await em.save(user);
-      await em.update(PasswordResetToken, { id: record.id }, { usedAt: new Date() });
-      return saved;
+      if (data.phone && data.phone !== user.phone) {
+        const phoneTaken = await findUserByKgPhone(this.ds, data.phone, user.id);
+        if (phoneTaken) {
+          // Rolls back: the code stays usable.
+          throw new AppError(409, 'Бул телефон менен аккаунт бар', {
+            fields: { phone: 'Бул телефон менен аккаунт бар' },
+          });
+        }
+      }
+
+      await em.update(
+        User,
+        { id: user.id },
+        {
+          passwordHash,
+          isVerified: true,
+          lastLoginAt: now,
+          updatedAt: now,
+          ...(data.firstName ? { firstName: data.firstName } : {}),
+          ...(data.lastName ? { lastName: data.lastName } : {}),
+          ...(data.phone ? { phone: data.phone } : {}),
+        },
+      );
     });
 
+    const updated = await this.users.findOneByOrFail({ id: user.id });
     return { token: this.signToken({ id: updated.id, role: updated.role }), user: toPublicUser(updated) };
+  }
+
+  /** Emails a new `register` code to an unverified account. The answer is the same whether or
+   * not such an account exists, so it cannot be used to probe emails — except that a failed
+   * send is reported (503) instead of claiming success; the unsent code is revoked. */
+  async resendCode(data: z.infer<typeof resendCodeSchema>) {
+    if (!this.mail.isConfigured()) throw new AppError(503, MAIL_NOT_CONNECTED);
+
+    const user = await this.findByEmailInsensitive(data.email);
+    if (user && user.isActive && user.role !== 'admin' && !user.isVerified) {
+      const { code, tokenId } = await this.issueAuthCode(user.id, 'register');
+      if (!(await this.deliverAuthCode(user.email, code, 'register'))) {
+        await this.revokeToken(tokenId);
+        throw new AppError(503, CODE_NOT_SENT);
+      }
+    }
+    return { message: RESEND_SENT };
   }
 
   async resetPassword(data: z.infer<typeof resetPasswordSchema>) {
@@ -285,17 +343,13 @@ export class AuthService {
     const token = data.token.trim();
     const user = await this.findByEmailInsensitive(data.email);
     if (!user || !user.isActive || user.role === 'admin') throw invalid();
-
-    const record = await this.tokens.findOneBy({ token, usedAt: IsNull(), userId: user.id });
-    if (!record || record.usedAt || record.expiresAt < new Date() || !user.isActive) {
-      throw invalid();
-    }
+    if (!(await this.hasLiveAuthCode(user.id, token, 'reset'))) throw invalid();
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     await this.ds.transaction(async (em) => {
+      if (!(await this.consumeAuthCode(em, user.id, token, 'reset'))) throw invalid();
       await em.update(User, { id: user.id }, { passwordHash, isVerified: true, updatedAt: new Date() });
-      await em.update(PasswordResetToken, { id: record.id }, { usedAt: new Date() });
     });
 
     return { message: 'Сыр сөз ийгиликтүү өзгөртүлдү' };

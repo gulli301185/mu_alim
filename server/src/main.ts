@@ -14,7 +14,6 @@ import { langMiddleware } from './common/i18n';
 import { resolveJwtSecret } from './common/jwt-config';
 import { ensureSchema } from './database/bootstrap-schema';
 import { MailService } from './mail/mail.service';
-import { SmsService } from './mail/sms.service';
 
 /** Sites allowed to call the API. `CLIENT_ORIGIN` adds more (comma-separated). */
 function allowedOrigins() {
@@ -81,7 +80,7 @@ async function bootstrap() {
   console.log(`API server: http://localhost:${port}`);
   if (docsEnabled) console.log(`Swagger UI: http://localhost:${port}/api-docs`);
   console.log(
-    `Reset codes: SMS ${app.get(SmsService).isConfigured() ? 'on' : 'off'}, email ${app.get(MailService).isConfigured() ? 'on' : 'off'}`,
+    `Auth codes: email ${app.get(MailService).isConfigured() ? 'on' : 'off'} (never sent by SMS)`,
   );
 }
 

@@ -117,6 +117,10 @@ export class PasswordResetToken {
   @Column({ type: 'varchar', length: 64, unique: true })
   token!: string;
 
+  /** What the code may be used for. NULL = issued before purposes existed; accepted nowhere. */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  purpose!: 'register' | 'reset' | null;
+
   @Column({ name: 'expires_at', ...timestamptz })
   expiresAt!: Date;
 

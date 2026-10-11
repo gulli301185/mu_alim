@@ -29,6 +29,7 @@ export async function ensureSchema(
   if (seededQa) await cache?.invalidate('qa:');
   await ensureAdmin(ds);
   await ensureCertificateColumns(ds);
+  await ensureAuthCodeColumns(ds);
   const seededReviews = await ensureVideoReviews(ds);
   const seededTextReviews = await ensureTextReviews(ds);
   if (seededReviews || seededTextReviews) await cache?.invalidate('reviews:');
@@ -80,6 +81,20 @@ async function ensureCertificateColumns(ds: DataSource) {
   await ds.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS certificates_user_id_course_id_key
     ON public.certificates (user_id, course_id)
+  `);
+}
+
+/** Adds `password_reset_tokens.purpose` ('register' | 'reset') to databases created before it.
+ * Older rows keep NULL and are refused by both code endpoints. Safe to run repeatedly. */
+export async function ensureAuthCodeColumns(ds: DataSource) {
+  const [{ exists }] = await ds.query(
+    `SELECT to_regclass('public.password_reset_tokens') IS NOT NULL AS exists`,
+  );
+  if (!exists) return;
+
+  await ds.query(`
+    ALTER TABLE public.password_reset_tokens
+    ADD COLUMN IF NOT EXISTS purpose character varying(16)
   `);
 }
 

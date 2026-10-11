@@ -79,12 +79,25 @@ export const forgotPasswordSchema = z.object({
   email: emailSchema,
 });
 
+const nameField = (min: string, letters: string) =>
+  z.string().trim().min(2, min).max(100).regex(nameRegex, letters).optional();
+
+/** Confirms a registration. The password (and optionally name/phone) is set here, by whoever
+ * holds the emailed code — not by whoever registered the email first (QA F6). */
 export const confirmCodeSchema = z.object({
   email: emailSchema,
   code: z
     .string()
     .trim()
     .regex(/^\d{6}$/, 'Код 6 сандан турушу керек'),
+  password: passwordSchema,
+  firstName: nameField('Аты кеминде 2 тамгадан турушу керек', 'Атта тек тамгалар болушу керек'),
+  lastName: nameField('Фамилия кеминде 2 тамгадан турушу керек', 'Фамилияда тек тамгалар болушу керек'),
+  phone: phoneSchema,
+});
+
+export const resendCodeSchema = z.object({
+  email: emailSchema,
 });
 
 export const resetPasswordSchema = z

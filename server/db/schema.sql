@@ -333,7 +333,8 @@ CREATE TABLE public.password_reset_tokens (
     token character varying(64) NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     used_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    purpose character varying(16)
 );
 
 

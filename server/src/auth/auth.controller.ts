@@ -10,6 +10,7 @@ import {
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resendCodeSchema,
   resetPasswordSchema,
   updateProfileSchema,
 } from '../lib/auth-validation';
@@ -61,6 +62,13 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   confirmCode(@Body(new ZodPipe(confirmCodeSchema, formErrors)) body: z.infer<typeof confirmCodeSchema>) {
     return this.auth.confirmCode(body);
+  }
+
+  @Post('resend-code')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  resendCode(@Body(new ZodPipe(resendCodeSchema, formErrors)) body: z.infer<typeof resendCodeSchema>) {
+    return this.auth.resendCode(body);
   }
 
   @Post('reset-password')
