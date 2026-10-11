@@ -127,16 +127,16 @@ export async function deleteAdminTest(token: string, testId: string) {
   if (!res.ok) throw await parseApiError(res, 'Тест өчүрүлбөдү');
 }
 
-export function emptyChoiceQuestion(): CreateTestQuestionInput {
+/** Empty choice question with `count` options: 2 → А, Б; 4 → А, Б, В, Г. */
+export function emptyChoiceQuestion(count = 4): CreateTestQuestionInput {
   return {
     questionType: 'choice',
     questionText: '',
-    options: [
-      { optionText: '', isCorrect: true, optionOrder: 1 },
-      { optionText: '', isCorrect: false, optionOrder: 2 },
-      { optionText: '', isCorrect: false, optionOrder: 3 },
-      { optionText: '', isCorrect: false, optionOrder: 4 },
-    ],
+    options: Array.from({ length: count }, (_, i) => ({
+      optionText: '',
+      isCorrect: i === 0,
+      optionOrder: i + 1,
+    })),
   };
 }
 
@@ -166,15 +166,6 @@ export function trueFalseQuestion(questionText = '', correctIsTrue = true): Crea
       { optionText: FALSE_OPTION_TEXT, isCorrect: !correctIsTrue, optionOrder: 2 },
     ],
   };
-}
-
-export function isTrueFalseQuestion(question: CreateTestQuestionInput) {
-  return (
-    question.questionType === 'choice' &&
-    question.options.length === 2 &&
-    question.options[0].optionText.trim() === TRUE_OPTION_TEXT &&
-    question.options[1].optionText.trim() === FALSE_OPTION_TEXT
-  );
 }
 
 /** For a text question whose expected answer is just "Туура" / "Туура эмес" (or "Ката"):

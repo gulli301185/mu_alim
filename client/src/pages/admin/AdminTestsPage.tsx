@@ -12,7 +12,6 @@ import {
   emptyTextQuestion,
   fetchAdminTest,
   fetchAdminTests,
-  isTrueFalseQuestion,
   textTrueFalseAnswer,
   trueFalseQuestion,
   updateAdminTest,
@@ -46,21 +45,24 @@ function toCreateQuestions(questions: CreateTestQuestionInput[]): CreateTestQues
   });
 }
 
-type QuestionKind = 'choice' | 'truefalse' | 'text';
-
-function questionKind(question: CreateTestQuestionInput): QuestionKind {
-  return isTrueFalseQuestion(question) ? 'truefalse' : question.questionType;
+/** "А, Б" for two options, "А, Б, В, Г" for four. */
+function choiceLabels(count: number) {
+  return CHOICE_LABELS.slice(0, count).join(', ');
 }
 
 /** Switches the question type but keeps the question text (and a text answer of
  * "Туура" / "Туура эмес" becomes the matching А/Б choice). */
-function changeQuestionKind(question: CreateTestQuestionInput, kind: QuestionKind): CreateTestQuestionInput {
+function changeQuestionType(
+  question: CreateTestQuestionInput,
+  type: CreateTestQuestionInput['questionType'],
+): CreateTestQuestionInput {
+  if (type === question.questionType) return question;
   const { questionText } = question;
-  if (kind === 'truefalse') {
-    return trueFalseQuestion(questionText, textTrueFalseAnswer(question) ?? true);
-  }
-  if (kind === 'choice') {
-    return { ...emptyChoiceQuestion(), questionText } as CreateTestQuestionInput;
+  if (type === 'choice') {
+    const answer = textTrueFalseAnswer(question);
+    return answer === null
+      ? ({ ...emptyChoiceQuestion(), questionText } as CreateTestQuestionInput)
+      : trueFalseQuestion(questionText, answer);
   }
   const correctOption =
     question.questionType === 'choice' ? question.options.find((o) => o.isCorrect)?.optionText : '';
@@ -445,9 +447,9 @@ export function AdminTestsPage() {
                     <button
                       type="button"
                       className="qa-admin-btn qa-admin-btn-muted"
-                      onClick={() => setQuestions((prev) => [...prev, trueFalseQuestion()])}
+                      onClick={() => setQuestions((prev) => [...prev, emptyChoiceQuestion(2)])}
                     >
-                      + Туура / Туура эмес
+                      + А-Б
                     </button>
                     <button
                       type="button"
@@ -473,14 +475,21 @@ export function AdminTestsPage() {
                     <div className="admin-test-question-head">
                       <span className="admin-test-question-num">{qIndex + 1}-суроо</span>
                       <AdminSelect
-                        className="admin-test-type-select max-w-[260px]!"
-                        value={questionKind(question)}
-                        onChange={(kind) =>
-                          updateQuestion(qIndex, changeQuestionKind(question, kind as QuestionKind))
+                        className="admin-test-type-select"
+                        value={question.questionType}
+                        onChange={(type) =>
+                          updateQuestion(
+                            qIndex,
+                            changeQuestionType(question, type as CreateTestQuestionInput['questionType']),
+                          )
                         }
                         options={[
-                          { value: 'choice', label: 'А, Б, В, Г' },
-                          { value: 'truefalse', label: 'Туура / Туура эмес' },
+                          {
+                            value: 'choice',
+                            label: choiceLabels(
+                              question.questionType === 'choice' ? question.options.length : 4,
+                            ),
+                          },
                           { value: 'text', label: 'Текст жооп' },
                         ]}
                         aria-label="Суроо түрү"
@@ -544,11 +553,9 @@ export function AdminTestsPage() {
                                 })
                               }
                               placeholder={`${CHOICE_LABELS[oIndex]} вариант`}
-                              readOnly={isTrueFalseQuestion(question)}
                               required
                             />
-                            {!isTrueFalseQuestion(question) &&
-                            question.options.length > MIN_CHOICE_OPTIONS ? (
+                            {question.options.length > MIN_CHOICE_OPTIONS ? (
                               <button
                                 type="button"
                                 className="qa-admin-btn qa-admin-btn-danger"
@@ -561,8 +568,7 @@ export function AdminTestsPage() {
                             ) : null}
                           </label>
                         ))}
-                        {!isTrueFalseQuestion(question) &&
-                        question.options.length < MAX_CHOICE_OPTIONS ? (
+                        {question.options.length < MAX_CHOICE_OPTIONS ? (
                           <button
                             type="button"
                             className="qa-admin-btn qa-admin-btn-muted"
