@@ -30,7 +30,16 @@ type UserAuthModalProps = {
 export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthModalProps) {
   const { t } = useTranslation();
   const PASSWORD_HINT = t('auth.passwordHint');
-  const { loginUser, register, confirmCode, forgotPassword, resetPassword, isLoggingIn, isRegistering } = useAuth();
+  const {
+    loginUser,
+    register,
+    confirmCode,
+    resendRegisterCode,
+    forgotPassword,
+    resetPassword,
+    isLoggingIn,
+    isRegistering,
+  } = useAuth();
   const { image } = useSiteImages();
   const [tab, setTab] = useState<AuthTab>(initialTab);
   const [loading, setLoading] = useState(false);
@@ -50,6 +59,12 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
     password: '',
     confirmPassword: '',
   });
+  /** Name/phone from a validated registration form; sent again when the code is confirmed. */
+  const [pendingProfile, setPendingProfile] = useState<{
+    firstName: string;
+    lastName: string;
+    phone: string;
+  } | null>(null);
   const [forgotEmail, setForgotEmail] = useState('');
   const [resetForm, setResetForm] = useState({ token: '', password: '', confirmPassword: '' });
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -119,6 +134,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
       if (err instanceof AuthApiError && err.needsConfirmation) {
         setTab('register');
         setRegisterStep('code');
+        setPendingProfile(null);
         setRegisterForm((prev) => ({
           ...prev,
           email: err.email ?? loginForm.email,
@@ -156,6 +172,11 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
         password: parsed.data.password,
       });
       if (result?.needsConfirmation) {
+        setPendingProfile({
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          phone: parsed.data.phone,
+        });
         setForgotMessage(result.message);
         setRegisterStep('code');
         setResendIn(59);
@@ -182,7 +203,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
     }
     setLoading(true);
     try {
-      await confirmCode(parsed.data);
+      await confirmCode({ ...parsed.data, password: registerForm.password, ...pendingProfile });
       toastSuccess(t('auth.registeredSuccess'));
       onClose();
     } catch (err) {
@@ -193,11 +214,12 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
     }
   };
 
-  const handleResend = async (email: string) => {
+  const handleResend = async (email: string, purpose: 'register' | 'reset') => {
     if (resendIn > 0 || !email) return;
     setLoading(true);
     try {
-      const result = await forgotPassword({ email });
+      const result =
+        purpose === 'register' ? await resendRegisterCode({ email }) : await forgotPassword({ email });
       setForgotMessage(result.message);
       setResendIn(59);
       toastSuccess(result.message);
@@ -374,7 +396,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
                 {resendIn > 0 ? (
                   <span>{t('auth.resendCountdown', { sec: String(resendIn).padStart(2, '0') })}</span>
                 ) : (
-                  <button type="button" className="auth-modal-switch-btn" onClick={() => void handleResend(registerForm.email)}>
+                  <button type="button" className="auth-modal-switch-btn" onClick={() => void handleResend(registerForm.email, 'register')}>
                     {t('auth.resendCode')}
                   </button>
                 )}
@@ -525,7 +547,7 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
                   {resendIn > 0 ? (
                     <span>{t('auth.resendCountdown', { sec: String(resendIn).padStart(2, '0') })}</span>
                   ) : (
-                    <button type="button" className="auth-modal-switch-btn" onClick={() => void handleResend(forgotEmail)}>
+                    <button type="button" className="auth-modal-switch-btn" onClick={() => void handleResend(forgotEmail, 'reset')}>
                       {t('auth.resendCode')}
                     </button>
                   )}

@@ -187,7 +187,18 @@ export async function registerRequest(input: RegisterInput): Promise<AuthSession
   return res.json() as Promise<AuthSession | RegisterPending>;
 }
 
-export async function confirmCodeRequest(input: { email: string; code: string }): Promise<AuthSession> {
+/** The password (and name/phone, when known) is set when the emailed code is confirmed,
+ * so only the mailbox owner can choose it (QA F6). */
+export type ConfirmCodeInput = {
+  email: string;
+  code: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+};
+
+export async function confirmCodeRequest(input: ConfirmCodeInput): Promise<AuthSession> {
   const res = await fetch(`${API_BASE}/api/auth/confirm-code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -203,6 +214,19 @@ export async function forgotPasswordRequest(input: { email: string }): Promise<{
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
+  if (!res.ok) throw await parseApiError(res, 'Сурам ийгиликсиз');
+  return res.json() as Promise<{ message: string }>;
+}
+
+/** Sends a new registration code. An API without /auth/resend-code (404, deployed before it)
+ * gets the previous behaviour (forgot-password); drop the fallback once the backend is live. */
+export async function resendRegisterCodeRequest(input: { email: string }): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/resend-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 404) return forgotPasswordRequest(input);
   if (!res.ok) throw await parseApiError(res, 'Сурам ийгиликсиз');
   return res.json() as Promise<{ message: string }>;
 }

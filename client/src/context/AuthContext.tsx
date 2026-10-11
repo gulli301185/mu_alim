@@ -10,6 +10,8 @@ import {
   fetchMe,
   confirmCodeRequest,
   forgotPasswordRequest,
+  resendRegisterCodeRequest,
+  type ConfirmCodeInput,
   isRegisterPending,
   loadStoredAuth,
   loginUserRequest,
@@ -36,7 +38,8 @@ type AuthContextValue = {
   loginUser: (input: LoginInput) => Promise<void>;
   loginAdmin: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<{ needsConfirmation: true; email: string; message: string } | void>;
-  confirmCode: (input: { email: string; code: string }) => Promise<void>;
+  confirmCode: (input: ConfirmCodeInput) => Promise<void>;
+  resendRegisterCode: (input: { email: string }) => Promise<{ message: string }>;
   logout: () => void;
   updateProfile: (input: UpdateProfileInput) => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
@@ -226,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const confirmCode = useCallback(
-    async (input: { email: string; code: string }) => {
+    async (input: ConfirmCodeInput) => {
       await confirmCodeMutation.mutateAsync(input);
       navigate('/', { replace: true });
     },
@@ -266,6 +269,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [forgotPasswordMutation],
   );
 
+  const resendRegisterCode = useCallback(
+    (input: { email: string }) => resendRegisterCodeRequest(input),
+    [],
+  );
+
   const resetPassword = useCallback(
     async (input: {
       token: string;
@@ -296,6 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginAdmin,
       register,
       confirmCode,
+      resendRegisterCode,
       logout,
       updateProfile,
       refreshUser,
@@ -316,6 +325,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginAdmin,
       register,
       confirmCode,
+      resendRegisterCode,
       logout,
       updateProfile,
       refreshUser,
