@@ -8,8 +8,6 @@ export type Dua = {
   note?: string;
 };
 
-export const DUAS_TITLE = 'Пайгамбар ﷺ көп окуган дубалар';
-
 export const DUAS: Dua[] = [
   {
     id: 'dua-1',

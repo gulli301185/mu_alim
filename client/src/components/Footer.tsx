@@ -218,7 +218,7 @@ export function Footer() {
                 <li>
                   <p className="footer-contact-item">
                     <MapPin className="footer-contact-icon" aria-hidden />
-                    <span>{SITE.address}</span>
+                    <span>{t("site.address")}</span>
                   </p>
                 </li>
               </ul>

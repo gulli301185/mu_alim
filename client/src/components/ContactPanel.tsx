@@ -103,7 +103,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
               </span>
               <span className="contact-panel-copy">
                 <span className="contact-panel-label">{t("contact.address")}</span>
-                <span className="contact-panel-value">{SITE.address}</span>
+                <span className="contact-panel-value">{t('site.address')}</span>
               </span>
             </div>
           </li>

@@ -121,8 +121,9 @@ function VideoPanelLink({
 }
 
 function StarRating({ value }: { value: number }) {
+  const { t } = useTranslation();
   return (
-    <span className="course-stars" aria-label={`${value} из 5`}>
+    <span className="course-stars" aria-label={t("courses.ratingAria", { value })}>
       {Array.from({ length: 5 }, (_, i) => (
         <Star
           key={i}
