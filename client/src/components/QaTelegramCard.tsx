@@ -1,5 +1,4 @@
 import { Eye } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import {
   formatQuestionDate,
   formatQuestionNumber,
@@ -18,17 +17,14 @@ type QaTelegramCardProps = {
 };
 
 export function QaTelegramCard({ article, compact = false, searchQuery = '' }: QaTelegramCardProps) {
-  const { t } = useTranslation();
   const question = article.question ?? article.title;
   const answer = article.answer ?? article.excerpt;
   const numberLabel =
-    article.number != null
-      ? `${t('qaCard.question')} ${formatQuestionNumber(article.number)}:`
-      : `${t('qaCard.question')}:`;
+    article.number != null ? `СУРОО ${formatQuestionNumber(article.number)}:` : 'СУРОО:';
 
   return (
     <div className="qa-tg-card">
-      <p className="qa-tg-header">{t('qaCard.header')}</p>
+      <p className="qa-tg-header">⚜️ СУРОО-ЖООП ⚜️</p>
 
       <div className="qa-tg-section">
         <p className="qa-tg-label">❓ {numberLabel}</p>
@@ -36,7 +32,7 @@ export function QaTelegramCard({ article, compact = false, searchQuery = '' }: Q
       </div>
 
       <div className="qa-tg-section">
-        <p className="qa-tg-label">✅ {t('qaCard.answer')}:</p>
+        <p className="qa-tg-label">✅ ЖООП:</p>
         <p className={`qa-tg-text${compact ? ' qa-tg-text-compact' : ''}`}>
           {highlightText(answer, searchQuery)}
         </p>

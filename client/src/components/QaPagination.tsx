@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 type QaPaginationProps = {
   currentPage: number;
@@ -9,7 +8,6 @@ type QaPaginationProps = {
 };
 
 export function QaPagination({ currentPage, totalPages, onPageChange }: QaPaginationProps) {
-  const { t } = useTranslation();
   const numsRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
 
@@ -25,20 +23,20 @@ export function QaPagination({ currentPage, totalPages, onPageChange }: QaPagina
   if (totalPages <= 1) return null;
 
   return (
-    <nav className="qa-pagination" aria-label={t('pagination.aria')}>
+    <nav className="qa-pagination" aria-label="Беттер">
       <button
         type="button"
         className="qa-page-nav-btn qa-page-nav-btn-prev"
         disabled={currentPage <= 1}
         onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-        aria-label={t('pagination.prev')}
+        aria-label="Алдыңкы"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
-        <span className="qa-page-nav-label">{t('pagination.prev')}</span>
+        <span className="qa-page-nav-label">Алдыңкы</span>
       </button>
 
       <div className="qa-pagination-nums-wrap">
-        <div ref={numsRef} className="qa-page-nums" role="group" aria-label={t('pagination.numbersAria')}>
+        <div ref={numsRef} className="qa-page-nums" role="group" aria-label="Бет номери">
           {middlePages.map((n) => (
             <button
               key={n}
@@ -61,7 +59,7 @@ export function QaPagination({ currentPage, totalPages, onPageChange }: QaPagina
             }`}
             onClick={() => onPageChange(lastPage)}
             aria-current={currentPage === lastPage ? 'page' : undefined}
-            aria-label={t('pagination.lastPage', { page: lastPage })}
+            aria-label={`Акыркы бет ${lastPage}`}
           >
             {lastPage}
           </button>
@@ -73,9 +71,9 @@ export function QaPagination({ currentPage, totalPages, onPageChange }: QaPagina
         className="qa-page-nav-btn qa-page-nav-btn-next"
         disabled={currentPage >= totalPages}
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-        aria-label={t('pagination.next')}
+        aria-label="Кийинки"
       >
-        <span className="qa-page-nav-label">{t('pagination.next')}</span>
+        <span className="qa-page-nav-label">Кийинки</span>
         <ChevronRight className="h-4 w-4" aria-hidden />
       </button>
     </nav>
