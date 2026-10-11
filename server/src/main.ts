@@ -11,6 +11,7 @@ import { AppModule } from './app.module';
 import { CacheService } from './cache/cache.service';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { langMiddleware } from './common/i18n';
+import { resolveJwtSecret } from './common/jwt-config';
 import { ensureSchema } from './database/bootstrap-schema';
 import { MailService } from './mail/mail.service';
 import { SmsService } from './mail/sms.service';
@@ -40,6 +41,14 @@ function isAllowedOrigin(origin: string | undefined) {
 }
 
 async function bootstrap() {
+  // Fail fast — before any database connection — when production has no safe JWT secret.
+  try {
+    resolveJwtSecret(process.env, () => undefined);
+  } catch (err) {
+    console.error(`Startup aborted: ${(err as Error).message}`);
+    process.exit(1);
+  }
+
   // Body parsing is wired by hand: the review-video upload streams its raw body itself.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   // Behind Cloudflare + Traefik: trust the proxy chain so the throttler's fallback

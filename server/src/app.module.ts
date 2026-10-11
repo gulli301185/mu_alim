@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AuthModule } from './auth/auth.module';
 import { CacheModule } from './cache/cache.service';
+import { jwtModuleOptions } from './common/jwt-config';
 import { CoursesModule } from './courses/courses.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { HealthController } from './health/health.controller';
@@ -21,11 +22,8 @@ import { TestsModule } from './tests/tests.module';
 
 @Module({
   imports: [
-    JwtModule.register({
-      global: true,
-      secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
-      signOptions: { expiresIn: '7d' },
-    }),
+    // HS256 + 7 days as before; NODE_ENV=production refuses a missing/weak secret (common/jwt-config.ts).
+    JwtModule.registerAsync({ global: true, useFactory: () => jwtModuleOptions(process.env) }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 300 }]),
     DatabaseModule,
     CacheModule,
