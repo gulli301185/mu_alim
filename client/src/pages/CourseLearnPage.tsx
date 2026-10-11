@@ -6,6 +6,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -92,6 +93,7 @@ function FreeYoutubeEmbed({
   videoId: string;
   title: string;
 }) {
+  const { t } = useTranslation();
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
@@ -104,7 +106,7 @@ function FreeYoutubeEmbed({
         type="button"
         className="course-learn-embed course-learn-free-embed courses-free-watch course-learn-free-preview"
         onClick={() => setPlaying(true)}
-        aria-label={`${title} — сайтта ойнотуу`}
+        aria-label={t("learn.playOnSite", { title })}
       >
         <img
           src={youtubeThumbnail(videoId)}
@@ -132,6 +134,7 @@ function FreeYoutubeEmbed({
 }
 
 export function CourseLearnPage() {
+  const { t } = useTranslation();
   const { courseId } = useParams<{ courseId: string }>();
   const [searchParams] = useSearchParams();
   const lessonFromQuery = searchParams.get("lesson");
@@ -486,7 +489,7 @@ export function CourseLearnPage() {
         })
         .catch(() => {
           toastError(
-            "Сабак серверге сакталган жок. Интернетти текшерип, сабакты кайра бүтүрүңүз.",
+            t("learn.saveFailed"),
           );
         });
     }
@@ -536,8 +539,8 @@ export function CourseLearnPage() {
       if (!result.passed) {
         toastError(
           result.locked
-            ? "Тесттен 3 жолу өтпөдүңүз. Даярданып, кайрадан тест тапшырыңыз."
-            : "Тесттен өтпөдүңүз",
+            ? t("learn.failed3")
+            : t("learn.failed"),
         );
       }
     } catch (error) {
@@ -545,7 +548,7 @@ export function CourseLearnPage() {
         toastError(error.message);
         void refetchFinalTest();
       } else {
-        toastError("Тест тапшырылган жок. Кайра аракет кылыңыз.");
+        toastError(t("learn.submitFailed"));
       }
     } finally {
       setTestSubmitting(false);
@@ -598,10 +601,10 @@ export function CourseLearnPage() {
         issuedAt: new Date(),
         certificateNumber,
       });
-      if (result === "ok") toastSuccess("Сертификат даяр");
+      if (result === "ok") toastSuccess(t("learn.certReady"));
     } catch (err) {
       toastError(
-        getErrorMessage(err, "Сертификат жүктөлгөн жок. Кайра аракет кылыңыз."),
+        getErrorMessage(err, t("learn.certFailed")),
       );
     } finally {
       setCertificateDownloading(false);
@@ -622,7 +625,7 @@ export function CourseLearnPage() {
     return (
       <section className="course-learn-page">
         <div className="wrap course-learn-inner">
-          <p className="course-learn-stats">Жүктөлүүдө...</p>
+          <p className="course-learn-stats">{t("common.loading")}</p>
         </div>
       </section>
     );
@@ -636,7 +639,7 @@ export function CourseLearnPage() {
     return (
       <section className="course-learn-page">
         <div className="wrap course-learn-inner">
-          <p className="course-learn-stats">Сабактар жүктөлүүдө...</p>
+          <p className="course-learn-stats">{t("learn.lessonsLoading")}</p>
         </div>
       </section>
     );
@@ -646,14 +649,14 @@ export function CourseLearnPage() {
     const message =
       lessonsQueryError instanceof Error &&
       lessonsQueryError.message === "Курс табылган жок"
-        ? "Бул курс базада табылган жок. Админге кайрылыңыз."
-        : "Сабактар жүктөлбөдү. Кийинчерээк кайра аракет кылыңыз.";
+        ? t("learn.courseNotInDb")
+        : t("learn.lessonsLoadFailed");
     return (
       <section className="course-learn-page">
         <div className="wrap course-learn-inner">
           <Link to={`/courses/${courseId}`} className="course-learn-back">
             <ArrowLeft className="h-4 w-4" />
-            Курска кайтуу
+            {t("learn.backToCourse")}
           </Link>
           <p className="course-learn-stats">{message}</p>
         </div>
@@ -667,10 +670,10 @@ export function CourseLearnPage() {
         <div className="wrap course-learn-inner">
           <Link to={`/courses/${courseId}`} className="course-learn-back">
             <ArrowLeft className="h-4 w-4" />
-            Курска кайтуу
+            {t("learn.backToCourse")}
           </Link>
           <p className="course-learn-stats">
-            Бул курс үчүн жарыяланган сабактар табылган жок.
+            {t("learn.noPublished")}
           </p>
         </div>
       </section>
@@ -681,7 +684,7 @@ export function CourseLearnPage() {
     return (
       <section className="course-learn-page">
         <div className="wrap course-learn-inner">
-          <p className="course-learn-stats">Сабактар жүктөлүүдө...</p>
+          <p className="course-learn-stats">{t("learn.lessonsLoading")}</p>
         </div>
       </section>
     );
@@ -700,13 +703,13 @@ export function CourseLearnPage() {
           <div className="course-learn-head">
             <Link to="/courses/free" className="course-learn-back">
               <ArrowLeft className="h-4 w-4" />
-              Бекер курстарга кайтуу
+              {t("learn.backToFree")}
             </Link>
             <div>
-              <p className="course-learn-label">Бекер курс</p>
+              <p className="course-learn-label">{t("learn.freeCourse")}</p>
               <h1 className="course-learn-title">{course.title}</h1>
               <p className="course-learn-stats">
-                {lessonCount} видео-баян · YouTube'да ачык көрүү
+                {t("learn.freeStats", { count: lessonCount })}
               </p>
             </div>
           </div>
@@ -714,7 +717,7 @@ export function CourseLearnPage() {
           <div className="course-learn-grid">
             <aside className="course-learn-sidebar ui-card">
               <h2 className="course-learn-sidebar-title">
-                Видеолор ({lessonCount})
+                {t("learn.videos", { count: lessonCount })}
               </h2>
               <ul className="course-learn-lessons">
                 {lessons.map((lesson) => {
@@ -745,7 +748,7 @@ export function CourseLearnPage() {
                 })}
               </ul>
               <Link to="/courses/free" className="course-learn-back-courses">
-                Бекер курстарга өтүү
+                {t("learn.toFree")}
               </Link>
             </aside>
 
@@ -756,7 +759,7 @@ export function CourseLearnPage() {
                     {activeLesson.title}
                   </h2>
                   <p className="course-learn-main-author">
-                    Сабактын автору Мухаммадалим Халил
+                    {t("learn.author")}
                   </p>
                 </div>
                 <span className="course-learn-main-step">
@@ -772,8 +775,7 @@ export function CourseLearnPage() {
                   />
                 ) : null}
                 <p className="course-learn-video-hint">
-                  Видеону бассаңыз сайтта ойнотулат. Толук YouTube'да ачуу үчүн
-                  төмөнкү баскычты колдонуңуз.
+                  {t("learn.freeHint")}
                 </p>
                 <button
                   type="button"
@@ -784,7 +786,7 @@ export function CourseLearnPage() {
                   }}
                 >
                   <PlayCircle className="h-5 w-5" aria-hidden />
-                  YouTube'да ачуу
+                  {t("learn.openYoutube")}
                 </button>
               </div>
             </article>
@@ -815,18 +817,18 @@ export function CourseLearnPage() {
           <h3 className="course-learn-test-title">{test.title}</h3>
           <div className="course-learn-test-lock" role="alert">
             <p className="course-learn-test-lock-title">
-              Тест 1 суткага жабылды
+              {t("learn.testLocked")}
             </p>
             <p className="course-learn-test-fail">
-              Тесттен 3 жолу өтпөдүңүз. Даярданып, кайрадан тест тапшырыңыз.
+              {t("learn.failed3")}
             </p>
             {lockedUntil ? (
               <p className="course-learn-test-lock-until">
-                Кайра аракет: {formatTestLockUntil(lockedUntil)}
+                {t("learn.retryAt", { date: formatTestLockUntil(lockedUntil) })}
               </p>
             ) : (
               <p className="course-learn-test-lock-until">
-                Кайра аракет 1 суткадан кийин.
+                {t("learn.retryIn24h")}
               </p>
             )}
           </div>
@@ -838,11 +840,12 @@ export function CourseLearnPage() {
       <div className="course-learn-test">
         <h3 className="course-learn-test-title">{test.title}</h3>
         <p className="course-learn-video-hint">
-          Бардык сабактар аяктады. {test.questions.length} суроолук финалдык
-          тестти тапшырыңыз — {CERTIFICATE_THRESHOLD * 100}% жана андан жогору
-          болсо PDF сертификат берилет.
+          {t("learn.testIntro", {
+            count: test.questions.length,
+            pct: CERTIFICATE_THRESHOLD * 100,
+          })}
           {typeof remainingAttempts === "number" && !testPassed ? (
-            <> · Калып {remainingAttempts} аракет</>
+            <>{t("learn.attemptsLeft", { count: remainingAttempts })}</>
           ) : null}
         </p>
         <div className="course-learn-test-scroll">
@@ -899,13 +902,13 @@ export function CourseLearnPage() {
                         [question.id]: e.target.value,
                       }))
                     }
-                    placeholder="Жообуңузду жазыңыз"
+                    placeholder={t("learn.answerPlaceholder")}
                     disabled={testSubmitted && testPassed}
                   />
                 )}
                 {isWrong ? (
                   <p className="course-learn-test-wrong-hint" role="alert">
-                    Туура эмес жооп
+                    {t("learn.wrongAnswer")}
                   </p>
                 ) : null}
               </fieldset>
@@ -916,9 +919,10 @@ export function CourseLearnPage() {
         {testSubmitted && !testPassed && (
           <>
             <p className="course-learn-test-fail">
-              {passingScoreLabel}% дан жогору топтоңуз (
-              {lastTestScore ?? gradeResult?.scorePercent ?? 0}%). Кайра аракет
-              кылыңыз.
+              {t("learn.scoreAbove", {
+                pct: passingScoreLabel,
+                score: lastTestScore ?? gradeResult?.scorePercent ?? 0,
+              })}
             </p>
             <button
               type="button"
@@ -930,7 +934,7 @@ export function CourseLearnPage() {
                 setGradeResult(null);
               }}
             >
-              Кайра тапшыруу
+              {t("learn.retake")}
             </button>
           </>
         )}
@@ -938,22 +942,24 @@ export function CourseLearnPage() {
         {testPassed ? (
           <div className="course-learn-test-pass-wrap">
             <p className="course-learn-test-pass">
-              <CheckCircle2 className="h-4 w-4 inline" /> Курстук тест
-              ийгиликтүү! ({lastTestScore ?? progress.finalTestScore}%)
+              <CheckCircle2 className="h-4 w-4 inline" />{" "}
+              {t("learn.testPassed", {
+                score: lastTestScore ?? progress.finalTestScore,
+              })}
             </p>
             {certificateReady ? (
               <div className="course-learn-done course-learn-done-inline">
                 <p className="course-learn-test-cert-hint">
-                  Сертификатты жүктөп ала аласыз!
+                  {t("learn.canDownloadCert")}
                 </p>
                 <label className="course-learn-cert-name-field">
-                  <span className="course-learn-cert-name-label">Атыңыз</span>
+                  <span className="course-learn-cert-name-label">{t("learn.yourName")}</span>
                   <input
                     type="text"
                     className="course-learn-cert-name-input"
                     value={certificateName}
                     onChange={(e) => setCertificateName(e.target.value)}
-                    placeholder="Сертификатка жазылуу"
+                    placeholder={t("learn.certNamePlaceholder")}
                   />
                 </label>
                 <button
@@ -964,8 +970,8 @@ export function CourseLearnPage() {
                 >
                   <Download className="h-4 w-4" aria-hidden />
                   {certificateDownloading
-                    ? "Даярдалууда..."
-                    : "ПДФ сертификатты жүктөө"}
+                    ? t("learn.preparing")
+                    : t("learn.downloadCert")}
                 </button>
               </div>
             ) : null}
@@ -977,7 +983,7 @@ export function CourseLearnPage() {
             onClick={() => void handleFinalTestSubmit()}
             disabled={!allTestQuestionsAnswered || testSubmitting}
           >
-            {testSubmitting ? "Текшерилүүдө..." : "Курстук тестти тапшыруу"}
+            {testSubmitting ? t("learn.checking") : t("learn.submitTest")}
           </button>
         )}
       </div>
@@ -993,14 +999,17 @@ export function CourseLearnPage() {
             className="course-learn-back"
           >
             <ArrowLeft className="h-4 w-4" />
-            {isFree ? "Бекер курстарга" : "Курстарга"} кайтуу
+            {isFree ? t("learn.backToFreeShort") : t("learn.backToCourses")}
           </Link>
           <div>
-            <p className="course-learn-label">Менин курсум</p>
+            <p className="course-learn-label">{t("learn.myCourse")}</p>
             <h1 className="course-learn-title">{course.title}</h1>
             <p className="course-learn-stats">
-              {lessonCount} видео-сабак · {completedCount} аякталды ·{" "}
-              {lessonCount - completedCount} калды
+              {t("learn.stats", {
+                count: lessonCount,
+                done: completedCount,
+                left: lessonCount - completedCount,
+              })}
             </p>
           </div>
         </div>
@@ -1008,7 +1017,7 @@ export function CourseLearnPage() {
         <div className="course-learn-grid">
           <aside className="course-learn-sidebar ui-card">
             <h2 className="course-learn-sidebar-title">
-              Видеолор ({lessonCount})
+              {t("learn.videos", { count: lessonCount })}
             </h2>
             <ul className="course-learn-lessons">
               {lessons.map((lesson) => {
@@ -1083,10 +1092,10 @@ export function CourseLearnPage() {
                               }`}
                             >
                               {completed
-                                ? "Көрүлүп бүттү"
+                                ? t("learn.watchedDone")
                                 : unlocked
-                                  ? "Бүтө элек"
-                                  : "Жабык"}
+                                  ? t("learn.notDone")
+                                  : t("learn.locked")}
                             </span>
                           </span>
                         </span>
@@ -1099,7 +1108,7 @@ export function CourseLearnPage() {
                             : ""
                         }`}
                         disabled={!unlocked}
-                        aria-label={`${lesson.title} видеону ачуу`}
+                        aria-label={t("learn.openVideo", { title: lesson.title })}
                         onClick={openLesson}
                       >
                         {lesson.videoId ? (
@@ -1143,7 +1152,7 @@ export function CourseLearnPage() {
                     setLastTestScore(null);
                   }}
                 >
-                  Курстук финалдык тест
+                  {t("learn.finalTest")}
                 </button>
               </div>
             ) : null}
@@ -1152,7 +1161,7 @@ export function CourseLearnPage() {
               to={isFree ? "/courses/free" : "/courses"}
               className="course-learn-back-courses"
             >
-              {isFree ? "Бекер курстарга өтүү" : "Курстарга өтүү"}
+              {isFree ? t("learn.toFree") : t("learn.toCourses")}
             </Link>
           </aside>
 
@@ -1161,18 +1170,18 @@ export function CourseLearnPage() {
               <>
                 <div className="course-learn-main-head">
                   <h2 className="course-learn-main-title">
-                    Курстук финалдык тест
+                    {t("learn.finalTest")}
                   </h2>
                   <button
                     type="button"
                     className="course-learn-back-to-lessons"
                     onClick={() => setViewMode("lesson")}
                   >
-                    Сабактарга кайтуу
+                    {t("learn.backToLessons")}
                   </button>
                 </div>
                 {courseFinalTestLoading ? (
-                  <p className="course-learn-stats">Тест жүктөлүүдө...</p>
+                  <p className="course-learn-stats">{t("learn.testLoading")}</p>
                 ) : (
                   renderFinalTestPanel(courseFinalTest)
                 )}
@@ -1185,7 +1194,7 @@ export function CourseLearnPage() {
                       {activeLesson.title}
                     </h2>
                     <p className="course-learn-main-author">
-                      Сабактын автору Мухаммадалим Халил
+                      {t("learn.author")}
                     </p>
                   </div>
                   <span className="course-learn-main-step">
@@ -1196,14 +1205,14 @@ export function CourseLearnPage() {
                 {!activeAccessible ? (
                   <div className="course-learn-locked-msg">
                     <Lock className="h-8 w-8" aria-hidden />
-                    <p>Бул видео жабык. Мурунку сабакты аяктаңыз.</p>
+                    <p>{t("learn.videoLocked")}</p>
                   </div>
                 ) : (
                   <div className="course-learn-video-block">
                     {isActiveLessonCompleted ? (
                       <div className="course-learn-review-success">
                         <CheckCircle2 className="h-5 w-5" aria-hidden />
-                        <span>Сабак аякталды — кайра көрө аласыз</span>
+                        <span>{t("learn.lessonDoneRewatch")}</span>
                       </div>
                     ) : null}
 
@@ -1220,8 +1229,7 @@ export function CourseLearnPage() {
                       <div className="course-learn-locked-msg">
                         <Lock className="h-8 w-8" aria-hidden />
                         <p>
-                          Сабак шилтемеси ачыла элек. Доступ берилгенде көрө
-                          аласыз.
+                          {t("learn.linkNotOpen")}
                         </p>
                       </div>
                     )}
@@ -1229,8 +1237,7 @@ export function CourseLearnPage() {
                     {isActiveLessonCompleted ? (
                       <>
                         <p className="course-learn-video-hint">
-                          Видеону каалаган убакта кайра көрүңүз · ылдамдыкты
-                          өзгөртүүгө болот
+                          {t("learn.rewatchHint")}
                         </p>
                         {(() => {
                           const next = lessons.find(
@@ -1250,21 +1257,20 @@ export function CourseLearnPage() {
                                   className="course-learn-done-logo"
                                 />
                                 <p className="course-learn-done-all">
-                                  Бардык видеолор аякталды!
+                                  {t("learn.allVideosDone")}
                                 </p>
                                 {!courseFinalTest ? (
                                   certificateReady ? (
                                     <>
                                       <p className="course-learn-done-title">
-                                        Сертификатка укук ачылды!
+                                        {t("learn.certUnlocked")}
                                       </p>
                                       <p className="course-learn-done-text">
-                                        Бардык сабактар аякталды. Сертификатты
-                                        жүктөп алыңыз.
+                                        {t("learn.allLessonsDoneDownload")}
                                       </p>
                                       <label className="course-learn-cert-name-field">
                                         <span className="course-learn-cert-name-label">
-                                          Атыңыз
+                                          {t("learn.yourName")}
                                         </span>
                                         <input
                                           type="text"
@@ -1273,7 +1279,7 @@ export function CourseLearnPage() {
                                           onChange={(e) =>
                                             setCertificateName(e.target.value)
                                           }
-                                          placeholder="Сертификатка жазылуу"
+                                          placeholder={t("learn.certNamePlaceholder")}
                                         />
                                       </label>
                                       <button
@@ -1292,43 +1298,44 @@ export function CourseLearnPage() {
                                           aria-hidden
                                         />
                                         {certificateDownloading
-                                          ? "Даярдалууда..."
-                                          : "ПДФ сертификатты жүктөө"}
+                                          ? t("learn.preparing")
+                                          : t("learn.downloadCert")}
                                       </button>
                                     </>
                                   ) : (
                                     <p className="course-learn-done-text">
-                                      Курс ийгиликтүү аяктады!
+                                      {t("learn.courseDone")}
                                     </p>
                                   )
                                 ) : !finalTestPassed ? (
                                   <>
                                     <p className="course-learn-done-text">
-                                      Сертификат алуу үчүн курстук финалдык
-                                      тестти {CERTIFICATE_THRESHOLD * 100}% жана
-                                      андан жогору топтоңуз.
+                                      {t("learn.needTestForCert", {
+                                        pct: CERTIFICATE_THRESHOLD * 100,
+                                      })}
                                     </p>
                                     <button
                                       type="button"
                                       className="btn-gold course-learn-next-btn"
                                       onClick={() => setViewMode("final-test")}
                                     >
-                                      Курстук тестке өтүү
+                                      {t("learn.toTest")}
                                     </button>
                                   </>
                                 ) : certificateReady ? (
                                   <>
                                     <p className="course-learn-done-title">
-                                      Сертификатка укук ачылды!
+                                      {t("learn.certUnlocked")}
                                     </p>
                                     <p className="course-learn-done-text">
-                                      Курстук тест:{" "}
-                                      {progress.finalTestScore ?? 0}% (минимум{" "}
-                                      {CERTIFICATE_THRESHOLD * 100}%)
+                                      {t("learn.testScore", {
+                                        score: progress.finalTestScore ?? 0,
+                                        pct: CERTIFICATE_THRESHOLD * 100,
+                                      })}
                                     </p>
                                     <label className="course-learn-cert-name-field">
                                       <span className="course-learn-cert-name-label">
-                                        Атыңыз
+                                        {t("learn.yourName")}
                                       </span>
                                       <input
                                         type="text"
@@ -1337,7 +1344,7 @@ export function CourseLearnPage() {
                                         onChange={(e) =>
                                           setCertificateName(e.target.value)
                                         }
-                                        placeholder="Сертификатка жазылуу"
+                                        placeholder={t("learn.certNamePlaceholder")}
                                       />
                                     </label>
                                     <button
@@ -1356,15 +1363,15 @@ export function CourseLearnPage() {
                                         aria-hidden
                                       />
                                       {certificateDownloading
-                                        ? "Даярдалууда..."
-                                        : "ПДФ сертификатты жүктөө"}
+                                        ? t("learn.preparing")
+                                        : t("learn.downloadCert")}
                                     </button>
                                   </>
                                 ) : (
                                   <p className="course-learn-done-text">
-                                    Сертификат үчүн курстук тестти{" "}
-                                    {CERTIFICATE_THRESHOLD * 100}% жана андан
-                                    жогору топтоңуз.
+                                    {t("learn.certNeedsTest", {
+                                      pct: CERTIFICATE_THRESHOLD * 100,
+                                    })}
                                   </p>
                                 )}
                               </div>
@@ -1376,7 +1383,7 @@ export function CourseLearnPage() {
                               className="btn-gold course-learn-next-btn"
                               onClick={() => setActiveLessonId(next.id)}
                             >
-                              Кийинки видео: {next.order}-сабак
+                              {t("learn.nextVideo", { n: next.order })}
                             </button>
                           );
                         })()}
@@ -1384,7 +1391,7 @@ export function CourseLearnPage() {
                     ) : (
                       <>
                         <p className="course-learn-video-hint">
-                          Видеону аягына чейин көрүңүз.
+                          {t("learn.watchToEnd")}
                         </p>
                         <button
                           type="button"
@@ -1393,8 +1400,8 @@ export function CourseLearnPage() {
                           onClick={handleVideoComplete}
                         >
                           {!videoWatched
-                            ? "Видеону аягына чейин көрүңүз..."
-                            : "Көрүү аяктады — улантуу"}
+                            ? t("learn.watchToEndBtn")
+                            : t("learn.watchedContinue")}
                         </button>
                       </>
                     )}
