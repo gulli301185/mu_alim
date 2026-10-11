@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Maximize2, Minimize2, Play } from 'lucide-react';
 
 type CourseYoutubePlayerProps = {
@@ -109,6 +110,7 @@ export function CourseYoutubePlayer({
   requireFullWatch = true,
   allowSpeedControl = !requireFullWatch,
 }: CourseYoutubePlayerProps) {
+  const { t } = useTranslation();
   const reactId = useId().replace(/:/g, '');
   const playerHostId = `yt-player-${reactId}`;
   const playerRef = useRef<YtPlayer | null>(null);
@@ -422,7 +424,7 @@ export function CourseYoutubePlayer({
           <button
             type="button"
             className="course-learn-yt-shield"
-            aria-label={isPlaying ? 'Пауза' : 'Ойнотуу'}
+            aria-label={isPlaying ? t('player.pause') : t('player.play')}
             onClick={() => {
               const player = playerRef.current;
               if (!player) return;
@@ -443,7 +445,7 @@ export function CourseYoutubePlayer({
         <button
           type="button"
           className="course-learn-yt-fs"
-          aria-label={isFullscreen ? 'Толук экрандан чыгуу' : 'Толук экран'}
+          aria-label={isFullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}
           onClick={(event) => {
             event.stopPropagation();
             toggleFullscreen();
@@ -454,14 +456,14 @@ export function CourseYoutubePlayer({
         {seekNotice ? (
           <p className="course-learn-video-notice">
             {requireFullWatch
-              ? 'Бул сабакта башка видеого өтүүгө жана алдыга секирүүгө болбойт'
-              : 'Башка видеого же YouTube каналына өтүүгө болбойт'}
+              ? t('player.noSeekNotice')
+              : t('player.noLeaveNotice')}
           </p>
         ) : null}
         {requireFullWatch && endedCover ? (
           <div className="course-learn-yt-end-cover">
-            <p>Сабак аякталды</p>
-            <span>Төмөнкү «Улантуу» баскычын басыңыз</span>
+            <p>{t('player.lessonEnded')}</p>
+            <span>{t('player.pressContinue')}</span>
           </div>
         ) : null}
         {allowSpeedControl ? (
@@ -469,16 +471,16 @@ export function CourseYoutubePlayer({
             <div
               className="course-learn-playback-speed course-learn-playback-speed-embed"
               role="group"
-              aria-label="Видео ылдамдыгы"
+              aria-label={t('player.speedAria')}
             >
               <label className="course-learn-playback-speed-label" htmlFor="course-playback-rate">
-                Ылдамдык
+                {t('player.speed')}
               </label>
               <select
                 id="course-playback-rate"
                 className="course-learn-playback-speed-select"
                 value={playbackRate}
-                aria-label="Видео ылдамдыгы"
+                aria-label={t('player.speedAria')}
                 onClick={(event) => event.stopPropagation()}
                 onChange={(event) => {
                   event.stopPropagation();
@@ -518,7 +520,7 @@ export function CourseYoutubePlayer({
                 max={Math.max(duration, 1)}
                 step={1}
                 value={Math.min(currentTime, Math.max(duration, 1))}
-                aria-label="Видео убакыты"
+                aria-label={t('player.timeAria')}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   isSeekingRef.current = true;
@@ -544,7 +546,7 @@ export function CourseYoutubePlayer({
       </div>
       {requireFullWatch && !watchComplete ? (
         <p className="course-learn-video-progress" aria-live="polite">
-          Көрүлдү: {watchProgress}% · Токтотуп коё аласыз, бирок аягына чейин көрүшүңүз керек
+          {t('player.watched', { pct: watchProgress })}
         </p>
       ) : null}
     </div>

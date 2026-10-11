@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Star } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,7 @@ function Stars({
   value: number;
   onChange?: (value: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <span className="course-review-stars">
       {Array.from({ length: 5 }, (_, i) => {
@@ -37,7 +39,7 @@ function Stars({
             type="button"
             className="course-review-star-btn"
             onClick={() => onChange(i + 1)}
-            aria-label={`${i + 1} жылдыз`}
+            aria-label={t('reviews.starN', { n: i + 1 })}
           >
             {icon}
           </button>
@@ -60,6 +62,7 @@ export function CourseReviewsSection({
   hideCards?: boolean;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const { token, user } = useAuth();
   const queryClient = useQueryClient();
   const [items, setItems] = useState<CourseReview[]>([]);
@@ -85,7 +88,7 @@ export function CourseReviewsSection({
         return '';
       });
     } catch (err) {
-      toastError(getErrorMessage(err, 'Пикирлер жүктөлгөн жок'));
+      toastError(getErrorMessage(err, t('reviews.loadFailed')));
     } finally {
       setLoading(false);
     }
@@ -101,7 +104,7 @@ export function CourseReviewsSection({
     if (!token) return;
 
     if (rating < 1) {
-      setRatingError('Жылдызча менен баа бериңиз');
+      setRatingError(t('reviews.ratingRequired'));
       return;
     }
 
@@ -119,7 +122,7 @@ export function CourseReviewsSection({
       setComment('');
       setRating(0);
     } catch (err) {
-      toastError(getErrorMessage(err, 'Пикир сакталган жок'));
+      toastError(getErrorMessage(err, t('reviews.saveFailed')));
     } finally {
       setSaving(false);
     }
@@ -128,9 +131,11 @@ export function CourseReviewsSection({
   return (
     <section className={`course-reviews ui-card${compact ? ' course-reviews-compact' : ''}`}>
       <div className="course-reviews-head">
-        <h2 className="course-reviews-title">Пикирлер</h2>
+        <h2 className="course-reviews-title">{t('reviews.title')}</h2>
         <p className="course-reviews-avg">
-          {ratingsCount > 0 ? `${averageRating} / 5 · ${ratingsCount} пикир` : 'Азырынча пикир жок'}
+          {ratingsCount > 0
+            ? t('reviews.summary', { avg: averageRating, count: ratingsCount })
+            : t('reviews.none')}
         </p>
       </div>
 
@@ -138,7 +143,7 @@ export function CourseReviewsSection({
         <div className={compact ? 'course-reviews-compact-form' : undefined}>
           {user ? (
             <form className="course-review-form" onSubmit={(event) => void onSubmit(event)}>
-              <p className="course-review-form-label">Сиздин бааңыз</p>
+              <p className="course-review-form-label">{t('reviews.yourRating')}</p>
               <Stars
                 value={rating}
                 onChange={(value) => {
@@ -148,42 +153,42 @@ export function CourseReviewsSection({
               />
               {ratingError ? <p className="course-review-field-error">{ratingError}</p> : null}
               <label className="course-review-form-label" htmlFor="course-review-name">
-                Отзыв жазган адам
+                {t('reviews.author')}
               </label>
               <input
                 id="course-review-name"
                 className="course-review-input"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Атыңыз"
+                placeholder={t('reviews.namePlaceholder')}
                 maxLength={150}
                 required
               />
               <label className="course-review-form-label" htmlFor="course-review-text">
-                Отзыв тексти
+                {t('reviews.text')}
               </label>
               <textarea
                 id="course-review-text"
                 className="course-review-textarea"
                 rows={compact ? 3 : 8}
                 maxLength={8000}
-                placeholder="Пикириңизди жазыңыз"
+                placeholder={t('reviews.textPlaceholder')}
                 value={comment}
                 onChange={(event) => setComment(event.target.value)}
                 required
               />
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Жөнөтүлүүдө...' : 'Пикир калтыруу'}
+                {saving ? t('reviews.sending') : t('reviews.submit')}
               </button>
             </form>
           ) : (
-            <p className="course-review-note">Пикир калтыруу үчүн аккаунтка кириңиз.</p>
+            <p className="course-review-note">{t('reviews.loginToReview')}</p>
           )}
         </div>
 
         {hideCards ? null : loading ? (
           <div className="course-reviews-compact-carousel course-review-note-wrap">
-            <p className="course-review-note">Жүктөлүүдө...</p>
+            <p className="course-review-note">{t('common.loading')}</p>
           </div>
         ) : (
           <div className={`ig-reviews-list${compact ? ' course-reviews-compact-carousel' : ''}`}>

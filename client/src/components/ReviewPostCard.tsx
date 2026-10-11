@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import type { CourseReview } from '../lib/reviews-api';
 import { useSiteImages } from '../context/SiteImagesContext';
@@ -29,6 +30,7 @@ function pauseOtherVideos(current: HTMLVideoElement) {
 }
 
 export function ReviewPostCard({ review }: { review: CourseReview }) {
+  const { t } = useTranslation();
   const { image } = useSiteImages();
   const videoSrc = reviewVideoSrc(review.videoUrl);
   const videoPoster = reviewVideoPoster(review.videoUrl);
@@ -59,7 +61,7 @@ export function ReviewPostCard({ review }: { review: CourseReview }) {
         <div className="otzyv-logo-badge">
           <img src={image(SITE_IMAGE_KEYS.logo)} alt="" className="otzyv-logo" />
         </div>
-        <div className="otzyv-stars" aria-label={`${review.rating} жылдыз`}>
+        <div className="otzyv-stars" aria-label={t('reviews.starN', { n: review.rating })}>
           {Array.from({ length: 5 }, (_, i) => (
             <Star
               key={i}
@@ -70,7 +72,7 @@ export function ReviewPostCard({ review }: { review: CourseReview }) {
           ))}
         </div>
         <p className={`otzyv-text${review.comment ? '' : ' otzyv-text-empty'}`}>
-          {review.comment || 'Текст жок'}
+          {review.comment || t('reviews.noText')}
         </p>
         {review.authorName ? (
           <p className="otzyv-author">— {review.authorName}</p>
@@ -123,6 +125,7 @@ export function groupVideoReviews(items: CourseReview[]) {
 }
 
 export function VideoReviewStack({ clips }: { clips: CourseReview[] }) {
+  const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const last = clips.length - 1;
   const current = clips[Math.min(index, last)];
@@ -148,7 +151,7 @@ export function VideoReviewStack({ clips }: { clips: CourseReview[] }) {
             type="button"
             className="otzyv-arrow otzyv-arrow-prev"
             onClick={() => go(-1)}
-            aria-label="Мурунку"
+            aria-label={t('common.prev')}
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -158,7 +161,7 @@ export function VideoReviewStack({ clips }: { clips: CourseReview[] }) {
             type="button"
             className="otzyv-arrow otzyv-arrow-next"
             onClick={() => go(1)}
-            aria-label="Кийинки"
+            aria-label={t('common.next')}
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -182,12 +185,13 @@ function isHiddenVideoReview(review: CourseReview) {
 }
 
 export function VideoReviewFeed({ items }: { items: CourseReview[] }) {
+  const { t } = useTranslation();
   const groups = groupVideoReviews(items.filter((item) => !isHiddenVideoReview(item)));
   if (!groups.length) return null;
 
   return (
     <div className="otzyv-video-feed">
-      <p className="otzyv-video-feed-title">Видео отзывдар</p>
+      <p className="otzyv-video-feed-title">{t('reviews.videoReviews')}</p>
       <div className="otzyv-video-feed-row">
         {groups.map((clips) => (
           <div key={clips[0].id} className="otzyv-video-feed-item">

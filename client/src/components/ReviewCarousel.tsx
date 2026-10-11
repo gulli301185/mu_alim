@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, ThumbsUp } from 'lucide-react';
 import { isVideoReview, type CourseReview } from '../lib/reviews-api';
 import { ReviewPostCard } from './ReviewPostCard';
@@ -6,6 +7,7 @@ import { useSiteImages } from '../context/SiteImagesContext';
 import { SITE_IMAGE_KEYS } from '../lib/site-images-api';
 
 export function ReviewCoverSlide({ title }: { title: string }) {
+  const { t } = useTranslation();
   const { image } = useSiteImages();
 
   return (
@@ -20,7 +22,7 @@ export function ReviewCoverSlide({ title }: { title: string }) {
       </div>
       <div className="otzyv-cover-copy">
         <p className="otzyv-cover-title">“{title}”</p>
-        <p className="otzyv-cover-tag">“ОТЗЫВДАР СҮЙЛӨСҮН”</p>
+        <p className="otzyv-cover-tag">{t('reviews.coverTag')}</p>
         <div className="otzyv-cover-bubbles" aria-hidden>
           <span className="otzyv-bubble otzyv-bubble-back">
             <i /><i /><i />
@@ -60,6 +62,7 @@ export function ReviewCarousel({
   title: string;
   items: CourseReview[];
 }) {
+  const { t } = useTranslation();
   const textItems = items.filter((item) => !isVideoReview(item));
   const newestId = textItems[0]?.id ?? '';
   // Open on the first written review so text is visible immediately (cover is still reachable via prev).
@@ -84,13 +87,13 @@ export function ReviewCarousel({
   return (
     <div className="otzyv-stage" {...swipe}>
       {index > 0 ? (
-        <button type="button" className="otzyv-arrow otzyv-arrow-prev" onClick={() => go(-1)} aria-label="Мурунку">
+        <button type="button" className="otzyv-arrow otzyv-arrow-prev" onClick={() => go(-1)} aria-label={t('common.prev')}>
           <ChevronLeft className="h-5 w-5" />
         </button>
       ) : null}
       {slides[index]}
       {index < last ? (
-        <button type="button" className="otzyv-arrow otzyv-arrow-next" onClick={() => go(1)} aria-label="Кийинки">
+        <button type="button" className="otzyv-arrow otzyv-arrow-next" onClick={() => go(1)} aria-label={t('common.next')}>
           <ChevronRight className="h-5 w-5" />
         </button>
       ) : null}
@@ -102,7 +105,7 @@ export function ReviewCarousel({
               type="button"
               className={`otzyv-dot${i === index ? ' otzyv-dot-active' : ''}`}
               onClick={() => setIndex(i)}
-              aria-label={`${i + 1}-слайд`}
+              aria-label={t('reviews.slideN', { n: i + 1 })}
             />
           ))}
         </div>

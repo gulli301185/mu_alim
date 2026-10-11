@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, BookOpen, GraduationCap, Lock, Play, Star, Youtube } from 'lucide-react';
 import {
   fetchCourseByRef,
@@ -28,9 +29,10 @@ import { CourseReviewsSection } from '../components/CourseReviews';
 import { CoursePaymentBlock } from './CoursesPage';
 
 function StarRating({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation();
   const value = 4.9;
   return (
-    <span className={`course-stars${compact ? ' course-stars-compact' : ''}`} aria-label={`${value} из 5`}>
+    <span className={`course-stars${compact ? ' course-stars-compact' : ''}`} aria-label={t('courses.ratingAria', { value })}>
       {Array.from({ length: 5 }, (_, i) => (
         <Star
           key={i}
@@ -57,6 +59,7 @@ function PaidLessonsSidebar({
   paid: boolean;
   onSelect: (lessonId: string) => void;
 }) {
+  const { t } = useTranslation();
   const { user, token } = useAuth();
   const courseLessons = mapLessonsToCourseLessons(lessons, '');
   const { data: serverProgress } = useQuery({
@@ -74,7 +77,7 @@ function PaidLessonsSidebar({
     <aside className="courses-sidebar ui-card">
       <h2 className="courses-sidebar-title">
         <BookOpen className="h-5 w-5" aria-hidden />
-        Сабактар ({lessons.length})
+        {t('courses.lessonsCount', { count: lessons.length })}
       </h2>
       <ul className="courses-sidebar-list free-lessons-sidebar-list">
         {lessons.map((lesson) => {
@@ -116,7 +119,7 @@ function PaidLessonsSidebar({
                     {formatCourseDuration(lesson.durationSeconds)}
                   </span>
                 </span>
-                <span className="courses-sidebar-price">{unlocked ? 'Ачылды' : 'Жабык'}</span>
+                <span className="courses-sidebar-price">{unlocked ? t('courses.opened') : t('courses.locked')}</span>
               </button>
             </li>
           );
@@ -124,7 +127,7 @@ function PaidLessonsSidebar({
       </ul>
       {paid ? (
         <Link to={`/courses/${courseId}/learn`} className="btn-gold courses-sidebar-learn-link">
-          Сабактарга өтүү
+          {t('courses.goToLessons')}
         </Link>
       ) : null}
     </aside>
@@ -132,6 +135,7 @@ function PaidLessonsSidebar({
 }
 
 export function CourseDetailPage() {
+  const { t } = useTranslation();
   const { courseId } = useParams<{ courseId: string }>();
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
 
@@ -202,7 +206,7 @@ export function CourseDetailPage() {
     return (
       <section className="courses-page">
         <div className="wrap courses-page-inner">
-          <p className="courses-page-subtitle">Жүктөлүүдө...</p>
+          <p className="courses-page-subtitle">{t('common.loading')}</p>
         </div>
       </section>
     );
@@ -212,10 +216,10 @@ export function CourseDetailPage() {
     return (
       <section className="courses-page">
         <div className="wrap courses-page-inner">
-          <p className="courses-page-subtitle">Курс табылган жок.</p>
+          <p className="courses-page-subtitle">{t('courses.notFound')}</p>
           <Link to="/courses" className="courses-page-back">
             <ArrowLeft className="h-4 w-4" />
-            Курстарга кайтуу
+            {t('courses.backToCourses')}
           </Link>
         </div>
       </section>
@@ -236,10 +240,10 @@ export function CourseDetailPage() {
     <section className="courses-page">
       <div className="wrap courses-page-inner">
         <div className="courses-page-head">
-          <p className="courses-page-label">Муалим академиясы</p>
+          <p className="courses-page-label">{t('courses.academy')}</p>
           <h1 className="courses-page-title">{course.title}</h1>
           <p className="courses-page-subtitle">
-            WhatsApp аркылуу төлөп, чекти жибериңиз — андан кийин 1-сабактан баштап катар-каатар ачылат.
+            {t('courses.detailSubtitle')}
           </p>
         </div>
 
@@ -247,14 +251,14 @@ export function CourseDetailPage() {
           <div className="courses-payment-panel ui-card">
             <div className="courses-payment-panel-body">
               <p className="courses-payment-panel-label">
-                {activeLesson ? 'Курс алдын ала көрүү' : 'Курс'}
+                {activeLesson ? t('courses.preview') : t('courses.course')}
               </p>
               <h2 className="courses-payment-course-name">
                 {activeLesson ? activeLesson.title : course.title}
               </h2>
               <div className="courses-payment-course-meta">
                 <StarRating compact />
-                <span>{publishedLessons.length || course.lessonCount} видео-сабак</span>
+                <span>{t('courses.videoLessons', { count: publishedLessons.length || course.lessonCount })}</span>
                 <span>{course.priceLabel}</span>
               </div>
 
@@ -270,10 +274,10 @@ export function CourseDetailPage() {
               {paid ? (
                 <div className="courses-detail-paid-actions">
                   <p className="courses-payment-hint">
-                    Төлөм ырасталды. 1-сабактан баштап катар-каатар көрүңүз.
+                    {t('courses.paidConfirmed')}
                   </p>
                   <Link to={learnPath} className="btn-primary courses-payment-btn w-full">
-                    Сабактарга өтүү
+                    {t('courses.goToLessons')}
                   </Link>
                 </div>
               ) : (
@@ -300,7 +304,7 @@ export function CourseDetailPage() {
               </p>
               {previewDuration ? (
                 <p className="courses-payment-hint">
-                  Узактыгы: {formatCourseDuration(previewDuration)}
+                  {t('courses.duration', { value: formatCourseDuration(previewDuration) })}
                 </p>
               ) : null}
             </div>
@@ -316,8 +320,8 @@ export function CourseDetailPage() {
             />
           ) : (
             <aside className="courses-sidebar ui-card">
-              <h2 className="courses-sidebar-title">Сабактар (0)</h2>
-              <p className="courses-page-subtitle m-0 px-1">Сабактар азырынча жок.</p>
+              <h2 className="courses-sidebar-title">{t('courses.lessonsCount', { count: 0 })}</h2>
+              <p className="courses-page-subtitle m-0 px-1">{t('courses.noLessons')}</p>
             </aside>
           )}
         </div>
@@ -331,7 +335,7 @@ export function CourseDetailPage() {
 
         <Link to="/courses" className="courses-page-back">
           <ArrowLeft className="h-4 w-4" />
-          Бардык курстарга кайтуу
+          {t('courses.backToAll')}
         </Link>
       </div>
     </section>
@@ -339,16 +343,17 @@ export function CourseDetailPage() {
 }
 
 function CoursesHubSwitch({ active }: { active: 'free' | 'paid' }) {
+  const { t } = useTranslation();
   return (
-    <div className="courses-hub-switch" role="tablist" aria-label="Курс түрлөрү">
+    <div className="courses-hub-switch" role="tablist" aria-label={t('courses.typesAria')}>
       {active === 'free' ? (
         <span className="courses-hub-switch-card courses-hub-switch-card-active" role="tab" aria-current="page">
           <span className="courses-hub-switch-icon courses-hub-switch-icon-free">
             <Youtube className="h-5 w-5" aria-hidden />
           </span>
           <span className="courses-hub-switch-text">
-            <strong>Бекер сабактар</strong>
-            <span>YouTube видеолор сайтта</span>
+            <strong>{t('courses.freeLessons')}</strong>
+            <span>{t('courses.freeLessonsSub')}</span>
           </span>
         </span>
       ) : (
@@ -357,8 +362,8 @@ function CoursesHubSwitch({ active }: { active: 'free' | 'paid' }) {
             <Youtube className="h-5 w-5" aria-hidden />
           </span>
           <span className="courses-hub-switch-text">
-            <strong>Бекер сабактар</strong>
-            <span>YouTube видеолор сайтта</span>
+            <strong>{t('courses.freeLessons')}</strong>
+            <span>{t('courses.freeLessonsSub')}</span>
           </span>
         </Link>
       )}
@@ -368,8 +373,8 @@ function CoursesHubSwitch({ active }: { active: 'free' | 'paid' }) {
             <GraduationCap className="h-5 w-5" aria-hidden />
           </span>
           <span className="courses-hub-switch-text">
-            <strong>Акылуу курстар</strong>
-            <span>WhatsApp төлөм</span>
+            <strong>{t('courses.paidCourses')}</strong>
+            <span>{t('courses.paidCoursesSub')}</span>
           </span>
         </span>
       ) : (
@@ -378,8 +383,8 @@ function CoursesHubSwitch({ active }: { active: 'free' | 'paid' }) {
             <GraduationCap className="h-5 w-5" aria-hidden />
           </span>
           <span className="courses-hub-switch-text">
-            <strong>Акылуу курстар</strong>
-            <span>WhatsApp төлөм</span>
+            <strong>{t('courses.paidCourses')}</strong>
+            <span>{t('courses.paidCoursesSub')}</span>
           </span>
         </Link>
       )}
@@ -388,6 +393,7 @@ function CoursesHubSwitch({ active }: { active: 'free' | 'paid' }) {
 }
 
 function CourseHubCard({ course, free = false }: { course: CourseSummary; free?: boolean }) {
+  const { t } = useTranslation();
   return (
     <Link
       to={free ? `/courses/${course.slug}/learn` : `/courses/${course.slug}`}
@@ -407,7 +413,7 @@ function CourseHubCard({ course, free = false }: { course: CourseSummary; free?:
           <Play className="h-5 w-5" fill="currentColor" />
         </span>
         <span className={free ? 'video-free-badge' : 'video-paid-badge'}>
-          {free ? 'Бекер' : course.priceLabel}
+          {free ? t('common.free') : course.priceLabel}
         </span>
         {course.introDurationSeconds ? (
           <span className="courses-hub-card-time">{formatCourseDuration(course.introDurationSeconds)}</span>
@@ -418,15 +424,16 @@ function CourseHubCard({ course, free = false }: { course: CourseSummary; free?:
         <p className="courses-hub-card-desc">{course.shortDescription || course.description}</p>
         <div className="courses-hub-card-meta">
           <StarRating compact />
-          <span>{course.lessonCount} сабак</span>
+          <span>{t('courses.lessonsWord', { count: course.lessonCount })}</span>
         </div>
-        <span className="courses-hub-card-cta">{free ? 'Сабактарды көрүү' : 'Курска кирүү'}</span>
+        <span className="courses-hub-card-cta">{free ? t('courses.viewLessons') : t('courses.enterCourse')}</span>
       </div>
     </Link>
   );
 }
 
 function FreeLessonHubCard({ lesson }: { lesson: FreeLessonItem }) {
+  const { t } = useTranslation();
   return (
     <Link
       to={`/courses/${lesson.courseSlug}/learn?lesson=${lesson.id}`}
@@ -437,7 +444,7 @@ function FreeLessonHubCard({ lesson }: { lesson: FreeLessonItem }) {
         <span className="courses-hub-card-play" aria-hidden>
           <Play className="h-5 w-5" fill="currentColor" />
         </span>
-        <span className="video-free-badge">Бекер</span>
+        <span className="video-free-badge">{t('common.free')}</span>
         {lesson.durationSeconds ? (
           <span className="courses-hub-card-time">{formatCourseDuration(lesson.durationSeconds)}</span>
         ) : null}
@@ -450,15 +457,16 @@ function FreeLessonHubCard({ lesson }: { lesson: FreeLessonItem }) {
           <p className="courses-hub-card-desc">{lesson.courseTitle}</p>
         )}
         <div className="courses-hub-card-meta">
-          <span>{lesson.lessonOrder}-сабак</span>
+          <span>{t('courses.lessonN', { n: lesson.lessonOrder })}</span>
         </div>
-        <span className="courses-hub-card-cta">Сабакты көрүү</span>
+        <span className="courses-hub-card-cta">{t('courses.viewLesson')}</span>
       </div>
     </Link>
   );
 }
 
 export function FreeCoursesPage() {
+  const { t } = useTranslation();
   const { data: freeLessons, isLoading, isError, refetch } = useQuery({
     queryKey: ['free-lessons'],
     queryFn: fetchFreeLessons,
@@ -473,7 +481,7 @@ export function FreeCoursesPage() {
     return (
       <section className="courses-hub">
         <div className="wrap courses-hub-inner">
-          <p className="courses-hub-muted">Жүктөлүүдө...</p>
+          <p className="courses-hub-muted">{t('common.loading')}</p>
         </div>
       </section>
     );
@@ -486,8 +494,8 @@ export function FreeCoursesPage() {
     <section className="courses-hub">
       <div className="wrap courses-hub-inner">
         <div className="courses-hub-head">
-          <h1 className="courses-hub-title">Курстар</h1>
-          <p className="courses-hub-lead">Бекер сабактар — сайтта. Акылуу курстар — WhatsApp төлөм.</p>
+          <h1 className="courses-hub-title">{t('courses.title')}</h1>
+          <p className="courses-hub-lead">{t('courses.freeLead')}</p>
         </div>
 
         <CoursesHubSwitch active="free" />
@@ -507,15 +515,15 @@ export function FreeCoursesPage() {
         ) : (
           <div className="courses-hub-empty ui-card">
             <p className="courses-hub-empty-title">
-              {isError ? 'Бекер сабактар жүктөлбөдү' : 'Бекер сабактар азырынча жок'}
+              {isError ? t('courses.freeLoadFailed') : t('courses.freeEmpty')}
             </p>
             {isError ? (
               <button type="button" className="btn-gold courses-hub-empty-btn" onClick={() => void refetch()}>
-                Кайра жүктөө
+                {t('courses.reload')}
               </button>
             ) : (
               <Link to="/courses" className="btn-gold courses-hub-empty-btn">
-                Акылуу курстарга өтүү
+                {t('courses.toPaid')}
               </Link>
             )}
           </div>
@@ -526,6 +534,7 @@ export function FreeCoursesPage() {
 }
 
 export function CoursesIndexPage() {
+  const { t } = useTranslation();
   const { data: paidCourses, isLoading } = useQuery({
     queryKey: ['courses', 'paid'],
     queryFn: () => import('../lib/course-api').then((m) => m.fetchCourses({ type: 'paid', limit: 100 })),
@@ -535,7 +544,7 @@ export function CoursesIndexPage() {
     return (
       <section className="courses-hub">
         <div className="wrap courses-hub-inner">
-          <p className="courses-hub-muted">Жүктөлүүдө...</p>
+          <p className="courses-hub-muted">{t('common.loading')}</p>
         </div>
       </section>
     );
@@ -547,8 +556,8 @@ export function CoursesIndexPage() {
     <section className="courses-hub">
       <div className="wrap courses-hub-inner">
         <div className="courses-hub-head">
-          <h1 className="courses-hub-title">Курстар</h1>
-          <p className="courses-hub-lead">Акылуу курстар — WhatsApp аркылуу төлөп, чекти жибериңиз</p>
+          <h1 className="courses-hub-title">{t('courses.title')}</h1>
+          <p className="courses-hub-lead">{t('courses.paidLead')}</p>
         </div>
 
         <CoursesHubSwitch active="paid" />
@@ -561,9 +570,9 @@ export function CoursesIndexPage() {
           </div>
         ) : (
           <div className="courses-hub-empty ui-card">
-            <p className="courses-hub-empty-title">Акылуу курстар азырынча жок</p>
+            <p className="courses-hub-empty-title">{t('courses.paidEmpty')}</p>
             <Link to="/courses/free" className="btn-gold courses-hub-empty-btn">
-              Бекер сабактарга өтүү
+              {t('courses.toFree')}
             </Link>
           </div>
         )}

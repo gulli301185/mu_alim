@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { CourseReview } from '../lib/reviews-api';
 import { ReviewCarousel } from './ReviewCarousel';
@@ -12,6 +13,7 @@ export function ReviewModal({
   items: CourseReview[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -34,7 +36,7 @@ export function ReviewModal({
         aria-label={title}
         onClick={(event) => event.stopPropagation()}
       >
-        <button type="button" className="auth-modal-close otzyv-modal-close" onClick={onClose} aria-label="Жабуу">
+        <button type="button" className="auth-modal-close otzyv-modal-close" onClick={onClose} aria-label={t('common.close')}>
           <X className="h-5 w-5" />
         </button>
         <ReviewCarousel title={title} items={items} />

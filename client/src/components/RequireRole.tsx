@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function AuthLoading() {
+  const { t } = useTranslation();
   return (
     <section className="profile-page">
       <div className="wrap profile-page-wrap">
         <div className="ui-card profile-card">
-          <p>Жүктөлүүдө...</p>
+          <p>{t('common.loading')}</p>
         </div>
       </div>
     </section>

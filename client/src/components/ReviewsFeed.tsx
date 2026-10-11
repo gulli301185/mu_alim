@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCourses } from '../lib/course-api';
 import { fetchPublicReviews, isVideoReview, type CourseReview } from '../lib/reviews-api';
@@ -13,6 +14,7 @@ type ReviewRow = {
 };
 
 export function ReviewsFeed() {
+  const { t } = useTranslation();
   const reviewsQuery = useQuery({
     queryKey: ['public-reviews'],
     queryFn: () => fetchPublicReviews({ page: 1, limit: 200 }),
@@ -71,7 +73,7 @@ export function ReviewsFeed() {
   return (
     <div id="reviews" className="otzyv-panel">
       {loading ? (
-        <p className="otzyv-status">Жүктөлүүдө...</p>
+        <p className="otzyv-status">{t('common.loading')}</p>
       ) : (
         <>
           <div className="otzyv-stack">
