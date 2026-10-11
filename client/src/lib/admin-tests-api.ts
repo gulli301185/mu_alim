@@ -149,3 +149,40 @@ export function emptyTextQuestion(): CreateTestQuestionInput {
 }
 
 export const CHOICE_LABELS = ['А', 'Б', 'В', 'Г'] as const;
+
+export const MIN_CHOICE_OPTIONS = 2;
+export const MAX_CHOICE_OPTIONS = 4;
+
+export const TRUE_OPTION_TEXT = 'Туура';
+export const FALSE_OPTION_TEXT = 'Туура эмес';
+
+/** Two-option choice question: А) Туура, Б) Туура эмес. */
+export function trueFalseQuestion(questionText = '', correctIsTrue = true): CreateTestQuestionInput {
+  return {
+    questionType: 'choice',
+    questionText,
+    options: [
+      { optionText: TRUE_OPTION_TEXT, isCorrect: correctIsTrue, optionOrder: 1 },
+      { optionText: FALSE_OPTION_TEXT, isCorrect: !correctIsTrue, optionOrder: 2 },
+    ],
+  };
+}
+
+export function isTrueFalseQuestion(question: CreateTestQuestionInput) {
+  return (
+    question.questionType === 'choice' &&
+    question.options.length === 2 &&
+    question.options[0].optionText.trim() === TRUE_OPTION_TEXT &&
+    question.options[1].optionText.trim() === FALSE_OPTION_TEXT
+  );
+}
+
+/** For a text question whose expected answer is just "Туура" / "Туура эмес" (or "Ката"):
+ * true / false. Any other text question: null. */
+export function textTrueFalseAnswer(question: CreateTestQuestionInput): boolean | null {
+  if (question.questionType !== 'text') return null;
+  const answer = question.correctTextAnswer.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (answer === 'туура') return true;
+  if (answer === 'туура эмес' || answer === 'ката') return false;
+  return null;
+}

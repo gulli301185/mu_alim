@@ -4,19 +4,24 @@ import { useAuth } from '../../context/AuthContext';
 import { fetchAdminCourses } from '../../lib/admin-courses-api';
 import {
   CHOICE_LABELS,
+  MAX_CHOICE_OPTIONS,
+  MIN_CHOICE_OPTIONS,
   createAdminTest,
   deleteAdminTest,
   emptyChoiceQuestion,
   emptyTextQuestion,
   fetchAdminTest,
   fetchAdminTests,
+  isTrueFalseQuestion,
+  textTrueFalseAnswer,
+  trueFalseQuestion,
   updateAdminTest,
   type AdminTestDetail,
   type AdminTestListItem,
   type CreateTestQuestionInput,
 } from '../../lib/admin-tests-api';
 import { AdminSelect } from '../../components/admin/AdminSelect';
-import { getErrorMessage, toastError } from '../../lib/toast';
+import { getErrorMessage, toastError, toastSuccess } from '../../lib/toast';
 
 type PaidCourseOption = { slug: string; title: string };
 
@@ -26,10 +31,10 @@ function toCreateQuestions(questions: CreateTestQuestionInput[]): CreateTestQues
       return {
         questionType: 'choice' as const,
         questionText: q.questionText.trim(),
-        options: q.options.map((o) => ({
+        options: q.options.map((o, i) => ({
           optionText: o.optionText.trim(),
           isCorrect: o.isCorrect,
-          optionOrder: o.optionOrder,
+          optionOrder: i + 1,
         })),
       };
     }
@@ -41,17 +46,40 @@ function toCreateQuestions(questions: CreateTestQuestionInput[]): CreateTestQues
   });
 }
 
+type QuestionKind = 'choice' | 'truefalse' | 'text';
+
+function questionKind(question: CreateTestQuestionInput): QuestionKind {
+  return isTrueFalseQuestion(question) ? 'truefalse' : question.questionType;
+}
+
+/** Switches the question type but keeps the question text (and a text answer of
+ * "Туура" / "Туура эмес" becomes the matching А/Б choice). */
+function changeQuestionKind(question: CreateTestQuestionInput, kind: QuestionKind): CreateTestQuestionInput {
+  const { questionText } = question;
+  if (kind === 'truefalse') {
+    return trueFalseQuestion(questionText, textTrueFalseAnswer(question) ?? true);
+  }
+  if (kind === 'choice') {
+    return { ...emptyChoiceQuestion(), questionText } as CreateTestQuestionInput;
+  }
+  const correctOption =
+    question.questionType === 'choice' ? question.options.find((o) => o.isCorrect)?.optionText : '';
+  return { questionType: 'text', questionText, correctTextAnswer: correctOption ?? '' };
+}
+
 function detailToFormQuestions(test: AdminTestDetail): CreateTestQuestionInput[] {
   return test.questions.map((q) => {
     if (q.questionType === 'choice') {
       return {
         questionType: 'choice',
         questionText: q.questionText,
-        options: q.options.map((o) => ({
-          optionText: o.optionText,
-          isCorrect: o.isCorrect,
-          optionOrder: o.optionOrder,
-        })),
+        options: [...q.options]
+          .sort((a, b) => a.optionOrder - b.optionOrder)
+          .map((o, i) => ({
+            optionText: o.optionText,
+            isCorrect: o.isCorrect,
+            optionOrder: i + 1,
+          })),
       };
     }
     return {
@@ -171,7 +199,7 @@ export function AdminTestsPage() {
     for (const q of prepared) {
       if (q.questionType === 'choice') {
         if (q.options.some((o) => !o.optionText)) {
-          showFormError('А, Б, В, Г варианттарын толтуруңуз');
+          showFormError('Бардык варианттарды толтуруңуз');
           return;
         }
         if (q.options.filter((o) => o.isCorrect).length !== 1) {
@@ -221,6 +249,38 @@ export function AdminTestsPage() {
 
   const updateQuestion = (index: number, next: CreateTestQuestionInput) => {
     setQuestions((prev) => prev.map((q, i) => (i === index ? next : q)));
+  };
+
+  const addOption = (index: number, question: CreateTestQuestionInput) => {
+    if (question.questionType !== 'choice' || question.options.length >= MAX_CHOICE_OPTIONS) return;
+    updateQuestion(index, {
+      ...question,
+      options: [
+        ...question.options,
+        { optionText: '', isCorrect: false, optionOrder: question.options.length + 1 },
+      ],
+    });
+  };
+
+  const removeOption = (index: number, question: CreateTestQuestionInput, optionIndex: number) => {
+    if (question.questionType !== 'choice' || question.options.length <= MIN_CHOICE_OPTIONS) return;
+    const options = question.options
+      .filter((_, i) => i !== optionIndex)
+      .map((o, i) => ({ ...o, optionOrder: i + 1 }));
+    if (!options.some((o) => o.isCorrect)) options[0] = { ...options[0], isCorrect: true };
+    updateQuestion(index, { ...question, options });
+  };
+
+  const trueFalseTextCount = questions.filter((q) => textTrueFalseAnswer(q) !== null).length;
+
+  const convertTrueFalseTextQuestions = () => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        const answer = textTrueFalseAnswer(q);
+        return answer === null ? q : trueFalseQuestion(q.questionText, answer);
+      }),
+    );
+    toastSuccess(`${trueFalseTextCount} суроо А) Туура / Б) Туура эмес болду. Сактоону басыңыз.`);
   };
 
   return (
@@ -385,28 +445,42 @@ export function AdminTestsPage() {
                     <button
                       type="button"
                       className="qa-admin-btn qa-admin-btn-muted"
+                      onClick={() => setQuestions((prev) => [...prev, trueFalseQuestion()])}
+                    >
+                      + Туура / Туура эмес
+                    </button>
+                    <button
+                      type="button"
+                      className="qa-admin-btn qa-admin-btn-muted"
                       onClick={() => setQuestions((prev) => [...prev, emptyTextQuestion()])}
                     >
                       + Текст
                     </button>
                   </div>
                 </div>
+                {trueFalseTextCount > 0 ? (
+                  <button
+                    type="button"
+                    className="qa-admin-btn qa-admin-btn-muted"
+                    onClick={convertTrueFalseTextQuestions}
+                  >
+                    Жообу «Туура / Туура эмес» болгон {trueFalseTextCount} текст суроону А/Б вариантка айландыруу
+                  </button>
+                ) : null}
 
                 {questions.map((question, qIndex) => (
                   <div key={qIndex} className="ui-card admin-test-question-card">
                     <div className="admin-test-question-head">
                       <span className="admin-test-question-num">{qIndex + 1}-суроо</span>
                       <AdminSelect
-                        className="admin-test-type-select"
-                        value={question.questionType}
-                        onChange={(type) => {
-                          updateQuestion(
-                            qIndex,
-                            type === 'choice' ? emptyChoiceQuestion() : emptyTextQuestion(),
-                          );
-                        }}
+                        className="admin-test-type-select max-w-[260px]!"
+                        value={questionKind(question)}
+                        onChange={(kind) =>
+                          updateQuestion(qIndex, changeQuestionKind(question, kind as QuestionKind))
+                        }
                         options={[
                           { value: 'choice', label: 'А, Б, В, Г' },
+                          { value: 'truefalse', label: 'Туура / Туура эмес' },
                           { value: 'text', label: 'Текст жооп' },
                         ]}
                         aria-label="Суроо түрү"
@@ -470,10 +544,33 @@ export function AdminTestsPage() {
                                 })
                               }
                               placeholder={`${CHOICE_LABELS[oIndex]} вариант`}
+                              readOnly={isTrueFalseQuestion(question)}
                               required
                             />
+                            {!isTrueFalseQuestion(question) &&
+                            question.options.length > MIN_CHOICE_OPTIONS ? (
+                              <button
+                                type="button"
+                                className="qa-admin-btn qa-admin-btn-danger"
+                                onClick={() => removeOption(qIndex, question, oIndex)}
+                                aria-label={`${CHOICE_LABELS[oIndex]} вариантын өчүрүү`}
+                                title="Вариантты өчүрүү"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            ) : null}
                           </label>
                         ))}
+                        {!isTrueFalseQuestion(question) &&
+                        question.options.length < MAX_CHOICE_OPTIONS ? (
+                          <button
+                            type="button"
+                            className="qa-admin-btn qa-admin-btn-muted"
+                            onClick={() => addOption(qIndex, question)}
+                          >
+                            + {CHOICE_LABELS[question.options.length]} вариант
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <label className="qa-admin-field">
