@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { BookOpen, Pencil, Send, Sparkles, User, Users } from "lucide-react";
 import { useSiteImages } from "../context/SiteImagesContext";
 import { SITE_IMAGE_KEYS } from "../lib/site-images-api";
@@ -10,12 +11,13 @@ import {
 import { getErrorMessage, toastError, toastSuccess } from "../lib/toast";
 
 const FOOTER_VALUES = [
-  { icon: BookOpen, head: "Илим —", tail: "пайда алып келет" },
-  { icon: Users, head: "Насаат —", tail: "жүрөктү тазалайт" },
-  { icon: Sparkles, head: "Адеп —", tail: "адамды көркөм кылат" },
+  { icon: BookOpen, key: "value1" },
+  { icon: Users, key: "value2" },
+  { icon: Sparkles, key: "value3" },
 ] as const;
 
 export function TeacherQuestionForm() {
+  const { t } = useTranslation();
   const { image } = useSiteImages();
   const queryClient = useQueryClient();
   const [question, setQuestion] = useState("");
@@ -28,11 +30,14 @@ export function TeacherQuestionForm() {
     staleTime: 30_000,
   });
 
-  const questionLabel = nextNumber != null ? `${nextNumber}-суроо` : "Сурооңуз";
+  const questionLabel =
+    nextNumber != null
+      ? t("askTeacher.questionN", { n: nextNumber })
+      : t("askTeacher.yourQuestion");
   const questionPlaceholder =
     nextNumber != null
-      ? `${nextNumber}-суроону бул жерге жазыңыз...`
-      : "Сурооңузду бул жерге жазыңыз...";
+      ? t("askTeacher.placeholderN", { n: nextNumber })
+      : t("askTeacher.placeholder");
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -49,7 +54,7 @@ export function TeacherQuestionForm() {
         queryKey: ["teacher-questions", "next-number"],
       });
     } catch (err) {
-      toastError(getErrorMessage(err, "Суроо жөнөтүлгөн жок"));
+      toastError(getErrorMessage(err, t("askTeacher.sendFailed")));
     } finally {
       setLoading(false);
     }
@@ -62,8 +67,8 @@ export function TeacherQuestionForm() {
           <div className="teacher-question-grid">
             <div className="teacher-question-panel">
               <h2 className="teacher-question-title">
-                <span className="teacher-question-title-navy">Устазга</span>
-                <span className="teacher-question-title-gold">суроо бер!</span>
+                <span className="teacher-question-title-navy">{t("askTeacher.titleNavy")}</span>
+                <span className="teacher-question-title-gold">{t("askTeacher.titleGold")}</span>
               </h2>
 
               <div className="teacher-question-divider" aria-hidden>
@@ -73,11 +78,11 @@ export function TeacherQuestionForm() {
               </div>
 
               <p className="teacher-question-subtitle">
-                Суроо бериңиз, устаз Мухаммадалим Халил так жооп берет
+                {t("askTeacher.subtitle")}
               </p>
 
               <p className="teacher-question-rose-quote">
-                «Туура суроо бере билүү — жарым илим.» 🌹
+                {t("askTeacher.roseQuote")}
               </p>
 
               <form
@@ -117,14 +122,14 @@ export function TeacherQuestionForm() {
                 </label>
 
                 <label className="teacher-question-field">
-                  <span className="teacher-question-label">Аты-жөнү</span>
+                  <span className="teacher-question-label">{t("askTeacher.nameLabel")}</span>
                   <span className="teacher-question-input-wrap">
                     <input
                       type="text"
                       className="teacher-question-input"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Атыңызды жана фамилияңызды жазыңыз..."
+                      placeholder={t("askTeacher.namePlaceholder")}
                       required
                       minLength={2}
                       maxLength={200}
@@ -142,7 +147,7 @@ export function TeacherQuestionForm() {
                     disabled={loading}
                   >
                     <Send className="h-4 w-4" aria-hidden />
-                    {loading ? "Жөнөтүлүүдө..." : "Жөнөтүү"}
+                    {loading ? t("askTeacher.sending") : t("askTeacher.send")}
                   </button>
                 </div>
               </form>
@@ -152,7 +157,7 @@ export function TeacherQuestionForm() {
               <div className="teacher-question-visual">
                 <img
                   src={image(SITE_IMAGE_KEYS.teacherQuestionScene)}
-                  alt="Устаз Мухаммадалим Халил студенттер менен"
+                  alt={t("askTeacher.imageAlt")}
                   className="teacher-question-visual-img"
                   loading="lazy"
                   decoding="async"
@@ -163,10 +168,10 @@ export function TeacherQuestionForm() {
                   </span>
                   <p className="teacher-question-visual-quote-text">
                     <span className="teacher-question-visual-quote-gold">
-                      Илим алуу —
+                      {t("askTeacher.hadithGold")}
                     </span>
                     <span className="teacher-question-visual-quote-light">
-                      ар бир мусулмандын милдети.(Хадис)
+                      {t("askTeacher.hadithLight")}
                     </span>
                   </p>
                 </blockquote>
@@ -190,8 +195,8 @@ export function TeacherQuestionForm() {
                   </svg>
                 </div>
                 <ul className="teacher-question-values">
-                  {FOOTER_VALUES.map(({ icon: Icon, head, tail }) => (
-                    <li key={head} className="teacher-question-value">
+                  {FOOTER_VALUES.map(({ icon: Icon, key }) => (
+                    <li key={key} className="teacher-question-value">
                       <span className="teacher-question-value-icon">
                         <Icon
                           className="teacher-question-value-icon-svg"
@@ -200,10 +205,10 @@ export function TeacherQuestionForm() {
                       </span>
                       <span className="teacher-question-value-text">
                         <span className="teacher-question-value-head">
-                          {head}
+                          {t(`askTeacher.${key}Head`)}
                         </span>
                         <span className="teacher-question-value-tail">
-                          {tail}
+                          {t(`askTeacher.${key}Tail`)}
                         </span>
                       </span>
                     </li>

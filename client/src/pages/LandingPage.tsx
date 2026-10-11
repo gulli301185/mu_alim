@@ -20,6 +20,7 @@ import {
 } from "../lib/course-api";
 import { fetchDailyQa, todayBishkek } from "../lib/qa-api";
 import { DEFAULT_HERO, fetchHeroBanner } from "../lib/hero-api";
+import { localizedText } from "../i18n/localizedList";
 import { youtubeThumbnail } from "../lib/youtube";
 import { FaqAccordion } from "../components/FaqAccordion";
 import { ReviewsFeed } from "../components/ReviewsFeed";
@@ -401,14 +402,19 @@ function VideoPanel({
 }
 
 export function LandingPage() {
-  const { t } = useTranslation();
+  const { t, i18n: i18next } = useTranslation();
   const { data: hero } = useQuery({
     queryKey: ["hero-banner"],
     queryFn: fetchHeroBanner,
     staleTime: 5 * 60 * 1000,
     placeholderData: DEFAULT_HERO,
   });
-  const banner = hero ?? DEFAULT_HERO;
+  const rawBanner = hero ?? DEFAULT_HERO;
+  const banner = {
+    ...rawBanner,
+    title: localizedText(i18next, "heroText", rawBanner.title),
+    subtitle: localizedText(i18next, "heroText", rawBanner.subtitle),
+  };
 
   const { data: freeLessonsData, isLoading: freeVideosLoading } = useQuery({
     queryKey: ["free-lessons"],
