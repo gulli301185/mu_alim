@@ -1,25 +1,19 @@
-import { defineConfig, loadEnv } from 'vite';
+import { createLogger, defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 const DEFAULT_DEV_API = 'http://localhost:3001';
 
-/** True only for http(s)://localhost | 127.0.0.1 | [::1] with an optional port and no path. */
+// This file is type-checked by tsconfig.node.json (lib ES2023, no Node/DOM types), so it must not use
+// globals such as URL, console or process: env comes from loadEnv, messages from Vite's logger.
+const logger = createLogger();
+
+/** http(s)://localhost | 127.0.0.1 | [::1], optional port, optional trailing slash — nothing else
+ * (no credentials, path, query or look-alike hosts such as localhost.example.com). */
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d{1,5})?\/?$/;
+
 function isLocalOrigin(value: string) {
-  try {
-    const url = new URL(value);
-    return (
-      (url.protocol === 'http:' || url.protocol === 'https:') &&
-      ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) &&
-      !url.username &&
-      !url.password &&
-      (url.pathname === '' || url.pathname === '/') &&
-      !url.search &&
-      !url.hash
-    );
-  } catch {
-    return false;
-  }
+  return LOCAL_ORIGIN.test(value);
 }
 
 /**
@@ -41,7 +35,7 @@ function devProxyTarget(env: Record<string, string | undefined>) {
   const apiUrl = env.VITE_API_URL?.trim();
   if (apiUrl && isLocalOrigin(apiUrl)) return apiUrl;
   if (apiUrl) {
-    console.warn(
+    logger.warn(
       `[vite] VITE_API_URL is not local, so relative /api and /uploads are proxied to ${DEFAULT_DEV_API}, not to it.`,
     );
   }
@@ -57,9 +51,10 @@ export default defineConfig(({ command, mode, isPreview }) => {
     return { plugins, preview: { proxy: {} } };
   }
 
-  const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
+  // Prefix '' = every variable: the .env files of this mode plus the shell environment (which wins).
+  const env = loadEnv(mode, '.', '');
   const target = devProxyTarget(env);
-  console.info(`[vite] /api and /uploads proxy → ${target}`);
+  logger.info(`[vite] /api and /uploads proxy → ${target}`);
   const proxy = {
     '/api': { target, changeOrigin: true },
     '/uploads': { target, changeOrigin: true },
