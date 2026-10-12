@@ -42,22 +42,25 @@ function devProxyTarget(env: Record<string, string | undefined>) {
   return DEFAULT_DEV_API;
 }
 
-export default defineConfig(({ command, mode, isPreview }) => {
-  const plugins = [react(), tailwindcss()];
-
-  // `vite build` (Cloudflare) never uses a proxy: nothing to resolve, nothing that could fail.
-  // `vite preview` serves the production build and must not forward /api anywhere.
-  if (command !== 'serve' || isPreview) {
-    return { plugins, preview: { proxy: {} } };
-  }
-
+/** Proxy for `vite` (dev server) only — local API targets, as before. */
+function devProxy(mode: string) {
   // Prefix '' = every variable: the .env files of this mode plus the shell environment (which wins).
-  const env = loadEnv(mode, '.', '');
-  const target = devProxyTarget(env);
+  const target = devProxyTarget(loadEnv(mode, '.', ''));
   logger.info(`[vite] /api and /uploads proxy → ${target}`);
-  const proxy = {
+  return {
     '/api': { target, changeOrigin: true },
     '/uploads': { target, changeOrigin: true },
   };
-  return { plugins, server: { proxy }, preview: { proxy: {} } };
+}
+
+// Keep ONE top-level `return` with a literal `plugins: [...]` array: Cloudflare's `wrangler deploy`
+// autoconfig appends cloudflare() to exactly that array (a shorthand or variable makes it fail).
+export default defineConfig(({ command, mode, isPreview }) => {
+  const devServer = command === 'serve' && !isPreview;
+  return {
+    plugins: [react(), tailwindcss()],
+    // `vite build` (Cloudflare) and `vite preview`: no proxy; `vite` (dev): local-only proxy.
+    server: devServer ? { proxy: devProxy(mode) } : undefined,
+    preview: { proxy: {} },
+  };
 });
