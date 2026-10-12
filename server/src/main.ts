@@ -12,6 +12,7 @@ import { CacheService } from './cache/cache.service';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { langMiddleware } from './common/i18n';
 import { resolveJwtSecret } from './common/jwt-config';
+import { resolveMailTransport } from './mail/mail-transport';
 import { ensureSchema } from './database/bootstrap-schema';
 import { MailService } from './mail/mail.service';
 
@@ -40,9 +41,11 @@ function isAllowedOrigin(origin: string | undefined) {
 }
 
 async function bootstrap() {
-  // Fail fast — before any database connection — when production has no safe JWT secret.
+  // Fail fast — before any database connection — when production has no safe JWT secret
+  // or is configured to log auth codes instead of emailing them.
   try {
     resolveJwtSecret(process.env, () => undefined);
+    resolveMailTransport(process.env);
   } catch (err) {
     console.error(`Startup aborted: ${(err as Error).message}`);
     process.exit(1);
@@ -80,7 +83,9 @@ async function bootstrap() {
   console.log(`API server: http://localhost:${port}`);
   if (docsEnabled) console.log(`Swagger UI: http://localhost:${port}/api-docs`);
   console.log(
-    `Auth codes: email ${app.get(MailService).isConfigured() ? 'on' : 'off'} (never sent by SMS)`,
+    resolveMailTransport() === 'log'
+      ? 'Auth codes: MAIL_TRANSPORT=log — written to this log, NOT emailed (development only)'
+      : `Auth codes: email ${app.get(MailService).isConfigured() ? 'on' : 'off'} (never sent by SMS)`,
   );
 }
 

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import nodemailer from "nodemailer";
 import { currentLang, type Lang } from "../common/i18n";
+import { resolveMailTransport } from "./mail-transport";
 
 /** Auth-code email text per site language (see common/i18n.ts). */
 const AUTH_CODE_COPY: Record<
@@ -53,6 +54,11 @@ export class MailService {
   private readonly logger = new Logger("Mail");
 
   isConfigured() {
+    try {
+      if (resolveMailTransport() === "log") return true;
+    } catch {
+      return false;
+    }
     return Boolean(process.env.SMTP_HOST?.trim() && smtpUser() && smtpPass());
   }
 
@@ -90,6 +96,12 @@ export class MailService {
     code: string,
     kind: "reset" | "register" = "reset",
   ) {
+    // MAIL_TRANSPORT=log (never in production): the code goes to the log, not to a mailbox.
+    if (resolveMailTransport() === "log") {
+      this.logger.warn(`[auth-code] MAIL_TRANSPORT=log — not emailed: ${kind} code for ${to}: ${code}`);
+      return;
+    }
+
     if (!this.isConfigured()) {
       const error = new Error("SMTP_NOT_CONFIGURED");
       error.name = "SmtpNotConfiguredError";
