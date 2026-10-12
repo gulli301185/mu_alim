@@ -75,6 +75,8 @@
     "confirmBtn": "Ырастоо",
     "resendCountdown": "Кодду кайра жөнөтүү: 00:{{sec}}",
     "resendCode": "Кодду дагы бир жолу жөнөтүү",
+    "resending": "Код жөнөтүлүүдө...",
+    "codeResent": "Жаңы код {{email}} дарегине жөнөтүлдү. Мурунку код мындан ары иштебейт.",
     "backToForm": "← Формага кайтуу",
     "firstNameLabel": "Атыңыз",
     "lastNameLabel": "Фамилияңыз",

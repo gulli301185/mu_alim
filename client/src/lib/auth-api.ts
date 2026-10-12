@@ -49,17 +49,19 @@ export class AuthApiError extends Error {
   fields?: Record<string, string>;
   needsConfirmation?: boolean;
   email?: string;
+  status?: number;
 
   constructor(
     message: string,
     fields?: Record<string, string>,
-    extra?: { needsConfirmation?: boolean; email?: string },
+    extra?: { needsConfirmation?: boolean; email?: string; status?: number },
   ) {
     super(message);
     this.name = 'AuthApiError';
     this.fields = fields;
     this.needsConfirmation = extra?.needsConfirmation;
     this.email = extra?.email;
+    this.status = extra?.status;
   }
 }
 
@@ -81,9 +83,10 @@ async function parseApiError(res: Response, fallback: string): Promise<AuthApiEr
     return new AuthApiError(data.error ?? fallback, data.fields, {
       needsConfirmation: data.needsConfirmation,
       email: data.email,
+      status: res.status,
     });
   } catch {
-    return new AuthApiError(fallback);
+    return new AuthApiError(fallback, undefined, { status: res.status });
   }
 }
 

@@ -75,6 +75,8 @@
     "confirmBtn": "Подтвердить",
     "resendCountdown": "Отправить код повторно: 00:{{sec}}",
     "resendCode": "Отправить код ещё раз",
+    "resending": "Отправка кода...",
+    "codeResent": "Новый код отправлен на {{email}}. Предыдущий код больше не действует.",
     "backToForm": "← Вернуться к форме",
     "firstNameLabel": "Имя",
     "lastNameLabel": "Фамилия",

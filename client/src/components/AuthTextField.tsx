@@ -1,6 +1,6 @@
 import { Mail, User, Phone, KeyRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { InputHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes } from 'react';
 
 type AuthTextFieldProps = {
   label: string;
@@ -35,6 +35,7 @@ export function AuthTextField({
   maxLength,
   inputMode,
 }: AuthTextFieldProps) {
+  const messageId = useId();
   return (
     <label className="auth-modal-field">
       <span className="auth-modal-label">{label}</span>
@@ -51,13 +52,23 @@ export function AuthTextField({
           autoComplete={autoComplete}
           maxLength={maxLength}
           inputMode={inputMode}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? messageId : undefined}
           value={value}
           onChange={onChange}
         />
       </span>
       {/* toi */}
-      {hint && !error ? <span className="auth-modal-field-hint">{hint}</span> : null}
-      {error ? <span className="auth-modal-field-error">{error}</span> : null}
+      {hint && !error ? (
+        <span id={messageId} className="auth-modal-field-hint">
+          {hint}
+        </span>
+      ) : null}
+      {error ? (
+        <span id={messageId} className="auth-modal-field-error" role="alert">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }

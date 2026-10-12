@@ -43,6 +43,10 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
   const { image } = useSiteImages();
   const [tab, setTab] = useState<AuthTab>(initialTab);
   const [loading, setLoading] = useState(false);
+  /** Separate from `loading`: re-sending a code must not relabel or lock the form's submit button. */
+  const [resending, setResending] = useState(false);
+  /** Synchronous guard: fast repeated clicks run before React re-renders with `resending`. */
+  const resendInFlight = useRef(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
   const [forgotStep, setForgotStep] = useState<'email' | 'reset'>('email');
@@ -145,6 +149,8 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
         return;
       }
       if (err instanceof AuthApiError && err.fields) setFieldErrors(err.fields);
+      // Wrong email or password: also show it under the password field (without saying which one was wrong).
+      else if (err instanceof AuthApiError && err.status === 401) setFieldErrors({ password: err.message });
       toastError(getErrorMessage(err, t('auth.loginFailed')));
     } finally {
       setLoading(false);
@@ -215,18 +221,23 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
   };
 
   const handleResend = async (email: string, purpose: 'register' | 'reset') => {
-    if (resendIn > 0 || !email) return;
-    setLoading(true);
+    if (resendInFlight.current || resendIn > 0 || !email) return;
+    resendInFlight.current = true;
+    setResending(true);
     try {
       const result =
         purpose === 'register' ? await resendRegisterCode({ email }) : await forgotPassword({ email });
-      setForgotMessage(result.message);
+      // The server's resend answer is deliberately neutral ("if such an account exists…"); the person
+      // on the registration step just registered, so tell them plainly that a new code is on its way.
+      const message = purpose === 'register' ? t('auth.codeResent', { email }) : result.message;
+      setForgotMessage(message);
       setResendIn(59);
-      toastSuccess(result.message);
+      toastSuccess(message);
     } catch (err) {
       toastError(getErrorMessage(err, t('auth.resendFailed')));
     } finally {
-      setLoading(false);
+      resendInFlight.current = false;
+      setResending(false);
     }
   };
 
@@ -396,8 +407,14 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
                 {resendIn > 0 ? (
                   <span>{t('auth.resendCountdown', { sec: String(resendIn).padStart(2, '0') })}</span>
                 ) : (
-                  <button type="button" className="auth-modal-switch-btn" onClick={() => void handleResend(registerForm.email, 'register')}>
-                    {t('auth.resendCode')}
+                  <button
+                    type="button"
+                    className="auth-modal-switch-btn"
+                    onClick={() => void handleResend(registerForm.email, 'register')}
+                    disabled={resending}
+                    aria-busy={resending}
+                  >
+                    {resending ? t('auth.resending') : t('auth.resendCode')}
                   </button>
                 )}
               </p>
@@ -547,8 +564,14 @@ export function UserAuthModal({ open, onClose, initialTab = 'login' }: UserAuthM
                   {resendIn > 0 ? (
                     <span>{t('auth.resendCountdown', { sec: String(resendIn).padStart(2, '0') })}</span>
                   ) : (
-                    <button type="button" className="auth-modal-switch-btn" onClick={() => void handleResend(forgotEmail, 'reset')}>
-                      {t('auth.resendCode')}
+                    <button
+                      type="button"
+                      className="auth-modal-switch-btn"
+                      onClick={() => void handleResend(forgotEmail, 'reset')}
+                      disabled={resending}
+                      aria-busy={resending}
+                    >
+                      {resending ? t('auth.resending') : t('auth.resendCode')}
                     </button>
                   )}
                 </p>

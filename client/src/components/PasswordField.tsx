@@ -1,4 +1,4 @@
-import { useState, type InputHTMLAttributes } from 'react';
+import { useId, useState, type InputHTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
@@ -25,6 +25,7 @@ export function PasswordField({
 }: PasswordFieldProps) {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
+  const messageId = useId();
 
   return (
     <label className="auth-modal-field">
@@ -41,6 +42,8 @@ export function PasswordField({
           required={required}
           minLength={minLength}
           autoComplete={autoComplete}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? messageId : undefined}
           value={value}
           onChange={onChange}
         />
@@ -54,8 +57,16 @@ export function PasswordField({
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </span>
-      {hint && !error ? <span className="auth-modal-field-hint">{hint}</span> : null}
-      {error ? <span className="auth-modal-field-error">{error}</span> : null}
+      {hint && !error ? (
+        <span id={messageId} className="auth-modal-field-hint">
+          {hint}
+        </span>
+      ) : null}
+      {error ? (
+        <span id={messageId} className="auth-modal-field-error" role="alert">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
