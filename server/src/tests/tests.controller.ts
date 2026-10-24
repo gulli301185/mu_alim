@@ -19,16 +19,24 @@ import {
   OptionalAuthGuard,
   assertUserRole,
 } from '../common/auth';
+import { AppError } from '../common/app-error';
 import { ZodPipe } from '../common/zod.pipe';
+import { CoursesService } from '../courses/courses.service';
 import { toStudentGradeResult } from './tests.helpers';
 import { TestsService } from './tests.service';
 import { createTestSchema, gradeSchema, updateTestSchema } from './tests.schemas';
 
 const testBody = { message: 'Маалымат туура эмес' };
 
+/** Final exams exist only for paid courses. A course that is not found is left to the service. */
+const isFreeCourse = (course: { courseType: string } | null) => course !== null && course.courseType !== 'paid';
+
 @Controller()
 export class TestsController {
-  constructor(private readonly tests: TestsService) {}
+  constructor(
+    private readonly tests: TestsService,
+    private readonly courses: CoursesService,
+  ) {}
 
   @Get('admin/tests')
   @UseGuards(AdminGuard)
@@ -44,7 +52,10 @@ export class TestsController {
 
   @Post('admin/tests')
   @UseGuards(AdminGuard)
-  adminCreate(@Body(new ZodPipe(createTestSchema, testBody)) body: z.infer<typeof createTestSchema>) {
+  async adminCreate(@Body(new ZodPipe(createTestSchema, testBody)) body: z.infer<typeof createTestSchema>) {
+    if (isFreeCourse(await this.courses.resolveRef(body.courseRef))) {
+      throw new AppError(400, 'Бекер курска курстук тест түзүлбөйт');
+    }
     return this.tests.adminCreate(body);
   }
 
@@ -66,7 +77,8 @@ export class TestsController {
 
   @Get('courses/:courseRef/final-test')
   @UseGuards(OptionalAuthGuard)
-  finalTest(@Param('courseRef') ref: string, @CurrentUser() user: AuthUser | undefined) {
+  async finalTest(@Param('courseRef') ref: string, @CurrentUser() user: AuthUser | undefined) {
+    if (isFreeCourse(await this.courses.resolveRef(ref))) throw new AppError(404, 'Тест табылган жок');
     return this.tests.getFinalTest(ref, user);
   }
 
@@ -79,6 +91,7 @@ export class TestsController {
     @Body(new ZodPipe(gradeSchema, testBody)) body: z.infer<typeof gradeSchema>,
   ) {
     assertUserRole(user);
+    if (isFreeCourse(await this.courses.resolveRef(ref))) throw new AppError(404, 'Тест табылган жок');
     return toStudentGradeResult(await this.tests.gradeFinalTest(ref, user, body.answers));
   }
 }
