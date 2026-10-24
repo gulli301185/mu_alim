@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BeforeApplicationShutdown, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { randomInt } from 'node:crypto';
@@ -6,7 +6,7 @@ import { AppError } from '../common/app-error';
 import { AuthUser } from '../common/auth';
 import { MailService } from '../mail/mail.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, IsNull, MoreThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, MoreThan, QueryFailedError, Repository } from 'typeorm';
 import { PasswordResetToken, User, UserProfile } from '../database/entities';
 import { findUserByKgPhone } from '../lib/user-phone';
 import type {
@@ -51,10 +51,53 @@ const CODE_NOT_SENT = 'Код почтага жөнөтүлгөн жок. Кий
 const CODE_INVALID = 'Код жараксыз же мөөнөтү өткөн';
 const RESEND_SENT = 'Эгер бул почта менен ырастала элек аккаунт болсо, ага код жөнөтүлдү.';
 const MAIL_NOT_CONNECTED = 'Код почтага жөнөтүлгөн жок. Почта сервиси туташа элек.';
+const RESET_REQUESTED = 'Эгер бул почта менен аккаунт болсо, ага сыр сөздү калыбына келтирүү коду жөнөтүлдү.';
+
+/** nodemailer / Node network error codes that may appear in auth-code logs as they are. */
+const LOGGABLE_ERROR_CODES = new Set([
+  'EAUTH',
+  'ENOAUTH',
+  'EOAUTH2',
+  'ECONNECTION',
+  'ETIMEDOUT',
+  'ESOCKET',
+  'EDNS',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETLS',
+  'EGREETING',
+  'EENVELOPE',
+  'EMESSAGE',
+  'ESTREAMING',
+  'EPROTOCOL',
+  'EMAXLIMIT',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EPIPE',
+]);
+
+/**
+ * A short, fixed tag for an error in auth-code logs (QA A5). Never the message, response or
+ * stack: they can quote addresses, codes, the SMTP login or the server's reply. Details that
+ * are safe to log are written by MailService itself.
+ */
+function safeErrorTag(err: unknown): string {
+  if (!(err instanceof Error)) return 'Error';
+  if (/^SMTP_REJECTED\b/.test(err.message)) return 'SMTP_REJECTED';
+  const { code } = err as { code?: unknown };
+  if (err instanceof QueryFailedError) {
+    // A PostgreSQL SQLSTATE is exactly five characters, e.g. 23505.
+    return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) ? `QueryFailedError:${code}` : 'QueryFailedError';
+  }
+  if (typeof code === 'string' && LOGGABLE_ERROR_CODES.has(code)) return code;
+  return 'Error';
+}
 
 @Injectable()
-export class AuthService {
+export class AuthService implements BeforeApplicationShutdown {
   private readonly logger = new Logger('Auth');
+  /** Auth-code work still running after the HTTP answer was sent (see forgotPassword). */
+  private readonly backgroundTasks = new Set<Promise<void>>();
 
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
@@ -66,6 +109,26 @@ export class AuthService {
 
   signToken(user: AuthUser) {
     return this.jwt.sign({ id: user.id, role: user.role });
+  }
+
+  /** Runs `task` after the response; failures are logged (never thrown) and the task is
+   * tracked so a graceful shutdown waits for it. */
+  private runInBackground(label: string, task: () => Promise<void>) {
+    const tracked: Promise<void> = task()
+      .catch((err) => {
+        this.logger.error(`[auth-code] ${label} failed (${safeErrorTag(err)})`);
+      })
+      .finally(() => this.backgroundTasks.delete(tracked));
+    this.backgroundTasks.add(tracked);
+  }
+
+  /** Resolves once every background auth-code task has finished (shutdown, tests). */
+  async settleBackgroundTasks() {
+    while (this.backgroundTasks.size > 0) await Promise.allSettled([...this.backgroundTasks]);
+  }
+
+  async beforeApplicationShutdown() {
+    await this.settleBackgroundTasks();
   }
 
   /** Issues a fresh code for `purpose`; every older unused code of the user stops working. */
@@ -106,8 +169,7 @@ export class AuthService {
       await this.mail.sendAuthCode(email, code, kind);
       return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`[auth-code] mail failed ${message}`);
+      this.logger.error(`[auth-code] ${kind} code not delivered (${safeErrorTag(err)})`);
       return false;
     }
   }
@@ -252,27 +314,29 @@ export class AuthService {
     };
   }
 
+  /**
+   * Same answer for every address — unknown, inactive, admin or a real account — and nothing
+   * address-specific happens before answering, so neither the reply nor its timing shows
+   * whether an account exists (QA F14). For an eligible account the code is issued and
+   * emailed in the background; if the email fails the code is revoked and the failure is
+   * logged (without the address or the code). A missing mail setup is the only error, and it
+   * is the same for everyone.
+   */
   async forgotPassword(data: z.infer<typeof forgotPasswordSchema>) {
-    const email = data.email;
-    const user = await this.findByEmailInsensitive(email);
+    if (!this.mail.isConfigured()) throw new AppError(503, MAIL_NOT_CONNECTED);
 
-    if (!user || !user.isActive || user.role === 'admin') {
-      throw new AppError(400, 'Бул почта менен аккаунт жок', {
-        fields: { email: 'Бул почта менен аккаунт жок' },
+    const user = await this.findByEmailInsensitive(data.email);
+    if (user && user.isActive && user.role !== 'admin') {
+      const { id: userId, email } = user;
+      this.runInBackground('forgot-password', async () => {
+        const { code, tokenId } = await this.issueAuthCode(userId, 'reset');
+        if (await this.deliverAuthCode(email, code, 'reset')) return;
+        await this.revokeToken(tokenId);
+        this.logger.error(`[auth-code] forgot-password: reset code not delivered, revoked (user ${userId})`);
       });
     }
 
-    const { code, tokenId } = await this.issueAuthCode(user.id, 'reset');
-    const delivered = await this.deliverAuthCode(email, code, 'reset');
-    if (!delivered) {
-      await this.revokeToken(tokenId);
-      throw new AppError(
-        503,
-        this.mail.isConfigured() ? CODE_NOT_SENT : MAIL_NOT_CONNECTED,
-      );
-    }
-
-    return { message: CODE_EMAILED };
+    return { message: RESET_REQUESTED };
   }
 
   /**
