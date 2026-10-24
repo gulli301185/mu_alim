@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { currentLang, type Lang } from "../common/i18n";
 import { resolveMailTransport } from "./mail-transport";
 
@@ -49,6 +50,45 @@ function smtpPass() {
   return (process.env.SMTP_PASS ?? "").replace(/\s+/g, "").trim();
 }
 
+type SmtpStage = "connect" | "auth" | "send";
+
+/** Leading 3-digit SMTP reply code of a server response ("250 2.0.0 OK …" → 250), or undefined. */
+function smtpReplyCode(response: unknown): number | undefined {
+  const match = /^\s*([2-5]\d{2})\b/.exec(typeof response === "string" ? response : "");
+  return match ? Number(match[1]) : undefined;
+}
+
+/** Message-ID without the brackets and the "@domain" part — the random id is enough to find
+ * the message in provider logs and carries no address. */
+function messageIdToken(messageId: unknown): string | undefined {
+  if (typeof messageId !== "string") return undefined;
+  const local = messageId.replace(/^<|>$/g, "").split("@")[0];
+  return /^[A-Za-z0-9._-]{1,128}$/.test(local) ? local : undefined;
+}
+
+/**
+ * Diagnostics that are safe to log for an SMTP failure. err.message / err.response are left out
+ * on purpose: they can quote addresses, the login name or the server's full reply.
+ */
+function smtpFailureDetails(err: unknown) {
+  const e = (err ?? {}) as { code?: unknown; command?: unknown; responseCode?: unknown };
+  const code = typeof e.code === "string" && /^[A-Z][A-Z0-9_]{1,31}$/.test(e.code) ? e.code : undefined;
+  const command =
+    typeof e.command === "string" && /^[A-Z]{2,10}( [A-Z]{2,10})?$/.test(e.command) ? e.command : undefined;
+  const responseCode =
+    typeof e.responseCode === "number" && e.responseCode >= 100 && e.responseCode <= 599 ? e.responseCode : undefined;
+  let stage: SmtpStage = "send";
+  if (code === "EAUTH" || command?.startsWith("AUTH")) stage = "auth";
+  else if (
+    ["ECONNECTION", "ETIMEDOUT", "ESOCKET", "EDNS", "ECONNREFUSED", "ECONNRESET", "ETLS", "EGREETING"].includes(code ?? "") ||
+    command === "CONN" ||
+    command === "GREETING"
+  ) {
+    stage = "connect";
+  }
+  return { stage, code, command, responseCode };
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger("Mail");
@@ -96,9 +136,10 @@ export class MailService {
     code: string,
     kind: "reset" | "register" = "reset",
   ) {
-    // MAIL_TRANSPORT=log (never in production): the code goes to the log, not to a mailbox.
+    // MAIL_TRANSPORT=log (never in production): nothing is emailed. The log only records that a
+    // code was withheld — never the code or the address.
     if (resolveMailTransport() === "log") {
-      this.logger.warn(`[auth-code] MAIL_TRANSPORT=log — not emailed: ${kind} code for ${to}: ${code}`);
+      this.logger.warn(`[auth-code] MAIL_TRANSPORT=log — ${kind} code not emailed (code and address are not logged)`);
       return;
     }
 
@@ -116,7 +157,9 @@ export class MailService {
     const subject = `${register ? copy.registerSubject : copy.resetSubject}: ${code}`;
     const purpose = register ? copy.registerPurpose : copy.resetPurpose;
 
-    const info = await transporter.sendMail({
+    let info: SMTPTransport.SentMessageInfo;
+    try {
+      info = await transporter.sendMail({
       from,
       to,
       replyTo: fromUser,
@@ -140,25 +183,23 @@ export class MailService {
       <p>${copy.validity}</p>
       <p>Mu Alim</p>
     `,
-    });
+      });
+    } catch (err) {
+      // Safe fields only; the error itself is re-thrown unchanged for the caller.
+      this.logger.error(`[auth-code] mail failed ${JSON.stringify({ kind, ...smtpFailureDetails(err) })}`);
+      throw err;
+    }
 
-    const rejected = [...(info.rejected ?? []), ...(info.pending ?? [])];
-    if (rejected.length > 0) {
-      throw new Error(`SMTP_REJECTED ${rejected.join(",")}`);
+    const accepted = info.accepted?.length ?? 0;
+    const rejected = (info.rejected?.length ?? 0) + (info.pending?.length ?? 0);
+    const smtpCode = smtpReplyCode(info.response);
+    if (rejected > 0) {
+      this.logger.error(`[auth-code] mail rejected ${JSON.stringify({ kind, accepted, rejected, smtpCode })}`);
+      throw new Error(`SMTP_REJECTED ${rejected} recipient(s)`);
     }
 
     this.logger.log(
-      `[auth-code] mail sent ${JSON.stringify({
-        to,
-        kind,
-        messageId: info.messageId,
-        accepted: info.accepted,
-        response: info.response,
-      })}`,
+      `[auth-code] mail sent ${JSON.stringify({ kind, accepted, rejected, smtpCode, messageId: messageIdToken(info.messageId) })}`,
     );
-
-    if (process.env.NODE_ENV !== "production") {
-      this.logger.debug(`[auth-code] DEV code for ${to}: ${code}`);
-    }
   }
 }
