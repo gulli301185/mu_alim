@@ -19,7 +19,6 @@ function savePaymentPending(courseRef: string, pending: boolean) {
 
 function buildWhatsappPayUrl(t: TFunction, input: {
   courseTitle: string;
-  coursePrice: string;
   userName: string;
   userEmail: string;
   userPhone: string;
@@ -27,7 +26,6 @@ function buildWhatsappPayUrl(t: TFunction, input: {
   const text = [
     t('payment.msgGreeting'),
     t('payment.msgIntro', { title: input.courseTitle }),
-    t('payment.msgPrice', { price: input.coursePrice }),
     t('payment.msgName', { name: input.userName }),
     `Email: ${input.userEmail}`,
     input.userPhone ? `WhatsApp: ${input.userPhone}` : null,
@@ -43,7 +41,6 @@ type CoursePaymentBlockProps = {
   courseRef: string;
   courseRecordId: string;
   courseTitle: string;
-  coursePrice: string;
   lessonCount: number;
   learnPath: string;
   onEnrolled?: () => void;
@@ -53,7 +50,6 @@ export function CoursePaymentBlock({
   courseRef,
   courseRecordId,
   courseTitle,
-  coursePrice,
   lessonCount,
   learnPath,
   onEnrolled,
@@ -97,7 +93,6 @@ export function CoursePaymentBlock({
 
     const url = buildWhatsappPayUrl(t, {
       courseTitle,
-      coursePrice,
       userName: `${user.firstName} ${user.lastName}`.trim() || user.email,
       userEmail: user.email,
       userPhone: user.phone ?? '',
@@ -125,7 +120,6 @@ export function CoursePaymentBlock({
             <MessageCircle className="h-4 w-4" aria-hidden />
             <span className="courses-payment-title">{t('payment.whatsappTitle')}</span>
           </div>
-          <p className="courses-payment-price">{coursePrice}</p>
           <p className="courses-payment-hint">{t('payment.needLogin')}</p>
           <button type="button" className="btn-primary courses-payment-btn w-full" onClick={() => setAuthOpen(true)}>
             {t('payment.loginOrRegister')}
@@ -154,7 +148,6 @@ export function CoursePaymentBlock({
   const reopenUrl = user
     ? buildWhatsappPayUrl(t, {
         courseTitle,
-        coursePrice,
         userName: `${user.firstName} ${user.lastName}`.trim() || user.email,
         userEmail: user.email,
         userPhone: user.phone ?? '',
@@ -213,7 +206,6 @@ export function CoursePaymentBlock({
         <MessageCircle className="h-4 w-4" aria-hidden />
         <span className="courses-payment-title">{t('payment.whatsappTitle')}</span>
       </div>
-      <p className="courses-payment-price">{coursePrice}</p>
       <p className="courses-payment-hint">
         {t('payment.hint', { count: lessonCount })}
       </p>

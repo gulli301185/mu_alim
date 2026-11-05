@@ -259,7 +259,6 @@ export function CourseDetailPage() {
               <div className="courses-payment-course-meta">
                 <StarRating compact />
                 <span>{t('courses.videoLessons', { count: publishedLessons.length || course.lessonCount })}</span>
-                <span>{course.priceLabel}</span>
               </div>
 
               <div className="courses-detail-preview">
@@ -285,7 +284,6 @@ export function CourseDetailPage() {
                   courseRef={courseId}
                   courseRecordId={course.recordId}
                   courseTitle={course.title}
-                  coursePrice={course.priceLabel}
                   lessonCount={publishedLessons.length || course.lessonCount}
                   learnPath={learnPath}
                   onEnrolled={() => {
@@ -412,9 +410,7 @@ function CourseHubCard({ course, free = false }: { course: CourseSummary; free?:
         <span className="courses-hub-card-play" aria-hidden>
           <Play className="h-5 w-5" fill="currentColor" />
         </span>
-        <span className={free ? 'video-free-badge' : 'video-paid-badge'}>
-          {free ? t('common.free') : course.priceLabel}
-        </span>
+        {free ? <span className="video-free-badge">{t('common.free')}</span> : null}
         {course.introDurationSeconds ? (
           <span className="courses-hub-card-time">{formatCourseDuration(course.introDurationSeconds)}</span>
         ) : null}
