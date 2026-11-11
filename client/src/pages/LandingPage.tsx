@@ -84,7 +84,6 @@ type VideoPanelItem = {
   badge?: string;
   lessons?: number;
   rating?: number;
-  price?: string;
 };
 
 function VideoPanelLink({
@@ -141,14 +140,12 @@ function StarRating({ value }: { value: number }) {
 function CourseMeta({
   lessons,
   rating,
-  price,
 }: {
   lessons?: number;
   rating?: number;
-  price?: string;
 }) {
   const { t } = useTranslation();
-  if (!lessons && !rating && !price) return null;
+  if (!lessons && !rating) return null;
   return (
     <div className="course-meta">
       {(lessons || rating) && (
@@ -161,7 +158,6 @@ function CourseMeta({
           )}
         </p>
       )}
-      {price && <p className="course-price">{price}</p>}
     </div>
   );
 }
@@ -346,7 +342,6 @@ function VideoPanel({
             <CourseMeta
               lessons={featured.lessons}
               rating={featured.rating}
-              price={featured.price}
             />
           </div>
         </VideoPanelLink>
@@ -378,11 +373,10 @@ function VideoPanel({
                   {v.subtitle && (
                     <p className="video-side-subtitle">{v.subtitle}</p>
                   )}
-                  {v.lessons || v.rating || v.price ? (
+                  {v.lessons || v.rating ? (
                     <CourseMeta
                       lessons={v.lessons}
                       rating={v.rating}
-                      price={v.price}
                     />
                   ) : (
                     v.date && (
