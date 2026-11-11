@@ -53,8 +53,9 @@ export async function fetchCourseFinalTest(
   courseRef: string,
   token?: string | null,
 ): Promise<CourseTestPayload | null> {
+  // A GET has no body: no Content-Type, so an anonymous request needs no CORS preflight.
   const res = await fetch(`${API_BASE}/api/courses/${encodeURIComponent(courseRef)}/final-test`, {
-    headers: authHeaders(token),
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (res.status === 404) return null;
   if (!res.ok) {
