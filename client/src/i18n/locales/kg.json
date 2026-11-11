@@ -33,6 +33,7 @@
   },
   "common": {
     "loading": "Жүктөлүүдө...",
+    "pageNotFound": "Мындай бет табылган жок.",
     "free": "Бекер",
     "readMore": "Кененирээк",
     "lessonsWord": "сабак",

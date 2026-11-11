@@ -33,6 +33,7 @@
   },
   "common": {
     "loading": "Загрузка...",
+    "pageNotFound": "Такая страница не найдена.",
     "free": "Бесплатно",
     "readMore": "Подробнее",
     "lessonsWord": "уроков",
