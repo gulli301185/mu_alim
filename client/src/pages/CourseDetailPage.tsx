@@ -531,7 +531,7 @@ export function FreeCoursesPage() {
 
 export function CoursesIndexPage() {
   const { t } = useTranslation();
-  const { data: paidCourses, isLoading } = useQuery({
+  const { data: paidCourses, isLoading, isError, refetch } = useQuery({
     queryKey: ['courses', 'paid'],
     queryFn: () => import('../lib/course-api').then((m) => m.fetchCourses({ type: 'paid', limit: 100 })),
   });
@@ -558,7 +558,14 @@ export function CoursesIndexPage() {
 
         <CoursesHubSwitch active="paid" />
 
-        {items.length > 0 ? (
+        {isError && !paidCourses ? (
+          <div className="courses-hub-empty ui-card">
+            <p className="courses-hub-empty-title">{t('courses.paidLoadFailed')}</p>
+            <button type="button" className="btn-gold courses-hub-empty-btn" onClick={() => void refetch()}>
+              {t('courses.reload')}
+            </button>
+          </div>
+        ) : items.length > 0 ? (
           <div className="courses-hub-grid">
             {items.map((course) => (
               <CourseHubCard key={course.id} course={course} />
