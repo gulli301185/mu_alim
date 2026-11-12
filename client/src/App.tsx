@@ -33,6 +33,7 @@ import { QuestionArticlePage } from "./pages/QuestionArticlePage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { AdminDashboardPage } from "./pages/admin/AdminDashboardPage";
 import { AdminUsersPage } from "./pages/admin/AdminUsersPage";
 import { AdminCertificatesPage } from "./pages/admin/AdminCertificatesPage";
@@ -106,6 +107,8 @@ export default function App() {
                 <Route element={<RequireUser />}>
                   <Route path="/profile" element={<ProfilePage />} />
                 </Route>
+
+                <Route path="*" element={<NotFoundPage />} />
               </Route>
 
               <Route path="/admin" element={<AdminLoginLayout />}>

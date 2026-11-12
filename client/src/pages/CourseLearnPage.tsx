@@ -444,7 +444,8 @@ export function CourseLearnPage() {
   } = useQuery({
     queryKey: ["course-final-test", courseId, progressUserId],
     queryFn: () => fetchCourseFinalTest(courseId!, token),
-    enabled: Boolean(courseId && course && !isFree),
+    // Only once access is known: without it the page redirects to the course page anyway.
+    enabled: Boolean(courseId && course && !isFree && hasAccess && !enrollmentLoading),
   });
 
   const allTestQuestionsAnswered = useMemo(() => {
