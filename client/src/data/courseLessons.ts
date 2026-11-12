@@ -67,13 +67,13 @@ export function isLessonUnlocked(
   lessonId: string,
   completedLessonIds: string[],
 ): boolean {
+  // The previous lesson is the one before it in the (published, sorted) list — not
+  // necessarily number `order - 1`: gaps in the numbering must not lock a lesson, and the
+  // first published lesson is open whatever its number.
   const sorted = [...lessons].sort((a, b) => a.order - b.order);
-  const lesson = sorted.find((l) => l.id === lessonId);
-  if (!lesson) return false;
-  if (lesson.order <= 1) return true;
+  const index = sorted.findIndex((l) => l.id === lessonId);
+  if (index < 0) return false;
+  if (index === 0) return true;
 
-  const prev = sorted.find((l) => l.order === lesson.order - 1);
-  if (!prev) return lesson.order <= 1;
-
-  return completedLessonIds.includes(prev.id);
+  return completedLessonIds.includes(sorted[index - 1].id);
 }
