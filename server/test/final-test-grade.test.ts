@@ -127,7 +127,8 @@ function controllerWithRealGrading() {
       ...LOCK,
     }),
   };
-  return new TestsController(service as never);
+  const courses = { resolveRef: async () => ({ courseType: 'paid' as const }) };
+  return new TestsController(service as never, courses as never);
 }
 
 const STUDENT = { id: '33333333-3333-4333-8333-333333333333', role: 'user' as const };
