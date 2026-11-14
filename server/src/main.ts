@@ -84,7 +84,7 @@ async function bootstrap() {
   if (docsEnabled) console.log(`Swagger UI: http://localhost:${port}/api-docs`);
   console.log(
     resolveMailTransport() === 'log'
-      ? 'Auth codes: MAIL_TRANSPORT=log — written to this log, NOT emailed (development only)'
+      ? 'Auth codes: MAIL_TRANSPORT=log — NOT emailed and NOT logged; read them from the local database (development only, see docs/dev-auth-codes.md)'
       : `Auth codes: email ${app.get(MailService).isConfigured() ? 'on' : 'off'} (never sent by SMS)`,
   );
 }
