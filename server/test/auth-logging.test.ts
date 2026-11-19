@@ -66,6 +66,7 @@ function setup(opts: { sendError: unknown; tokenUpdateError?: unknown }) {
     create: (row: object) => row,
     save: async (row: object) => ({ ...row, id: '22222222-2222-4222-8222-222222222222' }),
     existsBy: async () => false,
+    delete: async () => ({ affected: 0 }),
   };
   const em = {
     create: (_entity: unknown, row: object) => row,
