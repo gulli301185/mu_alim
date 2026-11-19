@@ -1,0 +1,82 @@
+# Checks for pull requests into main. No secrets, no database, no network calls to production:
+# the unit tests mock every dependency, and the API-startup tests point at an unreachable
+# database on purpose. The PostgreSQL integration test (server/test/*.integration.test.ts)
+# stays a separate manual check.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  server:
+    name: server (typecheck, unit tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22 # same major as server/Dockerfile (node:22-alpine)
+          cache: npm
+          cache-dependency-path: package-lock.json
+      # Root lockfile: root tools (tsx) + the `server` workspace.
+      - run: npm ci --no-audit --no-fund
+      - name: TypeScript
+        run: ./node_modules/.bin/tsc -p server/tsconfig.json --noEmit
+      - name: Unit tests
+        env:
+          TSX_TSCONFIG_PATH: server/tsconfig.json
+        run: node --import tsx --test $(ls server/test/*.test.ts | grep -v '\.integration\.test\.ts$')
+      - name: Build
+        run: npm run build:server
+
+  server-image:
+    name: server (production Docker image)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Same build as the deploy: context server/, server/package-lock.json. Not pushed anywhere.
+      - name: docker build
+        run: docker build -t mualim-server-ci server
+
+  client:
+    name: client (tests, typecheck + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+      # The client tests run with tsx from the root lockfile.
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+        working-directory: client
+      - name: Unit tests
+        run: node --import tsx --test client/test/*.test.ts
+      - name: TypeScript + build (tsc -b && vite build)
+        run: npm run build
+        working-directory: client
