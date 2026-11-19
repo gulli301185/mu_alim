@@ -6,9 +6,10 @@ import { AppError } from '../common/app-error';
 import { AuthUser } from '../common/auth';
 import { MailService } from '../mail/mail.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, IsNull, MoreThan, QueryFailedError, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, LessThan, MoreThan, QueryFailedError, Repository } from 'typeorm';
 import { PasswordResetToken, User, UserProfile } from '../database/entities';
 import { findUserByKgPhone } from '../lib/user-phone';
+import { CodeAttemptLimiter } from './code-attempts';
 import type {
   confirmCodeSchema,
   forgotPasswordSchema,
@@ -21,6 +22,13 @@ import type {
 import type { z } from 'zod';
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+/** Used and expired codes older than this are deleted when a user gets a new code (QA F-8). */
+const OLD_CODE_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+/** bcrypt hash (cost 10, like real passwords) of a random value. It is compared when the account
+ * does not exist or is blocked, so a failed login takes the same time either way (QA F-4). */
+const DUMMY_PASSWORD_HASH = '$2b$10$TGMi74UtR7sQqzOuXIV4W.B.ottlbajcEbzv.ZM71O9oX2QQtJk/6';
 
 /** A code confirms a registration or resets a password — never the other (QA F15). */
 type AuthCodePurpose = 'register' | 'reset';
@@ -98,6 +106,8 @@ export class AuthService implements BeforeApplicationShutdown {
   private readonly logger = new Logger('Auth');
   /** Auth-code work still running after the HTTP answer was sent (see forgotPassword). */
   private readonly backgroundTasks = new Set<Promise<void>>();
+  /** Code-check attempts per account, reserved before the database is asked (QA F-6). */
+  private readonly codeAttempts = new CodeAttemptLimiter();
 
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
@@ -134,6 +144,11 @@ export class AuthService implements BeforeApplicationShutdown {
   /** Issues a fresh code for `purpose`; every older unused code of the user stops working. */
   private async issueAuthCode(userId: string, purpose: AuthCodePurpose) {
     await this.tokens.update({ userId, usedAt: IsNull() }, { usedAt: new Date() });
+    // Drop this user's old rows so the table — and the pool of free 6-digit codes, which are
+    // unique across all users — does not fill up over time (QA F-8).
+    const cutoff = new Date(Date.now() - OLD_CODE_RETENTION_MS);
+    await this.tokens.delete({ userId, usedAt: LessThan(cutoff) });
+    await this.tokens.delete({ userId, expiresAt: LessThan(cutoff) });
 
     let code = String(randomInt(100000, 1000000));
     let tokenId: string | null = null;
@@ -205,6 +220,14 @@ export class AuthService implements BeforeApplicationShutdown {
     return result.affected === 1;
   }
 
+  /** A wrong code for an existing, eligible account (QA F-6). When `attempt` was the last one
+   * allowed, every live code of the account is revoked. The caller answers "invalid code". */
+  private async rejectWrongCode(userId: string, attempt: number) {
+    if (attempt < this.codeAttempts.max) return;
+    await this.tokens.update({ userId, usedAt: IsNull() }, { usedAt: new Date() });
+    this.logger.warn(`[auth-code] too many wrong codes: live codes revoked, checks paused (user ${userId})`);
+  }
+
   private findByEmailInsensitive(email: string) {
     return this.users
       .createQueryBuilder('u')
@@ -214,7 +237,10 @@ export class AuthService implements BeforeApplicationShutdown {
 
   private async authenticateUser(email: string, password: string) {
     const user = await this.findByEmailInsensitive(email);
-    if (!user || !user.isActive) return null;
+    if (!user || !user.isActive) {
+      await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+      return null;
+    }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return null;
@@ -349,7 +375,12 @@ export class AuthService implements BeforeApplicationShutdown {
     const code = data.code.trim();
     const user = await this.findByEmailInsensitive(data.email);
     if (!user || !user.isActive || user.role === 'admin' || user.isVerified) throw invalid();
-    if (!(await this.hasLiveAuthCode(user.id, code, 'register'))) throw invalid();
+    const attempt = this.codeAttempts.tryAcquire(user.id); // synchronous: parallel requests cannot overtake it
+    if (attempt === 0) throw invalid();
+    if (!(await this.hasLiveAuthCode(user.id, code, 'register'))) {
+      await this.rejectWrongCode(user.id, attempt);
+      throw invalid();
+    }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
     const now = new Date();
@@ -381,6 +412,7 @@ export class AuthService implements BeforeApplicationShutdown {
       );
     });
 
+    this.codeAttempts.reset(user.id);
     const updated = await this.users.findOneByOrFail({ id: user.id });
     return { token: this.signToken({ id: updated.id, role: updated.role }), user: toPublicUser(updated) };
   }
@@ -407,7 +439,12 @@ export class AuthService implements BeforeApplicationShutdown {
     const token = data.token.trim();
     const user = await this.findByEmailInsensitive(data.email);
     if (!user || !user.isActive || user.role === 'admin') throw invalid();
-    if (!(await this.hasLiveAuthCode(user.id, token, 'reset'))) throw invalid();
+    const attempt = this.codeAttempts.tryAcquire(user.id); // synchronous: parallel requests cannot overtake it
+    if (attempt === 0) throw invalid();
+    if (!(await this.hasLiveAuthCode(user.id, token, 'reset'))) {
+      await this.rejectWrongCode(user.id, attempt);
+      throw invalid();
+    }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
@@ -416,6 +453,7 @@ export class AuthService implements BeforeApplicationShutdown {
       await em.update(User, { id: user.id }, { passwordHash, isVerified: true, updatedAt: new Date() });
     });
 
+    this.codeAttempts.reset(user.id);
     return { message: 'Сыр сөз ийгиликтүү өзгөртүлдү' };
   }
 

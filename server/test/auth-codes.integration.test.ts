@@ -683,6 +683,25 @@ describe('F6 / F15 — auth codes (integration)', { skip: !DB_URL && 'AUTH_TEST_
     assert.equal((await post('/auth/confirm-code', { email: to, code: registerCode, password: 'Rev-pw-12345' })).status, 400);
   });
 
+  it('F-6: 5 wrong codes revoke the live code and pause code checks for the account (same 400)', async () => {
+    const to = email('wrong5');
+    await register(to, 'Start-pw-123');
+    const code = lastCode(to, 'register');
+    const wrong = String((Number(code) + 1) % 1000000).padStart(6, '0');
+    for (let i = 0; i < 5; i += 1) {
+      const r = await post('/auth/confirm-code', { email: to, code: wrong, password: 'Start-pw-123' });
+      assert.equal(r.status, 400, r.text);
+    }
+    const right = await post('/auth/confirm-code', { email: to, code, password: 'Start-pw-123' });
+    assert.equal(right.status, 400, 'the right code is refused after 5 wrong ones');
+    const [row] = await ds.query(
+      `SELECT count(*)::int AS live FROM password_reset_tokens t JOIN users u ON u.id = t.user_id
+       WHERE u.email = $1 AND t.used_at IS NULL`,
+      [to],
+    );
+    assert.equal(row.live, 0, 'no live code is left');
+  });
+
   it('another user’s code does not work for this email', async () => {
     const u1 = email('u1');
     const u2 = email('u2');

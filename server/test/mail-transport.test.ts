@@ -304,6 +304,13 @@ describe('API startup with NODE_ENV=production and MAIL_TRANSPORT=log', { timeou
       DATABASE_URL: 'postgres://nobody@127.0.0.1:1/none',
       REDIS_URL: '',
       SMTP_HOST: '',
+      // Set (empty) explicitly: main.ts loads the repo .env, and dotenv only fills unset keys (QA F-10).
+      SMTP_USER: '',
+      SMTP_PASS: '',
+      SMS_LOGIN: '',
+      SMS_PASSWORD: '',
+      TWILIO_ACCOUNT_SID: '',
+      TWILIO_AUTH_TOKEN: '',
       ADMIN_EMAIL: '',
       ADMIN_PASSWORD: '',
       PORT: '0',
