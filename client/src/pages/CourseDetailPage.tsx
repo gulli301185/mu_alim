@@ -13,8 +13,8 @@ import {
   type CourseSummary,
   type FreeLessonItem,
 } from '../lib/course-api';
-import { loadCourseProgress } from '../lib/courseAccess';
 import { fetchCourseProgress } from '../lib/course-progress-api';
+import { confirmedLessonIds } from '../lib/server-progress';
 import { useAuth } from '../context/AuthContext';
 import { useCourseEnrollment } from '../hooks/useMyEnrollments';
 import { getLessonsByCourse, type LessonDto } from '../lib/lesson-api';
@@ -22,7 +22,6 @@ import {
   getFirstUnlockedLessonId,
   isLessonUnlocked,
   mapLessonsToCourseLessons,
-  resolveCompletedLessonIds,
 } from '../data/courseLessons';
 import { youtubeThumbnail } from '../lib/youtube';
 import { CourseReviewsSection } from '../components/CourseReviews';
@@ -68,10 +67,11 @@ function PaidLessonsSidebar({
     enabled: Boolean(paid && token && user?.id),
     staleTime: 10_000,
   });
-  const completedIds = resolveCompletedLessonIds(courseLessons, [
-    ...loadCourseProgress(courseId, user?.id, { adoptLegacy: paid }).completedLessonIds,
-    ...(serverProgress?.completedLessonIds ?? []),
-  ]);
+  // QA H-2: only server-confirmed lessons open the next one (local progress is not widened).
+  const completedIds = confirmedLessonIds(
+    courseLessons,
+    serverProgress?.completedLessonIds ?? [],
+  );
 
   return (
     <aside className="courses-sidebar ui-card">
@@ -188,14 +188,10 @@ export function CourseDetailPage() {
       return;
     }
     const mapped = mapLessonsToCourseLessons(publishedLessons, '');
-    const completedIds = resolveCompletedLessonIds(
+    // QA H-2: the first open lesson follows the server-confirmed progress only.
+    const completedIds = confirmedLessonIds(
       mapped,
-      [
-        ...(courseId
-          ? loadCourseProgress(courseId, user?.id, { adoptLegacy: true }).completedLessonIds
-          : []),
-        ...(serverProgress?.completedLessonIds ?? []),
-      ],
+      serverProgress?.completedLessonIds ?? [],
     );
     const firstOpenId =
       getFirstUnlockedLessonId(mapped, completedIds) ?? publishedLessons[0]?.id ?? null;
