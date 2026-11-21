@@ -19,7 +19,6 @@ import {
   ensureCertificateMeta,
   isCertificateEligible,
   loadCourseProgress,
-  markFinalTestResult,
   markLessonComplete,
   PASS_THRESHOLD,
   saveCourseProgress,
@@ -31,8 +30,14 @@ import {
   completeCourseLesson,
   fetchCourseProgress,
   issueCourseCertificate,
-  syncCourseProgress,
 } from "../lib/course-progress-api";
+import { ApiError, DEFAULT_RETRY_AFTER_SEC } from "../lib/api-errors";
+import {
+  confirmedLessonIds,
+  isCertificateReadyFromServer,
+  isFinalTestAvailable,
+  unconfirmedLessonIds,
+} from "../lib/server-progress";
 import { fetchCourseByRef, isFreeCourse } from "../lib/course-api";
 import { CourseYoutubePlayer } from "../components/CourseYoutubeLink";
 import {
@@ -165,8 +170,6 @@ export function CourseLearnPage() {
         : [],
     [course],
   );
-  const syncedProgressRef = useRef<string>("");
-
   const {
     data: apiLessons,
     isLoading: lessonsLoading,
@@ -211,7 +214,11 @@ export function CourseLearnPage() {
     void refetchLessons();
   }, [hasAccess, enrolled, apiLessons, token, refetchLessons]);
 
-  const { data: serverProgress } = useQuery({
+  const {
+    data: serverProgress,
+    isError: progressLoadFailed,
+    refetch: refetchProgress,
+  } = useQuery({
     queryKey: ["course-progress", courseId, progressUserId],
     queryFn: () => fetchCourseProgress(courseId!, token!),
     enabled: Boolean(
@@ -225,11 +232,16 @@ export function CourseLearnPage() {
     [lessons],
   );
 
-  const [progress, setProgress] = useState<CourseProgress>(() =>
-    courseId
-      ? loadCourseProgress(courseId, progressUserId)
-      : { completedLessonIds: [] },
-  );
+  // Filled by the effect below (paid: from the server, free: from this device). Starting
+  // empty avoids reading localStorage here, where the legacy progress key would be removed.
+  const [progress, setProgress] = useState<CourseProgress>({
+    completedLessonIds: [],
+  });
+  /** Paid courses: lessons done only on this device, not confirmed by the server (display only). */
+  const [unconfirmedIds, setUnconfirmedIds] = useState<string[]>([]);
+  const [completePending, setCompletePending] = useState(false);
+  /** After a 429 the "watched" button stays disabled until this time; nothing retries by itself. */
+  const [completeBlockedUntil, setCompleteBlockedUntil] = useState(0);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [videoWatched, setVideoWatched] = useState(false);
   const [choiceAnswers, setChoiceAnswers] = useState<Record<string, string>>(
@@ -268,9 +280,45 @@ export function CourseLearnPage() {
       navigate(`/courses/${courseId}`, { replace: true });
       return;
     }
+    if (!isFree) {
+      // QA H-2: for a paid course only server-confirmed lessons count. Local progress is read
+      // (without dropping the legacy key) only to show what this device has but the server
+      // does not; it is never widened, never written back and never sent to the server.
+      const local = loadCourseProgress(courseId, progressUserId, {
+        aliases: progressAliases,
+        adoptLegacy: false,
+      });
+      const serverIds = serverProgress?.completedLessonIds ?? [];
+      setUnconfirmedIds(
+        serverProgress
+          ? unconfirmedLessonIds(lessons, local.completedLessonIds, serverIds)
+          : [],
+      );
+      setProgress({
+        completedLessonIds: serverProgress
+          ? confirmedLessonIds(lessons, serverIds)
+          : [],
+        lessonScores: local.lessonScores,
+        finalTestPassed: Boolean(serverProgress?.finalTestPassed),
+        finalTestScore:
+          typeof serverProgress?.finalTestScore === "number"
+            ? serverProgress.finalTestScore
+            : undefined,
+        certificateNumber: serverProgress?.certificate?.certificateNumber,
+        certificateIssuedAt: serverProgress?.certificate?.issuedAt,
+      });
+      if (
+        serverProgress?.certificate?.recipientName &&
+        !loadCertificateName(progressUserId)
+      ) {
+        setCertificateName(serverProgress.certificate.recipientName);
+      }
+      return;
+    }
+
     const local = loadCourseProgress(courseId, progressUserId, {
       aliases: progressAliases,
-      adoptLegacy: !isFree,
+      adoptLegacy: false,
     });
     const storedIds = [
       ...local.completedLessonIds,
@@ -312,24 +360,6 @@ export function CourseLearnPage() {
       !loadCertificateName(progressUserId)
     ) {
       setCertificateName(serverProgress.certificate.recipientName);
-    }
-
-    if (
-      !isFree &&
-      token &&
-      serverProgress &&
-      lessons.length &&
-      completedLessonIds.length > serverProgress.completedLessonIds.length
-    ) {
-      const syncKey = `${progressUserId}:${courseId}:${completedLessonIds.join(",")}`;
-      if (syncedProgressRef.current !== syncKey) {
-        syncedProgressRef.current = syncKey;
-        void syncCourseProgress(courseId, completedLessonIds, token).catch(
-          () => {
-            syncedProgressRef.current = "";
-          },
-        );
-      }
     }
   }, [
     courseId,
@@ -428,6 +458,19 @@ export function CourseLearnPage() {
     setVideoWatched(true);
   }, []);
 
+  // Re-enables the "watched" button once the 429 wait is over. It only clears the block —
+  // the learner presses the button again; no request is sent from here.
+  useEffect(() => {
+    if (!completeBlockedUntil) return;
+    const wait = completeBlockedUntil - Date.now();
+    if (wait <= 0) {
+      setCompleteBlockedUntil(0);
+      return;
+    }
+    const timer = window.setTimeout(() => setCompleteBlockedUntil(0), wait);
+    return () => window.clearTimeout(timer);
+  }, [completeBlockedUntil]);
+
   const activeLesson = lessons.find((l) => l.id === activeLessonId);
   const completedCount = progress.completedLessonIds.length;
   const isActiveLessonCompleted = activeLesson
@@ -458,6 +501,71 @@ export function CourseLearnPage() {
     });
   }, [courseFinalTest, choiceAnswers, textAnswers]);
 
+  /**
+   * Paid course (QA H-2): a lesson counts only once the server confirms it. On any failure
+   * nothing is marked locally, so the learner can press the button again; a 429 disables the
+   * button for Retry-After (or 60 s) and nothing is retried automatically.
+   */
+  const completePaidLesson = async (lessonId: string) => {
+    if (!courseId || !token || !serverProgress || completePending) return;
+    if (completeBlockedUntil > Date.now()) return;
+    setCompletePending(true);
+    try {
+      await completeCourseLesson(courseId, lessonId, token);
+      const refreshed = await refetchProgress();
+      const confirmed = refreshed.data
+        ? confirmedLessonIds(lessons, refreshed.data.completedLessonIds)
+        : [];
+      if (lessons.length > 0 && confirmed.length >= lessons.length) {
+        // The exam was loaded while lessons were missing — load it again now.
+        const test = await refetchFinalTest();
+        if (isFinalTestAvailable(test.data) && !refreshed.data?.finalTestPassed) {
+          setViewMode("final-test");
+          setChoiceAnswers({});
+          setTextAnswers({});
+          setGradeResult(null);
+          setTestSubmitted(false);
+          setLastTestScore(null);
+        }
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        const seconds = error.retryAfterSec ?? DEFAULT_RETRY_AFTER_SEC;
+        setCompleteBlockedUntil(Date.now() + seconds * 1000);
+        toastError(t("learn.completeRateLimited", { seconds }));
+      } else if (error instanceof ApiError && error.status === 400) {
+        // The server has not confirmed the previous lesson: reload its progress and go to the
+        // first open lesson it has not confirmed yet (published order; numbers may have gaps).
+        // Without such a lesson nothing moves — never fall back to lesson 1.
+        toastError(t("learn.previousNotConfirmed"));
+        const refreshed = await refetchProgress();
+        if (refreshed.isError || !refreshed.data) {
+          toastError(t("learn.progressLoadFailed"));
+        } else {
+          const confirmed = confirmedLessonIds(
+            lessons,
+            refreshed.data.completedLessonIds,
+          );
+          const nextToComplete = [...lessons]
+            .sort((a, b) => a.order - b.order)
+            .find(
+              (lesson) =>
+                !confirmed.includes(lesson.id) &&
+                canAccessLesson(lessons, lesson.id, confirmed),
+            );
+          if (nextToComplete) {
+            setViewMode("lesson");
+            setActiveLessonId(nextToComplete.id);
+          }
+        }
+      } else {
+        toastError(t("learn.saveFailed"));
+      }
+    } finally {
+      setCompletePending(false);
+    }
+  };
+
   const handleVideoComplete = () => {
     if (
       !videoWatched ||
@@ -468,6 +576,11 @@ export function CourseLearnPage() {
     )
       return;
 
+    if (!isFree) {
+      void completePaidLesson(activeLesson.id);
+      return;
+    }
+
     const next = markLessonComplete(
       courseId,
       activeLesson.id,
@@ -476,24 +589,6 @@ export function CourseLearnPage() {
     );
     setProgress(next);
     setVideoWatched(true);
-    if (token && !isFree) {
-      void completeCourseLesson(courseId, activeLesson.id, token)
-        .then((server) => {
-          if (!server.completedLessonIds?.length) return;
-          const merged = resolveCompletedLessonIds(lessons, [
-            ...next.completedLessonIds,
-            ...server.completedLessonIds,
-          ]);
-          const saved = { ...next, completedLessonIds: merged };
-          saveCourseProgress(courseId, saved, progressUserId);
-          setProgress(saved);
-        })
-        .catch(() => {
-          toastError(
-            t("learn.saveFailed"),
-          );
-        });
-    }
 
     const allDone = next.completedLessonIds.length >= lessons.length;
     if (allDone && courseFinalTest && !next.finalTestPassed) {
@@ -528,13 +623,15 @@ export function CourseLearnPage() {
       setTestSubmitted(true);
       setLastTestScore(result.scorePercent);
 
-      const next = markFinalTestResult(
-        courseId,
-        result.passed,
-        result.scorePercent,
-        progressUserId,
-      );
-      setProgress(next);
+      // The server keeps the attempt; reload its progress instead of writing a local result.
+      const certificatePassed =
+        result.passed && result.scorePercent >= CERTIFICATE_THRESHOLD * 100;
+      setProgress((prev) => ({
+        ...prev,
+        finalTestPassed: Boolean(prev.finalTestPassed) || certificatePassed,
+        finalTestScore: Math.max(prev.finalTestScore ?? 0, result.scorePercent),
+      }));
+      void refetchProgress();
       void refetchFinalTest();
 
       if (!result.passed) {
@@ -547,6 +644,22 @@ export function CourseLearnPage() {
     } catch (error) {
       if (error instanceof TestLockedError) {
         toastError(error.message);
+        void refetchFinalTest();
+      } else if (
+        error instanceof ApiError &&
+        error.status === 403 &&
+        error.code === "LESSONS_INCOMPLETE"
+      ) {
+        // QA H-2: the server has not confirmed every lesson — back to the lessons.
+        const total =
+          typeof error.details.total === "number" ? error.details.total : lessons.length;
+        const done =
+          typeof error.details.done === "number"
+            ? error.details.done
+            : progress.completedLessonIds.length;
+        toastError(t("learn.lessonsRequiredForTest", { done, total }));
+        setViewMode("lesson");
+        void refetchProgress();
         void refetchFinalTest();
       } else {
         toastError(t("learn.submitFailed"));
@@ -576,16 +689,14 @@ export function CourseLearnPage() {
           certificateNumber,
         });
         certificateNumber = issued.certificateNumber;
-        const next = ensureCertificateMeta(
-          courseId,
-          certificateNumber,
-          progressUserId,
-        );
-        setProgress({
-          ...next,
+        // The server holds the certificate (an already issued one is returned unchanged);
+        // keep it in page state and reload the server progress — no local write.
+        setProgress((prev) => ({
+          ...prev,
           certificateNumber: issued.certificateNumber,
           certificateIssuedAt: issued.issuedAt,
-        });
+        }));
+        void refetchProgress();
       } else if (!progress.certificateNumber) {
         const next = ensureCertificateMeta(
           courseId,
@@ -613,12 +724,23 @@ export function CourseLearnPage() {
   };
 
   const allLessonsDone = progress.completedLessonIds.length >= lessons.length;
-  const certificateReady = isCertificateEligible(
-    progress,
-    lessons.length,
-    Boolean(courseFinalTest),
-  );
+  /** `lessonsComplete: false` closes the exam whatever the questions; older servers: questions only. */
+  const examAvailable = isFinalTestAvailable(courseFinalTest);
+  /** A certificate the server already issued stays downloadable whatever the current progress. */
+  const hasIssuedCertificate = !isFree && Boolean(serverProgress?.certificate);
+  const certificateReady = isFree
+    ? isCertificateEligible(progress, lessons.length, Boolean(courseFinalTest))
+    : isCertificateReadyFromServer({
+        hasIssuedCertificate,
+        hasFinalTest: Boolean(courseFinalTest),
+        allLessonsConfirmed: allLessonsDone,
+        finalTestPassed: Boolean(progress.finalTestPassed),
+        finalTestScore: progress.finalTestScore,
+        passScore: CERTIFICATE_THRESHOLD * 100,
+      });
   const finalTestPassed = Boolean(progress.finalTestPassed);
+  /** Paid course without loaded server progress: nothing that needs confirmed progress is allowed. */
+  const progressUnavailable = !isFree && !serverProgress;
 
   const lessonCount = lessons.length || course?.lessonCount || 0;
 
@@ -1080,9 +1202,11 @@ export function CourseLearnPage() {
                             >
                               {completed
                                 ? t("learn.watchedDone")
-                                : unlocked
-                                  ? t("learn.notDone")
-                                  : t("learn.locked")}
+                                : unconfirmedIds.includes(lesson.id)
+                                  ? t("learn.notConfirmed")
+                                  : unlocked
+                                    ? t("learn.notDone")
+                                    : t("learn.locked")}
                             </span>
                           </span>
                         </span>
@@ -1121,7 +1245,7 @@ export function CourseLearnPage() {
               })}
             </ul>
 
-            {allLessonsDone && courseFinalTest && !finalTestPassed ? (
+            {allLessonsDone && examAvailable && !finalTestPassed ? (
               <div className="course-learn-sidebar-final-test">
                 <button
                   type="button"
@@ -1144,6 +1268,22 @@ export function CourseLearnPage() {
               </div>
             ) : null}
 
+            {hasIssuedCertificate ? (
+              <div className="course-learn-sidebar-final-test">
+                <button
+                  type="button"
+                  className="btn-gold course-learn-final-test-nav"
+                  disabled={!certificateName.trim() || certificateDownloading}
+                  onClick={() => void handleCertificateDownload()}
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  {certificateDownloading
+                    ? t("learn.preparing")
+                    : t("learn.downloadCert")}
+                </button>
+              </div>
+            ) : null}
+
             <Link
               to={isFree ? "/courses/free" : "/courses"}
               className="course-learn-back-courses"
@@ -1153,7 +1293,19 @@ export function CourseLearnPage() {
           </aside>
 
           <article className="course-learn-main ui-card">
-            {viewMode === "final-test" && courseFinalTest ? (
+            {!isFree && progressLoadFailed ? (
+              <div className="course-learn-locked-msg" role="alert">
+                <p>{t("learn.progressLoadFailed")}</p>
+                <button
+                  type="button"
+                  className="btn-gold course-learn-next-btn"
+                  onClick={() => void refetchProgress()}
+                >
+                  {t("learn.retry")}
+                </button>
+              </div>
+            ) : null}
+            {viewMode === "final-test" && courseFinalTest && examAvailable ? (
               <>
                 <div className="course-learn-main-head">
                   <h2 className="course-learn-main-title">
@@ -1294,6 +1446,21 @@ export function CourseLearnPage() {
                                       {t("learn.courseDone")}
                                     </p>
                                   )
+                                ) : !finalTestPassed && !examAvailable ? (
+                                  // The exam is closed (the server reports unfinished
+                                  // lessons, or it has no questions): never offer an empty test.
+                                  <p className="course-learn-done-text">
+                                    {courseFinalTest.lessonsComplete === false
+                                      ? t("learn.lessonsRequiredForTest", {
+                                          done:
+                                            courseFinalTest.lessonsRequired?.done ??
+                                            completedCount,
+                                          total:
+                                            courseFinalTest.lessonsRequired?.total ??
+                                            lessons.length,
+                                        })
+                                      : t("learn.courseDone")}
+                                  </p>
                                 ) : !finalTestPassed ? (
                                   <>
                                     <p className="course-learn-done-text">
@@ -1383,12 +1550,20 @@ export function CourseLearnPage() {
                         <button
                           type="button"
                           className="btn-primary course-learn-video-btn"
-                          disabled={!videoWatched}
+                          disabled={
+                            !videoWatched ||
+                            (!isFree &&
+                              (progressUnavailable ||
+                                completePending ||
+                                completeBlockedUntil > 0))
+                          }
                           onClick={handleVideoComplete}
                         >
                           {!videoWatched
                             ? t("learn.watchToEndBtn")
-                            : t("learn.watchedContinue")}
+                            : completePending
+                              ? t("learn.preparing")
+                              : t("learn.watchedContinue")}
                         </button>
                       </>
                     )}
