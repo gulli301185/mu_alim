@@ -1,3 +1,5 @@
+import { parseApiErrorResponse } from './api-errors';
+
 export type PublicTestOption = {
   id: string;
   optionText: string;
@@ -21,6 +23,10 @@ export type CourseTestPayload = {
   lockedUntil?: string | null;
   remainingAttempts?: number;
   failedInWindow?: number;
+  /** Sent by the server (QA H-2) when the course's lessons are not all completed yet; the
+   * exam then has no questions and is closed. Absent on older servers. */
+  lessonsComplete?: boolean;
+  lessonsRequired?: { total: number; done: number };
 };
 
 export type GradeTestAnswer = {
@@ -88,17 +94,18 @@ export async function gradeCourseFinalTest(
       body: JSON.stringify({ answers }),
     },
   );
-  const data = (await res.json().catch(() => null)) as
-    | (GradeTestResult & { error?: string })
-    | null;
   if (res.status === 423) {
+    const data = (await res.json().catch(() => null)) as
+      | (GradeTestResult & { error?: string })
+      | null;
     throw new TestLockedError(
       data?.error ?? 'Тесттен 3 жолу өтпөдүңүз. Даярданып, кайрадан тест тапшырыңыз.',
       data?.lockedUntil ?? null,
     );
   }
   if (!res.ok) {
-    throw new Error(data?.error ?? 'Тест тапшырылган жок');
+    // e.g. 403 with code LESSONS_INCOMPLETE (QA H-2) — the page reads status and code.
+    throw await parseApiErrorResponse(res, 'Тест тапшырылган жок');
   }
-  return data as GradeTestResult;
+  return (await res.json()) as GradeTestResult;
 }

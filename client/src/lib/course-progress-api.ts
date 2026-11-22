@@ -1,3 +1,5 @@
+import { parseApiErrorResponse } from './api-errors';
+
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 export type CourseServerProgress = {
@@ -22,13 +24,10 @@ function authHeaders(token: string) {
   };
 }
 
-async function parseProgressError(res: Response, fallback: string) {
-  try {
-    const data = (await res.json()) as { error?: string };
-    return new Error(data.error ?? fallback);
-  } catch {
-    return new Error(fallback);
-  }
+/** An ApiError keeps the status, the server's `code` and Retry-After, so the page can tell
+ * 400 (previous lesson not confirmed) / 429 (too many completions) from other failures. */
+function parseProgressError(res: Response, fallback: string) {
+  return parseApiErrorResponse(res, fallback);
 }
 
 export async function fetchCourseProgress(
