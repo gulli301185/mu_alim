@@ -4,7 +4,7 @@ import { AuthUser, assertUserRole } from "../common/auth";
 import { CoursesService } from "../courses/courses.service";
 import { InjectRepository } from "@nestjs/typeorm";
 import { randomUUID } from "node:crypto";
-import { DataSource, EntityManager, In, Repository } from "typeorm";
+import { DataSource, EntityManager, In, IsNull, LessThan, Repository } from "typeorm";
 import {
   Certificate,
   CourseProgress,
@@ -14,6 +14,7 @@ import {
   Test,
   TestAttempt,
 } from "../database/entities";
+import { getLessonCompletion } from "./lesson-completion";
 
 const CERTIFICATE_PASS_SCORE = 90;
 
@@ -90,17 +91,14 @@ export class ProgressService {
       allDone: boolean;
       now: Date;
     },
-    /** Sync keeps an existing `completed_at` when the course is not finished yet. */
-    keepCompletedAtUnlessDone = false,
   ) {
     const overwrite = [
       "last_lesson_id",
       "progress_percent",
       "is_completed",
+      "completed_at",
       "updated_at",
     ];
-    if (!keepCompletedAtUnlessDone || row.allDone)
-      overwrite.push("completed_at");
 
     return em
       .createQueryBuilder()
@@ -132,15 +130,12 @@ export class ProgressService {
   async get(user: AuthUser | undefined, ref: string) {
     const { userId, courseId } = await this.authorize(user, ref);
 
-    const [enrollment, progress, lessonRows, finalTest] = await Promise.all([
+    const [enrollment, completion, lessonRows, finalTest] = await Promise.all([
       this.enrollments.findOne({
         where: { userId, courseId },
         select: { enrolledAt: true, completedAt: true, status: true },
       }),
-      this.courseProgress.findOne({
-        where: { userId, courseId },
-        select: { isCompleted: true, progressPercent: true },
-      }),
+      getLessonCompletion(this.ds.manager, userId, courseId),
       this.lessonProgress.find({
         where: {
           userId,
@@ -150,7 +145,7 @@ export class ProgressService {
         select: { lessonId: true },
       }),
       this.tests.findOne({
-        where: { courseId, testType: "final", isActive: true },
+        where: { courseId, testType: "final", lessonId: IsNull(), isActive: true },
         select: { id: true, passingScore: true },
       }),
     ]);
@@ -182,7 +177,9 @@ export class ProgressService {
 
     return {
       completedLessonIds: lessonRows.map((row) => row.lessonId),
-      isCompleted: Boolean(progress?.isCompleted || enrollment?.completedAt),
+      // Computed from lesson_progress (H-2); a stored enrollments.completed_at or
+      // course_progress.is_completed is history and no longer counts on its own.
+      isCompleted: completion.complete,
       enrolledAt: enrollment?.enrolledAt?.toISOString() ?? null,
       finalTestPassed,
       finalTestScore,
@@ -211,23 +208,25 @@ export class ProgressService {
     });
     if (!lesson) throw new AppError(404, "Сабак табылган жок");
 
-    if (lesson.lessonOrder > 1) {
-      const previous = await this.lessons.findOne({
-        where: {
-          courseId,
-          isPublished: true,
-          lessonOrder: lesson.lessonOrder - 1,
-        },
-        select: { id: true },
+    // QA H-2 phase 1.5: the nearest earlier *published* lesson must be completed. Unpublished
+    // lessons and gaps in lesson_order are skipped, so they no longer let a lesson be skipped;
+    // the first published lesson (any number) has no predecessor.
+    const previous = await this.lessons.findOne({
+      where: {
+        courseId,
+        isPublished: true,
+        lessonOrder: LessThan(lesson.lessonOrder),
+      },
+      order: { lessonOrder: "DESC" },
+      select: { id: true },
+    });
+    if (previous) {
+      const prevDone = await this.lessonProgress.findOne({
+        where: { userId, lessonId: previous.id },
+        select: { isLessonCompleted: true },
       });
-      if (previous) {
-        const prevDone = await this.lessonProgress.findOne({
-          where: { userId, lessonId: previous.id },
-          select: { isLessonCompleted: true },
-        });
-        if (!prevDone?.isLessonCompleted)
-          throw new AppError(400, "Мурунку сабакты бүтүрүңүз");
-      }
+      if (!prevDone?.isLessonCompleted)
+        throw new AppError(400, "Мурунку сабакты бүтүрүңүз");
     }
 
     const now = new Date();
@@ -265,83 +264,26 @@ export class ProgressService {
     };
   }
 
-  async sync(user: AuthUser | undefined, ref: string, body: unknown) {
+  /**
+   * Kept for older clients, but read-only (QA H-2): the lesson ids a client sends are never
+   * trusted, so this only answers with the published lessons the server has recorded as
+   * completed. Lessons are marked done one at a time through `completeLesson`.
+   */
+  async sync(user: AuthUser | undefined, ref: string, _body: unknown) {
     const { userId, courseId } = await this.authorize(user, ref);
-
-    const rawIds = (body as { completedLessonIds?: unknown } | undefined)
-      ?.completedLessonIds;
-    const requested = Array.isArray(rawIds)
-      ? (rawIds as unknown[]).filter(
-          (id): id is string => typeof id === "string",
-        )
-      : [];
 
     const published = await this.lessons.find({
       where: { courseId, isPublished: true },
-      select: { id: true, lessonOrder: true },
+      select: { id: true },
       order: { lessonOrder: "ASC" },
     });
-
-    const byId = new Set(published.map((lesson) => lesson.id));
-    const matched = requested.filter((id) => byId.has(id));
-    const maxOrder =
-      matched.length > 0
-        ? Math.max(
-            0,
-            ...matched.map(
-              (id) =>
-                published.find((lesson) => lesson.id === id)?.lessonOrder ?? 0,
-            ),
-          )
-        : requested.length > 0
-          ? Math.min(requested.length, published.length)
-          : 0;
-
-    const toComplete = published.filter(
-      (lesson) => lesson.lessonOrder <= maxOrder,
+    const rows = await this.completedIds(
+      this.ds.manager,
+      userId,
+      published.map((lesson) => lesson.id),
     );
-    const now = new Date();
 
-    const completedRows = await this.ds.transaction(async (em) => {
-      for (const lesson of toComplete) {
-        await this.markLessonDone(em, userId, lesson.id, now);
-      }
-
-      const done = toComplete.length;
-      const percent = published.length
-        ? Math.round((done / published.length) * 100)
-        : 0;
-      const allDone = published.length > 0 && done >= published.length;
-
-      await this.saveCourseProgress(
-        em,
-        {
-          userId,
-          courseId,
-          lastLessonId: toComplete.at(-1)?.id ?? null,
-          percent,
-          allDone,
-          now,
-        },
-        true,
-      );
-
-      if (allDone) {
-        await em.update(
-          Enrollment,
-          { userId, courseId, status: "active" },
-          { completedAt: now },
-        );
-      }
-
-      return this.completedIds(
-        em,
-        userId,
-        published.map((item) => item.id),
-      );
-    });
-
-    return { completedLessonIds: completedRows.map((row) => row.lessonId) };
+    return { completedLessonIds: rows.map((row) => row.lessonId) };
   }
 
   async issueCertificate(
@@ -364,27 +306,15 @@ export class ProgressService {
       return this.toCertificateDto(existing);
     }
 
-    const published = await this.lessons.find({
-      where: { courseId, isPublished: true },
-      select: { id: true },
-      order: { lessonOrder: "ASC" },
-    });
-    if (published.length === 0) throw new AppError(400, "Курс сабактары жок");
-
-    const doneRows = await this.lessonProgress.find({
-      where: {
-        userId,
-        isLessonCompleted: true,
-        lessonId: In(published.map((lesson) => lesson.id)),
-      },
-      select: { lessonId: true },
-    });
-    if (doneRows.length < published.length) {
+    // Same rule as the final exam: every published lesson must be recorded as completed.
+    const completion = await getLessonCompletion(this.ds.manager, userId, courseId);
+    if (completion.total === 0) throw new AppError(400, "Курс сабактары жок");
+    if (!completion.complete) {
       throw new AppError(400, "Бардык сабактарды бүтүрүңүз");
     }
 
     const finalTest = await this.tests.findOne({
-      where: { courseId, testType: "final", isActive: true },
+      where: { courseId, testType: "final", lessonId: IsNull(), isActive: true },
       select: { id: true },
     });
     if (!finalTest) {

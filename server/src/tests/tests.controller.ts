@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import type { z } from 'zod';
 import {
   AdminGuard,
@@ -22,6 +23,7 @@ import {
 import { AppError } from '../common/app-error';
 import { ZodPipe } from '../common/zod.pipe';
 import { CoursesService } from '../courses/courses.service';
+import { getLessonCompletion } from '../progress/lesson-completion';
 import { toStudentGradeResult } from './tests.helpers';
 import { TestsService } from './tests.service';
 import { createTestSchema, gradeSchema, updateTestSchema } from './tests.schemas';
@@ -36,6 +38,7 @@ export class TestsController {
   constructor(
     private readonly tests: TestsService,
     private readonly courses: CoursesService,
+    private readonly ds: DataSource,
   ) {}
 
   @Get('admin/tests')
@@ -78,8 +81,28 @@ export class TestsController {
   @Get('courses/:courseRef/final-test')
   @UseGuards(OptionalAuthGuard)
   async finalTest(@Param('courseRef') ref: string, @CurrentUser() user: AuthUser | undefined) {
-    if (isFreeCourse(await this.courses.resolveRef(ref))) throw new AppError(404, 'Тест табылган жок');
-    return this.tests.getFinalTest(ref, user);
+    const course = await this.courses.resolveRef(ref);
+    if (isFreeCourse(course)) throw new AppError(404, 'Тест табылган жок');
+    // The service checks access to the course (403 without an enrollment) before anything is shown.
+    const test = await this.tests.getFinalTest(ref, user);
+    // Anonymous visitors (refused above for paid courses) and admins keep the previous answer.
+    if (course === null || user?.role !== 'user') return test;
+
+    // QA H-2: the questions are only shown once every published lesson is recorded as completed.
+    const completion = await getLessonCompletion(this.ds.manager, user.id, course.id);
+    if (completion.complete) return test;
+    return {
+      id: test.id,
+      title: test.title,
+      passingScore: test.passingScore,
+      locked: test.locked,
+      lockedUntil: test.lockedUntil,
+      remainingAttempts: test.remainingAttempts,
+      failedInWindow: test.failedInWindow,
+      questions: [],
+      lessonsComplete: false,
+      lessonsRequired: { total: completion.total, done: completion.done },
+    };
   }
 
   @Post('courses/:courseRef/final-test/grade')
@@ -91,7 +114,24 @@ export class TestsController {
     @Body(new ZodPipe(gradeSchema, testBody)) body: z.infer<typeof gradeSchema>,
   ) {
     assertUserRole(user);
-    if (isFreeCourse(await this.courses.resolveRef(ref))) throw new AppError(404, 'Тест табылган жок');
+    const course = await this.courses.resolveRef(ref);
+    if (isFreeCourse(course)) throw new AppError(404, 'Тест табылган жок');
+    if (course !== null) {
+      // Access first (same check and message as the service), so a user without access learns
+      // nothing about the lessons; then QA H-2: no grading and no saved attempt until every
+      // published lesson is recorded as completed.
+      if (!(await this.courses.userCanWatchPaidCourse(user, course.id))) {
+        throw new AppError(403, 'Курс ачыла элек');
+      }
+      const completion = await getLessonCompletion(this.ds.manager, user.id, course.id);
+      if (!completion.complete) {
+        throw new AppError(403, 'Бардык сабактарды бүтүрүңүз', {
+          code: 'LESSONS_INCOMPLETE',
+          total: completion.total,
+          done: completion.done,
+        });
+      }
+    }
     return toStudentGradeResult(await this.tests.gradeFinalTest(ref, user, body.answers));
   }
 }

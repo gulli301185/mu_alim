@@ -10,6 +10,7 @@
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { Lesson } from '../src/database/entities';
 import { gradeTestAnswers, type TestLockState } from '../src/tests/tests.helpers';
 import { TestsController } from '../src/tests/tests.controller';
 import type { GradeAnswers } from '../src/tests/tests.schemas';
@@ -127,8 +128,15 @@ function controllerWithRealGrading() {
       ...LOCK,
     }),
   };
-  const courses = { resolveRef: async () => ({ courseType: 'paid' as const }) };
-  return new TestsController(service as never, courses as never);
+  const courses = {
+    resolveRef: async () => ({ id: 'course-1', courseType: 'paid' as const }),
+    userCanWatchPaidCourse: async () => true,
+  };
+  // Every published lesson is completed, so the H-2 lesson check lets grading through.
+  const ds = {
+    manager: { find: async (entity: unknown) => (entity === Lesson ? [{ id: 'lesson-1' }] : [{ lessonId: 'lesson-1' }]) },
+  };
+  return new TestsController(service as never, courses as never, ds as never);
 }
 
 const STUDENT = { id: '33333333-3333-4333-8333-333333333333', role: 'user' as const };
