@@ -119,6 +119,10 @@ export function CourseReviewsSection({
       toastSuccess(result.message);
       await queryClient.invalidateQueries({ queryKey: ['public-reviews'] });
       await load();
+      // The review is already saved and approved; keep it visible even if the list came from a stale cache.
+      setItems((current) =>
+        current.some((item) => item.id === result.review.id) ? current : [result.review, ...current],
+      );
       setComment('');
       setRating(0);
     } catch (err) {
