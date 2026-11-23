@@ -198,7 +198,7 @@ export class ReviewsService {
     );
     const review = await this.reviewRepo.findOneOrFail({
       where: { id: saved.id },
-      relations: { user: true },
+      relations: authorAndCourse,
     });
 
     await this.invalidate();
