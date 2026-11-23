@@ -60,9 +60,11 @@ import {
   downloadCourseCertificate,
   generateCertificateNumber,
   loadCertificateName,
+  prepareCertificateWindow,
   saveCertificateName,
   SITE_LOGO_URL,
 } from "../lib/certificatePdf";
+import { showSidebarCertificateButton } from "../lib/certificate-save";
 import { youtubeThumbnail, youtubeWatchUrl } from "../lib/youtube";
 import { getErrorMessage, toastError, toastSuccess } from "../lib/toast";
 import { CourseReviewsSection } from "../components/CourseReviews";
@@ -678,6 +680,8 @@ export function CourseLearnPage() {
     saveCertificateName(trimmedName, progressUserId);
 
     const score = progress.finalTestScore ?? 0;
+    // iOS: the tab for the PDF must be opened now, inside the click (see prepareCertificateWindow).
+    const targetWindow = prepareCertificateWindow(t("learn.certPreparing"));
     setCertificateDownloading(true);
     try {
       let certificateNumber =
@@ -706,15 +710,20 @@ export function CourseLearnPage() {
         setProgress(next);
       }
 
-      const result = await downloadCourseCertificate({
-        studentName: trimmedName,
-        courseTitle: course.title,
-        scorePercent: score,
-        issuedAt: new Date(),
-        certificateNumber,
-      });
+      const result = await downloadCourseCertificate(
+        {
+          studentName: trimmedName,
+          courseTitle: course.title,
+          scorePercent: score,
+          issuedAt: new Date(),
+          certificateNumber,
+        },
+        targetWindow,
+      );
       if (result === "ok") toastSuccess(t("learn.certReady"));
+      if (result === "opened") toastSuccess(t("learn.certOpenedIos"));
     } catch (err) {
+      if (targetWindow && !targetWindow.closed) targetWindow.close();
       toastError(
         getErrorMessage(err, t("learn.certFailed")),
       );
@@ -1268,8 +1277,19 @@ export function CourseLearnPage() {
               </div>
             ) : null}
 
-            {hasIssuedCertificate ? (
+            {/* One download button per page: the sidebar only when the main area has none. */}
+            {showSidebarCertificateButton({ hasIssuedCertificate, allLessonsDone }) ? (
               <div className="course-learn-sidebar-final-test">
+                <label className="course-learn-cert-name-field">
+                  <span className="course-learn-cert-name-label">{t("learn.yourName")}</span>
+                  <input
+                    type="text"
+                    className="course-learn-cert-name-input"
+                    value={certificateName}
+                    onChange={(e) => setCertificateName(e.target.value)}
+                    placeholder={t("learn.certNamePlaceholder")}
+                  />
+                </label>
                 <button
                   type="button"
                   className="btn-gold course-learn-final-test-nav"

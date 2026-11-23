@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 
 import { assetUrl } from './asset-url';
+import { chooseSaveStrategy, fitFontSize, isIosDevice } from './certificate-save';
 
 export const SITE_LOGO_URL = assetUrl('/uploads/logo-mualim.png');
 
@@ -42,22 +43,6 @@ function absoluteAssetUrl(path: string): string {
   }
   if (typeof window === 'undefined') return path;
   return new URL(path, window.location.origin).href;
-}
-
-function isIosLike(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return (
-    /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  );
-}
-
-/** Desktop Chrome/macOS also implements navigator.share, which would pop the
- * OS share sheet instead of downloading — restrict the share-sheet path to
- * actual phones/tablets so desktop always gets a plain file download. */
-function isMobileLike(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || isIosLike();
 }
 
 function ensureCertificateFonts(): Promise<void> {
@@ -120,40 +105,69 @@ function wrapCenteredText(
   });
 }
 
-/** Mobile-friendly save: Share sheet → anchor download → open PDF tab (iOS). */
-async function savePdfBlob(blob: Blob, filename: string): Promise<'ok' | 'cancelled'> {
-  const file = new File([blob], filename, { type: 'application/pdf' });
+/** Result of a download: saved / shown in a tab for saving (iOS) / share sheet cancelled. */
+export type CertificateSaveResult = 'ok' | 'opened' | 'cancelled';
 
-  if (
-    isMobileLike() &&
-    typeof navigator.share === 'function' &&
-    navigator.canShare?.({ files: [file] })
-  ) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: 'Сертификат',
-        text: filename,
-      });
-      return 'ok';
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return 'cancelled';
-      // Fall through to download / open.
-    }
+/**
+ * iOS only: opens the tab the PDF will be shown in. Must be called synchronously from the click
+ * handler, before any `await` — Safari blocks `window.open` once the click's user activation
+ * has been used up by the network request and the rendering. Elsewhere returns null.
+ */
+export function prepareCertificateWindow(message: string): Window | null {
+  if (typeof window === 'undefined' || !isIosDevice(navigator)) return null;
+  const opened = window.open('', '_blank');
+  if (!opened) return null;
+  try {
+    opened.document.title = message;
+    opened.document.body.style.cssText = 'font-family:-apple-system,sans-serif;padding:24px;color:#1a1a1a';
+    opened.document.body.textContent = message;
+  } catch {
+    /* the tab still works without the message */
   }
+  return opened;
+}
 
-  const url = URL.createObjectURL(blob);
+async function savePdfBlob(
+  blob: Blob,
+  filename: string,
+  targetWindow: Window | null,
+): Promise<CertificateSaveResult> {
+  if (chooseSaveStrategy(navigator) === 'ios') {
+    const file = new File([blob], filename, { type: 'application/pdf' });
+    // The share sheet needs a still-active user activation; after the async work it usually is
+    // not, and a failed share would only waste the tab prepared for the PDF.
+    if (
+      navigator.userActivation?.isActive === true &&
+      typeof navigator.share === 'function' &&
+      navigator.canShare?.({ files: [file] })
+    ) {
+      try {
+        await navigator.share({ files: [file], title: 'Сертификат', text: filename });
+        if (targetWindow && !targetWindow.closed) targetWindow.close();
+        return 'ok';
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          if (targetWindow && !targetWindow.closed) targetWindow.close();
+          return 'cancelled';
+        }
+        // Fall through to the tab.
+      }
+    }
 
-  if (isIosLike()) {
-    const opened = window.open(url, '_blank');
-    if (!opened) {
-      // Popup blocked — last resort for iOS.
+    const url = URL.createObjectURL(blob);
+    if (targetWindow && !targetWindow.closed) {
+      targetWindow.location.href = url;
+    } else if (!window.open(url, '_blank')) {
+      // No tab at all — last resort: show the PDF in this tab.
       window.location.assign(url);
     }
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    return 'ok';
+    // Long enough for Safari to load the PDF and for Share → Save to Files.
+    window.setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
+    return 'opened';
   }
 
+  // Android Chrome and desktop: a plain file download (Android saves it to Downloads).
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;
@@ -168,7 +182,8 @@ async function savePdfBlob(blob: Blob, filename: string): Promise<'ok' | 'cancel
 
 export async function downloadCourseCertificate(
   data: CertificateData,
-): Promise<'ok' | 'cancelled'> {
+  targetWindow: Window | null = null,
+): Promise<CertificateSaveResult> {
   await ensureCertificateFonts();
 
   const template = await loadImage(TEMPLATE_URL);
@@ -188,8 +203,19 @@ export async function downloadCourseCertificate(
   const scale = canvas.width / 1024;
   const centerX = canvas.width / 2;
 
-  ctx.font = `400 ${Math.round(40 * scale)}px CertSerif, serif`;
-  ctx.fillText(data.studentName.trim(), centerX, 312 * scale);
+  // A long name is shrunk to fit the frame instead of running past it.
+  const studentName = data.studentName.trim();
+  const nameSize = fitFontSize(
+    (size) => {
+      ctx.font = `400 ${size}px CertSerif, serif`;
+      return ctx.measureText(studentName).width;
+    },
+    Math.round(40 * scale),
+    Math.round(22 * scale),
+    760 * scale,
+  );
+  ctx.font = `400 ${nameSize}px CertSerif, serif`;
+  ctx.fillText(studentName, centerX, 312 * scale);
 
   const courseTitle = data.courseTitle.trim();
   const body =
@@ -208,7 +234,7 @@ export async function downloadCourseCertificate(
 
   const filename = `sertifikat-${data.certificateNumber}.pdf`;
   const blob = doc.output('blob');
-  return savePdfBlob(blob, filename);
+  return savePdfBlob(blob, filename, targetWindow);
 }
 
 export const CERTIFICATE_NAME_KEY = 'mualim-certificate-name';
