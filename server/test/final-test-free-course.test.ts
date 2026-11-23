@@ -14,6 +14,7 @@ import { describe, it } from 'node:test';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { AppError } from '../src/common/app-error';
 import { AdminGuard, JwtAuthGuard, OptionalAuthGuard, type AuthUser } from '../src/common/auth';
+import { Lesson } from '../src/database/entities';
 import { TestsController } from '../src/tests/tests.controller';
 
 const STUDENT: AuthUser = { id: '33333333-3333-4333-8333-333333333333', role: 'user' } as AuthUser;
@@ -47,8 +48,13 @@ function setup(course: Course) {
       calls.resolveRef.push(ref);
       return course;
     },
+    userCanWatchPaidCourse: async () => true,
   };
-  return { controller: new TestsController(tests as never, courses as never), calls };
+  // Every published lesson is completed, so the H-2 lesson check never blocks these cases.
+  const ds = {
+    manager: { find: async (entity: unknown) => (entity === Lesson ? [{ id: 'lesson-1' }] : [{ lessonId: 'lesson-1' }]) },
+  };
+  return { controller: new TestsController(tests as never, courses as never, ds as never), calls };
 }
 
 function status(code: number, message?: string) {

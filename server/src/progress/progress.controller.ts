@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthUser, CurrentUser, JwtAuthGuard } from '../common/auth';
+import { UserThrottlerGuard } from '../common/user-throttler.guard';
 import { ProgressService } from './progress.service';
 
 @Controller('courses/:courseId/progress')
@@ -12,8 +14,11 @@ export class ProgressController {
     return this.progress.get(user, courseId);
   }
 
+  /** At most 5 lessons per minute per user (QA H-2 phase 1.5); slows scripted completion. */
   @Post('lessons/:lessonId/complete')
   @HttpCode(200)
+  @UseGuards(UserThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   complete(
     @CurrentUser() user: AuthUser | undefined,
     @Param('courseId') courseId: string,
