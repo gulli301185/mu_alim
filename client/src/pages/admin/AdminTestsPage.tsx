@@ -18,11 +18,48 @@ import {
   type AdminTestDetail,
   type AdminTestListItem,
   type CreateTestQuestionInput,
+  type UpdateTestInput,
 } from '../../lib/admin-tests-api';
 import { AdminSelect } from '../../components/admin/AdminSelect';
 import { getErrorMessage, toastError, toastSuccess } from '../../lib/toast';
 
-type PaidCourseOption = { slug: string; title: string };
+type PaidCourseOption = { slug: string; title: string; isPublished: boolean };
+
+/** What the edit form loaded, so a save sends only the fields that really changed. */
+type EditBaseline = { title: string; passingScore: number; isActive: boolean; questionsKey: string };
+
+/** Normalised form questions as a string: equal keys mean the questions were not edited. */
+function questionsKey(questions: CreateTestQuestionInput[]) {
+  return JSON.stringify(toCreateQuestions(questions));
+}
+
+const DELETE_CONFIRM = (title: string) =>
+  `"${title}" тестин биротоло өчүрөсүзбү?\n\n` +
+  'Тест жана анын суроолору өчүрүлөт. Ошону менен бирге студенттердин бул тест боюнча ' +
+  'аракеттеринин тарыхы (упайлар, 3 жолку бөгөт) жана «тестти тапшырды» деген статусу жоголушу мүмкүн. ' +
+  'Аларды калыбына келтирүүгө болбойт, ал эми сертификаты жок студенттер тестти кайра тапшырышы керек болушу мүмкүн. ' +
+  'Мурда берилген сертификаттар бул аракет менен өчүрүлбөйт.\n\n' +
+  'Тестти студенттерден жашыруу гана керек болсо, бул терезеде баш тартып, ' +
+  'тестти «Өчүрүү» баскычы же түзөтүү формасындагы «Активдүү» белгиси менен өчүрүңүз.';
+
+const DEACTIVATE_CONFIRM = (title: string) =>
+  `"${title}" тестин өчүрөсүзбү?\n\n` +
+  'Студенттер бул тестти көрбөй жана тапшыра албай калат. Тест, суроолор жана студенттердин аракеттери ' +
+  'өчүрүлбөйт — тестти каалаган убакта кайра активдештирсе болот.';
+
+const EMPTY_TEST_ACTIVATE_CONFIRM = (title: string) =>
+  `"${title}" тестинин суроолорунун саны тизмеде 0 деп көрсөтүлгөн.\n\n` +
+  'Бул сан тест менен сакталган сан гана, активдүү суроолордун чыныгы санын көрсөтпөшү мүмкүн. ' +
+  'Суроосу жок тестти студенттер тапшыра албай калышы мүмкүн.\n\n' +
+  'Баары бир активдештиресизби?';
+
+/** A passing score from the form field, or null when it is empty or not 0–100. */
+function parsePassingScore(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === '') return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+}
 
 function toCreateQuestions(questions: CreateTestQuestionInput[]): CreateTestQuestionInput[] {
   return questions.map((q) => {
@@ -106,9 +143,14 @@ export function AdminTestsPage() {
   const [title, setTitle] = useState('');
   const [passingScore, setPassingScore] = useState('90');
   const [questions, setQuestions] = useState<CreateTestQuestionInput[]>([emptyChoiceQuestion()]);
+  const [isActive, setIsActive] = useState(true);
+  const [baseline, setBaseline] = useState<EditBaseline | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  /** Courses with a course-level final test (active or not). A lesson-bound test does not count:
+   * students never get it, and the server still allows a course-level test next to it. */
   const coursesWithTest = useMemo(
-    () => new Set(items.map((item) => item.course.slug)),
+    () => new Set(items.filter((item) => !item.lesson).map((item) => item.course.slug)),
     [items],
   );
 
@@ -120,6 +162,12 @@ export function AdminTestsPage() {
     [paidCourses, editingId, coursesWithTest],
   );
 
+  /** Paid courses with no final test at all; a course whose test is only inactive is not listed. */
+  const coursesWithoutTest = useMemo(
+    () => paidCourses.filter((course) => !coursesWithTest.has(course.slug)),
+    [paidCourses, coursesWithTest],
+  );
+
   const showFormError = (message: string) => {
     toastError(message);
   };
@@ -129,12 +177,24 @@ export function AdminTestsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [testsData, coursesData] = await Promise.all([
+      const [testsData, firstPage] = await Promise.all([
         fetchAdminTests(token),
-        fetchAdminCourses(token, { type: 'paid', limit: 100 }),
+        fetchAdminCourses(token, { type: 'paid', page: 1, limit: 100 }),
       ]);
+      const restPages = await Promise.all(
+        Array.from({ length: Math.max(0, (firstPage.totalPages ?? 1) - 1) }, (_, i) =>
+          fetchAdminCourses(token, { type: 'paid', page: i + 2, limit: 100 }),
+        ),
+      );
+      const seen = new Set<string>();
+      // Pages are offset-based, so a course can repeat if the list changes while loading; keep the first.
+      const courses = [firstPage, ...restPages]
+        .flatMap((page) => page.items)
+        .filter((course) => (seen.has(course.slug) ? false : (seen.add(course.slug), true)));
       setItems(testsData.items);
-      setPaidCourses(coursesData.items.map((c) => ({ slug: c.slug, title: c.title })));
+      setPaidCourses(
+        courses.map((c) => ({ slug: c.slug, title: c.title, isPublished: c.isPublished })),
+      );
     } catch (err) {
       toastError(getErrorMessage(err, 'Жүктөө ийгиликсиз'));
       setError('load');
@@ -152,11 +212,19 @@ export function AdminTestsPage() {
     setTitle('');
     setPassingScore('90');
     setQuestions([emptyChoiceQuestion()]);
+    setIsActive(true);
+    setBaseline(null);
     setEditingId(null);
   };
 
   const openCreate = () => {
     resetForm();
+    setModalOpen(true);
+  };
+
+  const openCreateFor = (slug: string) => {
+    resetForm();
+    setCourseSlug(slug);
     setModalOpen(true);
   };
 
@@ -169,7 +237,15 @@ export function AdminTestsPage() {
       setCourseSlug(test.course.slug);
       setTitle(test.title);
       setPassingScore(String(test.passingScore));
-      setQuestions(detailToFormQuestions(test));
+      const formQuestions = detailToFormQuestions(test);
+      setQuestions(formQuestions);
+      setIsActive(test.isActive);
+      setBaseline({
+        title: test.title,
+        passingScore: Number(test.passingScore),
+        isActive: test.isActive,
+        questionsKey: questionsKey(formQuestions),
+      });
       setModalOpen(true);
     } catch (err) {
       toastError(getErrorMessage(err, 'Тест жүктөлбөдү'));
@@ -193,12 +269,15 @@ export function AdminTestsPage() {
     }
 
     const prepared = toCreateQuestions(questions);
-    if (prepared.some((q) => !q.questionText)) {
+    // When editing, untouched questions are not re-sent (the server would recreate them with new ids).
+    const questionsChanged = !editingId || !baseline || questionsKey(questions) !== baseline.questionsKey;
+
+    if (questionsChanged && prepared.some((q) => !q.questionText)) {
       showFormError('Бардык суроолорду толтуруңуз');
       return;
     }
 
-    for (const q of prepared) {
+    for (const q of questionsChanged ? prepared : []) {
       if (q.questionType === 'choice') {
         if (q.options.some((o) => !o.optionText)) {
           showFormError('Бардык варианттарды толтуруңуз');
@@ -214,18 +293,43 @@ export function AdminTestsPage() {
       }
     }
 
+    const trimmedTitle = title.trim() || undefined;
+    const parsedScore = parsePassingScore(passingScore);
+    // Empty or invalid input: a new test gets the usual 90, an edited test keeps its saved score.
+    const score = parsedScore ?? 90;
+
+    let update: UpdateTestInput | null = null;
+    if (editingId && baseline) {
+      update = {};
+      if (trimmedTitle !== undefined && trimmedTitle !== baseline.title) update.title = trimmedTitle;
+      if (parsedScore !== null && parsedScore !== baseline.passingScore) update.passingScore = parsedScore;
+      if (isActive !== baseline.isActive) update.isActive = isActive;
+      if (questionsChanged) update.questions = prepared;
+      if (Object.keys(update).length === 0) {
+        closeModal();
+        return;
+      }
+      const listed = items.find((item) => item.id === editingId);
+      if (update.isActive === true && listed?.questionsCount === 0) {
+        if (!window.confirm(EMPTY_TEST_ACTIVATE_CONFIRM(listed.title))) return;
+      }
+    }
+
     setSaving(true);
     try {
-      const payload = {
-        title: title.trim() || undefined,
-        passingScore: Number(passingScore) || 90,
-        questions: prepared,
-      };
-
       if (editingId) {
-        await updateAdminTest(token, editingId, payload);
+        await updateAdminTest(
+          token,
+          editingId,
+          update ?? { title: trimmedTitle, passingScore: score, questions: prepared },
+        );
       } else {
-        await createAdminTest(token, { ...payload, courseRef: courseSlug });
+        await createAdminTest(token, {
+          title: trimmedTitle,
+          passingScore: score,
+          questions: prepared,
+          courseRef: courseSlug,
+        });
       }
 
       closeModal();
@@ -239,13 +343,32 @@ export function AdminTestsPage() {
 
   const handleDelete = async (test: AdminTestListItem) => {
     if (!token) return;
-    const ok = window.confirm(`"${test.title}" тестин өчүрөсүзбү?`);
+    const ok = window.confirm(DELETE_CONFIRM(test.title));
     if (!ok) return;
     try {
       await deleteAdminTest(token, test.id);
       await load();
     } catch (err) {
       toastError(getErrorMessage(err, 'Өчүрүү ийгиликсиз'));
+    }
+  };
+
+  /** Sends only the status, so the questions (and their ids) stay as they are. */
+  const handleToggleActive = async (test: AdminTestListItem) => {
+    if (!token || togglingId) return;
+    if (test.isActive && !window.confirm(DEACTIVATE_CONFIRM(test.title))) return;
+    if (!test.isActive && test.questionsCount === 0 && !window.confirm(EMPTY_TEST_ACTIVATE_CONFIRM(test.title))) {
+      return;
+    }
+    setTogglingId(test.id);
+    try {
+      await updateAdminTest(token, test.id, { isActive: !test.isActive });
+      toastSuccess(test.isActive ? 'Тест өчүрүлдү' : 'Тест активдештирилди');
+      await load();
+    } catch (err) {
+      toastError(getErrorMessage(err, 'Абалы өзгөргөн жок'));
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -329,18 +452,47 @@ export function AdminTestsPage() {
                 <th>Курс</th>
                 <th>Суроолор</th>
                 <th>Өтүү</th>
+                <th>Абалы</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {items.map((test) => (
                 <tr key={test.id}>
-                  <td>{test.title}</td>
+                  <td>
+                    {test.title}
+                    {test.lesson ? (
+                      <span
+                        className="admin-test-hint"
+                        title="Студенттер курстук финалдык тест катары бул тестти алышпайт"
+                      >
+                        {' '}
+                        · Сабакка байланган ({test.lesson.lessonOrder}-сабак: {test.lesson.title})
+                      </span>
+                    ) : null}
+                  </td>
                   <td>{test.course.title}</td>
                   <td>{test.questionsCount}</td>
                   <td>{test.passingScore}%</td>
                   <td>
+                    <span
+                      className={`admin-users-status ${
+                        test.isActive ? 'admin-users-status-active' : 'admin-users-status-blocked'
+                      }`}
+                    >
+                      {test.isActive ? 'Активдүү' : 'Өчүк'}
+                    </span>
+                  </td>
+                  <td>
                     <div className="admin-lesson-actions">
+                      <button
+                        type="button"
+                        className="qa-admin-btn qa-admin-btn-muted"
+                        onClick={() => void handleToggleActive(test)}
+                        disabled={togglingId !== null}
+                      >
+                        {test.isActive ? 'Өчүрүү' : 'Активдештирүү'}
+                      </button>
                       <button
                         type="button"
                         className="qa-admin-btn qa-admin-btn-muted"
@@ -353,7 +505,8 @@ export function AdminTestsPage() {
                         type="button"
                         className="qa-admin-btn qa-admin-btn-danger"
                         onClick={() => void handleDelete(test)}
-                        aria-label="Өчүрүү"
+                        aria-label="Биротоло өчүрүү"
+                        title="Биротоло өчүрүү"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -365,6 +518,41 @@ export function AdminTestsPage() {
           </table>
         </div>
       )}
+
+      {!loading && !error && coursesWithoutTest.length > 0 ? (
+        <div className="admin-users-table-wrap ui-card">
+          <h3 className="admin-section-title">Тести жок акылуу курстар · {coursesWithoutTest.length}</h3>
+          <table className="admin-users-table">
+            <thead>
+              <tr>
+                <th>Курс</th>
+                <th>Абалы</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {coursesWithoutTest.map((course) => (
+                <tr key={course.slug}>
+                  <td>{course.title}</td>
+                  <td>{course.isPublished ? 'Жарыяланган' : 'Жарыяланбаган'}</td>
+                  <td>
+                    <div className="admin-lesson-actions">
+                      <button
+                        type="button"
+                        className="btn-gold qa-admin-btn"
+                        onClick={() => openCreateFor(course.slug)}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Тест түзүү
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       {modalOpen ? (
         <div className="auth-modal-overlay" role="presentation" onClick={closeModal}>
@@ -432,6 +620,13 @@ export function AdminTestsPage() {
                   onChange={(e) => setPassingScore(e.target.value)}
                 />
               </label>
+
+              {editingId ? (
+                <label className="qa-admin-field admin-course-checkbox">
+                  <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+                  <span>Активдүү (студенттерге көрүнөт)</span>
+                </label>
+              ) : null}
 
               <div className="admin-test-questions">
                 <div className="admin-test-questions-head">

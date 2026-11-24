@@ -14,6 +14,7 @@ import { Lesson } from '../src/database/entities';
 import { gradeTestAnswers, type TestLockState } from '../src/tests/tests.helpers';
 import { TestsController } from '../src/tests/tests.controller';
 import type { GradeAnswers } from '../src/tests/tests.schemas';
+import { TestsService } from '../src/tests/tests.service';
 
 const CHOICE_Q = '11111111-1111-4111-8111-111111111111';
 const TEXT_Q = '22222222-2222-4222-8222-222222222222';
@@ -248,5 +249,155 @@ describe('90% threshold — exact comparison, no rounding up (QA E2E finding)', 
     const r = gradeTestAnswers(choiceTest(0), []);
     assert.equal(r.passed, false);
     assert.equal(r.scorePercent, 0);
+  });
+});
+
+describe('inactive questions are not graded (QA H1-6)', () => {
+  const INACTIVE_Q = '44444444-4444-4444-8444-444444444444';
+  const INACTIVE_OK = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const INACTIVE_NO = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const inactiveQuestion = {
+    question: {
+      id: INACTIVE_Q,
+      questionText: 'Removed question?',
+      questionType: 'choice' as const,
+      correctTextAnswer: null,
+      options: [
+        { id: INACTIVE_OK, optionText: 'inactive right', isCorrect: true },
+        { id: INACTIVE_NO, optionText: 'inactive wrong', isCorrect: false },
+      ],
+      isActive: false,
+    },
+  };
+  const active = (item: (typeof TEST.testQuestions)[number]) => ({ question: { ...item.question, isActive: true } });
+  const WITH_INACTIVE = { passingScore: 90, testQuestions: [...TEST.testQuestions.map(active), inactiveQuestion] };
+
+  it('all questions active: grading is unchanged', () => {
+    const allActive = { passingScore: 90, testQuestions: TEST.testQuestions.map(active) };
+    for (const answers of [ALL_RIGHT, HALF_RIGHT, ALL_WRONG]) {
+      assert.deepEqual(gradeTestAnswers(allActive, answers), gradeTestAnswers(TEST, answers));
+    }
+    const right = gradeTestAnswers(allActive, ALL_RIGHT);
+    assert.equal(right.total, 2);
+    assert.equal(right.scorePercent, 100);
+    assert.equal(right.passed, true);
+  });
+
+  it('an inactive question counts neither toward the total nor the score', () => {
+    const r = gradeTestAnswers(WITH_INACTIVE, ALL_RIGHT);
+    assert.equal(r.total, 2, 'only the 2 active questions are graded');
+    assert.equal(r.correct, 2);
+    assert.equal(r.scorePercent, 100, 'all shown questions right → 100%, not 66.67%');
+    assert.equal(r.passed, true);
+  });
+
+  it('all questions inactive: no division by zero, a defined failing result', () => {
+    const allInactive = {
+      passingScore: 90,
+      testQuestions: TEST.testQuestions.map((item) => ({ question: { ...item.question, isActive: false } })),
+    };
+    const r = gradeTestAnswers(allInactive, ALL_RIGHT);
+    assert.equal(r.total, 0);
+    assert.equal(r.correct, 0);
+    assert.equal(r.scorePercent, 0);
+    assert.ok(Number.isFinite(r.scorePercent));
+    assert.equal(r.passed, false);
+  });
+
+  it('an answer sent for an inactive question is not graded', () => {
+    const withInactiveAnswer: GradeAnswers = [...HALF_RIGHT, { questionId: INACTIVE_Q, selectedOptionId: INACTIVE_OK }];
+    const r = gradeTestAnswers(WITH_INACTIVE, withInactiveAnswer);
+    assert.equal(r.total, 2);
+    assert.equal(r.correct, 1, 'the right answer to the inactive question adds nothing');
+    assert.equal(r.scorePercent, 50);
+    assert.equal(r.passed, false);
+  });
+
+  it('does not reveal the answer key (active or inactive) in the grade result', () => {
+    for (const answers of [ALL_RIGHT, ALL_WRONG, [...ALL_RIGHT, { questionId: INACTIVE_Q, selectedOptionId: INACTIVE_NO }]]) {
+      const r = gradeTestAnswers(WITH_INACTIVE, answers);
+      assertNoAnswerLeak(r, 'gradeTestAnswers(with inactive)');
+      const json = JSON.stringify(r);
+      assert.ok(!json.includes(INACTIVE_OK) && !json.includes('inactive right'), 'inactive answer key leaked');
+    }
+  });
+});
+
+describe('exam with no active questions cannot be submitted (QA H1-6)', () => {
+  const STUDENT_USER = { id: '55555555-5555-4555-8555-555555555555', role: 'user' as const };
+
+  function serviceWith(questionsActive: boolean[]) {
+    const calls = { lockLookups: 0, counts: 0, saves: 0 };
+    const test = {
+      id: 'test-1',
+      passingScore: 90,
+      testQuestions: questionsActive.map((isActive, i) => ({
+        questionOrder: i + 1,
+        question: {
+          id: `q${i}`,
+          questionText: `Question ${i}?`,
+          questionType: 'choice' as const,
+          correctTextAnswer: null,
+          isActive,
+          options: [
+            { id: `q${i}-ok`, optionText: 'right', isCorrect: true, optionOrder: 1 },
+            { id: `q${i}-no`, optionText: 'wrong', isCorrect: false, optionOrder: 2 },
+          ],
+        },
+      })),
+    };
+    const testRepo = { findOne: async () => test };
+    const attempts = {
+      find: async () => {
+        calls.lockLookups += 1;
+        return [];
+      },
+      countBy: async () => {
+        calls.counts += 1;
+        return 0;
+      },
+      create: (row: unknown) => row,
+      save: async (row: unknown) => {
+        calls.saves += 1;
+        return row;
+      },
+    };
+    const courses = {
+      resolveRef: async () => ({ id: 'course-1', courseType: 'paid' as const }),
+      userCanWatchPaidCourse: async () => true,
+    };
+    const service = new TestsService(testRepo as never, attempts as never, {} as never, courses as never);
+    return { service, calls };
+  }
+
+  it('all questions inactive → 404, nothing graded, no attempt saved, lock untouched', async () => {
+    const { service, calls } = serviceWith([false, false]);
+    await assert.rejects(
+      service.gradeFinalTest('course-1', STUDENT_USER as never, [{ questionId: 'q0', selectedOptionId: 'q0-ok' }]),
+      (err: unknown) => {
+        const e = err as { getStatus?: () => number };
+        assert.equal(e.getStatus?.(), 404);
+        return true;
+      },
+    );
+    assert.deepEqual(calls, { lockLookups: 0, counts: 0, saves: 0 });
+  });
+
+  it('an empty question list → 404, no attempt saved', async () => {
+    const { service, calls } = serviceWith([]);
+    await assert.rejects(service.gradeFinalTest('course-1', STUDENT_USER as never, []));
+    assert.equal(calls.saves, 0);
+  });
+
+  it('at least one active question → graded and one attempt saved (inactive one excluded)', async () => {
+    const { service, calls } = serviceWith([true, false]);
+    const result = await service.gradeFinalTest('course-1', STUDENT_USER as never, [
+      { questionId: 'q0', selectedOptionId: 'q0-ok' },
+      { questionId: 'q1', selectedOptionId: 'q1-ok' },
+    ]);
+    assert.equal(calls.saves, 1);
+    assert.equal(result.total, 1);
+    assert.equal(result.scorePercent, 100);
+    assert.equal(result.passed, true);
   });
 });

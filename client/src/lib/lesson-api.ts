@@ -69,7 +69,8 @@ export async function updateLesson(token: string, id: string, data: UpdateLesson
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(await parseApiError(res, 'Сабак жаңыртылган жок'));
-  return res.json() as Promise<LessonDto>;
+  // `warnings` comes only in the admin response, e.g. a published lesson that still has no duration.
+  return res.json() as Promise<LessonDto & { warnings?: string[] }>;
 }
 
 export async function deleteLesson(token: string, id: string) {

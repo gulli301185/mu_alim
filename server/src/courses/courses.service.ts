@@ -8,6 +8,7 @@ import { UUID_RE } from '../common/uuid';
 import { CacheService } from '../cache/cache.service';
 import { Category, Course, Enrollment, Lesson } from '../database/entities';
 import { fetchYoutubePlaylistVideos } from '../lib/youtube-playlist';
+import { isValidDuration } from '../lessons/lesson-duration';
 
 const CACHE_TTL = 300;
 const NOT_FOUND = 'Курс табылган жок';
@@ -448,18 +449,21 @@ export class CoursesService {
 
       const toCreate = videos
         .filter((video) => !existingIds.has(video.videoId))
-        .map((video, index) =>
-          em.create(Lesson, {
+        .map((video, index) => {
+          // Same rule as LessonsService: a lesson is published only with a valid duration;
+          // a video whose duration YouTube did not give is added unpublished, without one.
+          const hasDuration = isValidDuration(video.durationSeconds);
+          return em.create(Lesson, {
             courseId: course.id,
             title: video.title.slice(0, 255),
             description: null,
             youtubeUrl: video.youtubeUrl,
             youtubeVideoId: video.videoId,
-            durationSeconds: video.durationSeconds,
+            durationSeconds: hasDuration ? video.durationSeconds : null,
             lessonOrder: startOrder + index + 1,
-            isPublished: true,
-          }),
-        );
+            isPublished: hasDuration,
+          });
+        });
 
       if (toCreate.length > 0) {
         await em.save(toCreate);
@@ -469,6 +473,7 @@ export class CoursesService {
         imported: toCreate.length,
         skipped: videos.length - toCreate.length,
         total: videos.length,
+        unpublished: toCreate.filter((lesson) => !lesson.isPublished).length,
       };
     });
 
