@@ -11,8 +11,15 @@ export const QUESTION_SORT_OPTIONS: { value: QuestionSort; label: string }[] = [
   { value: 'popular', label: 'Популярдуусу' },
 ];
 
-export function formatQuestionDate(iso: string) {
+export function formatQuestionDate(iso: string, lang = 'kg') {
   const d = new Date(iso);
+  if (lang === 'ru') {
+    const ruMonths = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+    ] as const;
+    return `${d.getDate()} ${ruMonths[d.getMonth()]} ${d.getFullYear()}`;
+  }
   const months = [
     'январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
     'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь',

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { Plus, Search, X } from "lucide-react";
 import { QaPagination } from "../components/QaPagination";
@@ -122,8 +123,16 @@ function QaAdminList({
 }
 
 export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
+  const { t, i18n } = useTranslation();
   const { image } = useSiteImages();
   const { isAdmin, token } = useAuth();
+  // Read inside load() so the admin view gets Kyrgyz messages without adding isAdmin
+  // to load()'s dependencies (which would refetch once auth resolves).
+  const adminViewRef = useRef(adminMode || isAdmin);
+  adminViewRef.current = adminMode || isAdmin;
+  // Same for `t`: a language switch must not refetch the list.
+  const tRef = useRef(t);
+  tRef.current = t;
   const [searchParams, setSearchParams] = useSearchParams();
   const [queryInput, setQueryInput] = useState(
     () => searchParams.get("q") ?? "",
@@ -214,7 +223,9 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
       setTotal(data.total);
       setTotalPages(data.totalPages);
     } catch {
-      const message = "Маалымат базасынан жүктөө ийгиликсиз.";
+      const message = adminViewRef.current
+        ? i18n.getFixedT("kg")("qa.loadFailed")
+        : tRef.current("qa.loadFailed");
       toastError(message);
       setItems([]);
       setTotal(0);
@@ -254,10 +265,7 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
   };
 
   const currentPage = Math.min(page, totalPages);
-  const sortLabel = useMemo(
-    () => QUESTION_SORT_OPTIONS.find((option) => option.value === sort)?.label,
-    [sort],
-  );
+  const sortLabel = t(`qa.sort.${sort}`);
 
   const listReturnSearch = searchParams.toString();
 
@@ -370,7 +378,7 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
     <>
       <section className="qa-page">
         <div className="wrap qa-page-wrap">
-          <div className="qa-sort-row" role="group" aria-label="Сорттоо">
+          <div className="qa-sort-row" role="group" aria-label={t("qa.sortAria")}>
             {QUESTION_SORT_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -378,16 +386,14 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
                 className={`qa-sort-btn${sort === option.value ? " qa-sort-btn-active" : ""}`}
                 onClick={() => updateParams({ sort: option.value, page: "1" })}
               >
-                {option.label}
+                {t(`qa.sort.${option.value}`)}
               </button>
             ))}
           </div>
           <header className="qa-page-header">
             <div>
-              <h1 className="qa-page-title">Суроо-жооп</h1>
-              <p className="qa-page-subtitle">
-                Диний суроолорго жооптор — Муалим академиясы
-              </p>
+              <h1 className="qa-page-title">{t("qa.title")}</h1>
+              <p className="qa-page-subtitle">{t("qa.subtitle")}</p>
             </div>
           </header>
 
@@ -397,15 +403,18 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
               <input
                 type="search"
                 className="qa-search-input"
-                placeholder="Сөз же номер менен издөө (мисалы: 153)"
+                placeholder={t("qa.searchPlaceholder")}
                 value={queryInput}
                 onChange={(e) => setQueryInput(e.target.value)}
               />
             </label>
             {!loading && sort !== "default" && sortLabel ? (
               <p className="qa-sort-note">
-                Бардык {total} суроонун ичинен иреттелди ·{" "}
-                {sortLabel.toLowerCase()} · {currentPage}-бет
+                {t("qa.sortNote", {
+                  total,
+                  sort: sortLabel.toLowerCase(),
+                  page: currentPage,
+                })}
               </p>
             ) : null}
           </div>
@@ -419,14 +428,14 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
                   className="btn-primary qa-back-btn"
                   onClick={() => void load()}
                 >
-                  Кайра аракет кылуу
+                  {t("learn.retry")}
                 </button>
               </div>
             ) : null}
 
             {!error && loading ? (
               <div className="qa-empty ui-card">
-                <p>Жүктөлүүдө...</p>
+                <p>{t("common.loading")}</p>
               </div>
             ) : null}
 
@@ -452,12 +461,13 @@ export function QuestionsPage({ adminMode = false }: { adminMode?: boolean }) {
 
             {!loading && !error && items.length === 0 && (
               <div className="qa-empty ui-card">
-                <p>Эч нерсе табылган жок.</p>
+                <p>{t("qa.nothingFound")}</p>
               </div>
             )}
 
             {!loading && !error && (
               <QaPagination
+                localized
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={(nextPage) =>

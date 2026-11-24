@@ -645,7 +645,7 @@ export function CourseLearnPage() {
       }
     } catch (error) {
       if (error instanceof TestLockedError) {
-        toastError(error.message);
+        toastError(getErrorMessage(error, t("learn.failed3")));
         void refetchFinalTest();
       } else if (
         error instanceof ApiError &&

@@ -46,6 +46,8 @@ const KY_MONTHS_BY_LANG: Record<string, readonly string[]> = {
 function formatVideoDate(iso: string, lang: string) {
   const d = new Date(iso);
   const months = KY_MONTHS_BY_LANG[lang] ?? KY_MONTHS_BY_LANG.kg;
+  // Russian: "5 января 2026"; Kyrgyz keeps "5-январь, 2026".
+  if (lang === "ru") return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   return `${d.getDate()}-${months[d.getMonth()]}, ${d.getFullYear()}`;
 }
 
@@ -153,7 +155,7 @@ function CourseMeta({
           {rating != null && <StarRating value={rating} />}
           {lessons != null && (
             <span className="course-lessons">
-              {lessons} {t("common.lessonsWord")}
+              {t("common.lessonsCount", { count: lessons })}
             </span>
           )}
         </p>

@@ -1,4 +1,5 @@
 import { Eye } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   formatQuestionDate,
   formatQuestionNumber,
@@ -17,14 +18,17 @@ type QaTelegramCardProps = {
 };
 
 export function QaTelegramCard({ article, compact = false, searchQuery = '' }: QaTelegramCardProps) {
+  const { t, i18n } = useTranslation();
   const question = article.question ?? article.title;
   const answer = article.answer ?? article.excerpt;
   const numberLabel =
-    article.number != null ? `СУРОО ${formatQuestionNumber(article.number)}:` : 'СУРОО:';
+    article.number != null
+      ? t('qa.cardQuestionN', { number: formatQuestionNumber(article.number) })
+      : t('qa.cardQuestion');
 
   return (
     <div className="qa-tg-card">
-      <p className="qa-tg-header">⚜️ СУРОО-ЖООП ⚜️</p>
+      <p className="qa-tg-header">{t('qa.cardHeader')}</p>
 
       <div className="qa-tg-section">
         <p className="qa-tg-label">❓ {numberLabel}</p>
@@ -32,7 +36,7 @@ export function QaTelegramCard({ article, compact = false, searchQuery = '' }: Q
       </div>
 
       <div className="qa-tg-section">
-        <p className="qa-tg-label">✅ ЖООП:</p>
+        <p className="qa-tg-label">✅ {t('qa.cardAnswer')}</p>
         <p className={`qa-tg-text${compact ? ' qa-tg-text-compact' : ''}`}>
           {highlightText(answer, searchQuery)}
         </p>
@@ -54,7 +58,7 @@ export function QaTelegramCard({ article, compact = false, searchQuery = '' }: Q
           <Eye className="h-3.5 w-3.5" aria-hidden />
           <span>{formatViews(article.views)}</span>
           <span className="qa-tg-meta-dot">·</span>
-          <span>{formatQuestionDate(article.publishedAt)}</span>
+          <span>{formatQuestionDate(article.publishedAt, i18n.resolvedLanguage)}</span>
           <span className="qa-tg-meta-dot">·</span>
           <span>{formatQuestionTime(article.publishedAt)}</span>
         </div>

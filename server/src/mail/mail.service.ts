@@ -19,8 +19,8 @@ const AUTH_CODE_COPY: Record<
   }
 > = {
   kg: {
-    registerSubject: "Mu Alim каттоо коду",
-    resetSubject: "Mu Alim сыр сөз коду",
+    registerSubject: "Mualim Academy каттоо коду",
+    resetSubject: "Mualim Academy сыр сөз коду",
     registerPurpose: "Каттоону ырастоо үчүн код:",
     resetPurpose: "Сыр сөзүңүздү калыбына келтирүү үчүн код:",
     greeting: "Ассаламу алейкум!",
@@ -30,8 +30,8 @@ const AUTH_CODE_COPY: Record<
     plainIgnore: "Eger siz bul suramdy jasabagan bolsonuz, kattı etibarga albanyz.",
   },
   ru: {
-    registerSubject: "Mu Alim: код регистрации",
-    resetSubject: "Mu Alim: код для сброса пароля",
+    registerSubject: "Mualim Academy: код регистрации",
+    resetSubject: "Mualim Academy: код для восстановления пароля",
     registerPurpose: "Код для подтверждения регистрации:",
     resetPurpose: "Код для восстановления пароля:",
     greeting: "Ассаламу алейкум!",
@@ -150,7 +150,7 @@ export class MailService {
     }
 
     const fromUser = smtpUser();
-    const from = process.env.SMTP_FROM?.trim() || `Mu Alim <${fromUser}>`;
+    const from = process.env.SMTP_FROM?.trim() || `Mualim Academy <${fromUser}>`;
     const transporter = this.createTransport();
     const register = kind === "register";
     const copy = AUTH_CODE_COPY[currentLang()];
@@ -174,14 +174,14 @@ export class MailService {
         copy.plainValidity,
         copy.plainIgnore,
         "",
-        "Mu Alim",
+        "Mualim Academy",
       ].join("\n"),
       html: `
       <p>${copy.greeting}</p>
       <p>${purpose}</p>
       <p style="font-size:28px;letter-spacing:0.28em;font-weight:700">${code}</p>
       <p>${copy.validity}</p>
-      <p>Mu Alim</p>
+      <p>Mualim Academy</p>
     `,
       });
     } catch (err) {

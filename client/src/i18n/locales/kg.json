@@ -36,7 +36,7 @@
     "pageNotFound": "Мындай бет табылган жок.",
     "free": "Бекер",
     "readMore": "Кененирээк",
-    "lessonsWord": "сабак",
+    "lessonsCount": "{{count}} сабак",
     "back": "Башкы бетке кайтуу",
     "save": "Сактоо",
     "saving": "Сакталууда...",
@@ -50,6 +50,7 @@
     "close": "Жабуу",
     "phone": "Телефон",
     "address": "Дарек",
+    "email": "Email",
     "social": "Социалдык тармактар",
     "techSupportWhatsapp": "WhatsApp (техникалык суроолор)",
     "paidTelegram": "Telegram (акылуу курстар)"
@@ -215,7 +216,7 @@
     "goToLessons": "Сабактарга өтүү",
     "notFound": "Курс табылган жок.",
     "backToCourses": "Курстарга кайтуу",
-    "academy": "Муалим академиясы",
+    "academy": "Mualim Academy",
     "detailSubtitle": "WhatsApp аркылуу төлөп, чекти жибериңиз — андан кийин 1-сабактан баштап катар-каатар ачылат.",
     "preview": "Курс алдын ала көрүү",
     "course": "Курс",
@@ -314,7 +315,7 @@
     "attemptsLeft": " · Калып {{count}} аракет",
     "answerPlaceholder": "Жообуңузду жазыңыз",
     "wrongAnswer": "Туура эмес жооп",
-    "scoreAbove": "{{pct}}% дан жогору топтоңуз ({{score}}%). Кайра аракет кылыңыз.",
+    "scoreAbove": "{{pct}}% же андан жогору топтоңуз ({{score}}%). Кайра аракет кылыңыз.",
     "retake": "Кайра тапшыруу",
     "testPassed": "Курстук тест ийгиликтүү! ({{score}}%)",
     "canDownloadCert": "Сертификатты жүктөп ала аласыз!",
@@ -412,5 +413,43 @@
     "value2Tail": "жүрөктү тазалайт",
     "value3Head": "Адеп —",
     "value3Tail": "адамды көркөм кылат"
+  },
+  "qa": {
+    "title": "Суроо-жооп",
+    "subtitle": "Диний суроолорго жооптор — Mualim Academy",
+    "searchPlaceholder": "Сөз же номер менен издөө (мисалы: 153)",
+    "sortAria": "Сорттоо",
+    "sort": {
+      "default": "№ боюнча",
+      "newest": "Жаңылары",
+      "oldest": "Эскилери",
+      "popular": "Популярдуусу"
+    },
+    "sortNote": "Бардык {{total}} суроонун ичинен иреттелди · {{sort}} · {{page}}-бет",
+    "loadFailed": "Маалымат базасынан жүктөө ийгиликсиз.",
+    "nothingFound": "Эч нерсе табылган жок.",
+    "questionNotFound": "Суроо табылган жок.",
+    "articleNotFoundInDb": "Макала базадан табылган жок.",
+    "articleNotFound": "Макала табылган жок.",
+    "back": "Артка",
+    "backToList": "Суроо-жоопко кайтуу",
+    "cardHeader": "⚜️ СУРОО-ЖООП ⚜️",
+    "cardQuestion": "СУРОО:",
+    "cardQuestionN": "СУРОО {{number}}:",
+    "cardAnswer": "ЖООП:",
+    "pagination": {
+      "aria": "Беттер",
+      "prev": "Алдыңкы",
+      "next": "Кийинки",
+      "pageNumbers": "Бет номери",
+      "lastPage": "Акыркы бет {{page}}"
+    }
+  },
+  "meta": {
+    "title": "Mualim Academy — Ислам Булагы | mualim.kg",
+    "description": "Mualim Academy (mualim.kg) — кыргыз тилинде исламий онлайн курстар, устаздын сабактары, суроо-жооптор жана сертификаттар."
+  },
+  "errors": {
+    "network": "Серверге туташуу мүмкүн болгон жок. Интернетти текшерип, кайра аракет кылыңыз."
   }
 }
