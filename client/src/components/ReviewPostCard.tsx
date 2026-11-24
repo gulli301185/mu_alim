@@ -61,7 +61,7 @@ export function ReviewPostCard({ review }: { review: CourseReview }) {
         <div className="otzyv-logo-badge">
           <img src={image(SITE_IMAGE_KEYS.logo)} alt="" className="otzyv-logo" />
         </div>
-        <div className="otzyv-stars" aria-label={t('reviews.starN', { n: review.rating })}>
+        <div className="otzyv-stars" aria-label={t('reviews.starN', { n: review.rating, count: review.rating })}>
           {Array.from({ length: 5 }, (_, i) => (
             <Star
               key={i}

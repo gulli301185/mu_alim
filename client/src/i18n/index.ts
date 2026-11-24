@@ -4,6 +4,15 @@ import LanguageDetector from "i18next-browser-languagedetector";
 import kg from "./locales/kg.json";
 import ru from "./locales/ru.json";
 
+// index.html ships the Kyrgyz title/description (what crawlers see); once a language is
+// picked, the browser tab and description follow it. og:* tags stay static.
+i18n.on("languageChanged", () => {
+  document.title = i18n.t("meta.title");
+  document
+    .querySelector('meta[name="description"]')
+    ?.setAttribute("content", i18n.t("meta.description"));
+});
+
 void i18n
   .use(LanguageDetector)
   .use(initReactI18next)

@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { QaTelegramCard } from '../components/QaTelegramCard';
 import { QaAdminForm } from '../components/QaAdminForm';
 import { useAuth } from '../context/AuthContext';
@@ -14,11 +16,21 @@ import {
 import { getErrorMessage, toastError } from '../lib/toast';
 
 export function QuestionArticlePage({ adminMode = false }: { adminMode?: boolean }) {
+  const { t: currentT, i18n } = useTranslation();
   const { articleId } = useParams<{ articleId: string }>();
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAdmin, token, loading: authLoading } = useAuth();
+  // The admin view stays Kyrgyz. Memoized: getFixedT() returns a new function each call.
+  const t: TFunction = useMemo(
+    () => (adminMode || isAdmin ? i18n.getFixedT('kg') : currentT),
+    [adminMode, isAdmin, i18n, currentT],
+  );
+  // load() reads `t` through a ref so a language switch does not rerun it
+  // (which would call recordQaView again and count the view twice).
+  const tRef = useRef(t);
+  tRef.current = t;
   const questionsBase = adminMode || isAdmin ? '/admin/questions' : '/questions';
   const [article, setArticle] = useState<QuestionArticle | undefined>();
   const [loading, setLoading] = useState(true);
@@ -28,7 +40,7 @@ export function QuestionArticlePage({ adminMode = false }: { adminMode?: boolean
   const load = useCallback(async () => {
     if (!articleId) {
       setLoading(false);
-      toastError('Суроо табылган жок.');
+      toastError(tRef.current('qa.questionNotFound'));
       setError('not-found');
       return;
     }
@@ -47,7 +59,7 @@ export function QuestionArticlePage({ adminMode = false }: { adminMode?: boolean
       }
     } catch {
       setArticle(undefined);
-      toastError('Макала базадан табылган жок.');
+      toastError(tRef.current('qa.articleNotFoundInDb'));
       setError('not-found');
     } finally {
       setLoading(false);
@@ -98,7 +110,7 @@ export function QuestionArticlePage({ adminMode = false }: { adminMode?: boolean
       <section className="qa-page qa-page-admin">
         <div className="wrap qa-page-wrap">
           <div className="qa-empty ui-card">
-            <p>Жүктөлүүдө...</p>
+            <p>{t('common.loading')}</p>
           </div>
         </div>
       </section>
@@ -110,9 +122,9 @@ export function QuestionArticlePage({ adminMode = false }: { adminMode?: boolean
       <section className="qa-page qa-page-admin">
         <div className="wrap qa-page-wrap">
           <div className="qa-empty ui-card">
-            <p>Макала табылган жок.</p>
+            <p>{t('qa.articleNotFound')}</p>
             <Link to={questionsBase} className="btn-gold qa-admin-btn">
-              Артка
+              {t('qa.back')}
             </Link>
           </div>
         </div>
@@ -169,7 +181,7 @@ export function QuestionArticlePage({ adminMode = false }: { adminMode?: boolean
       <div className="wrap qa-article-page-wrap">
         <button type="button" className="course-learn-back" onClick={backToQuestions}>
           <ArrowLeft className="h-4 w-4" />
-          Суроо-жоопко кайтуу
+          {t('qa.backToList')}
         </button>
 
         <QaTelegramCard article={article} />

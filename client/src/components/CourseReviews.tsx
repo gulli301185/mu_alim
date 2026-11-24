@@ -39,7 +39,7 @@ function Stars({
             type="button"
             className="course-review-star-btn"
             onClick={() => onChange(i + 1)}
-            aria-label={t('reviews.starN', { n: i + 1 })}
+            aria-label={t('reviews.starN', { n: i + 1, count: i + 1 })}
           >
             {icon}
           </button>

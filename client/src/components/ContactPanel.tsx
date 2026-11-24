@@ -91,7 +91,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
                 <Mail className="h-5 w-5" aria-hidden />
               </span>
               <span className="contact-panel-copy">
-                <span className="contact-panel-label">Email</span>
+                <span className="contact-panel-label">{t("contact.email")}</span>
                 <span className="contact-panel-value">{SITE.email}</span>
               </span>
             </a>
@@ -128,7 +128,7 @@ export function ContactPanel({ open, onClose }: ContactPanelProps) {
         </div>
 
         {/* <div className="contact-panel-section">
-          <p className="contact-panel-section-title">Социалдык тармактар</p>
+          <p className="contact-panel-section-title">{t("contact.social")}</p>
           <ul className="contact-panel-links">
             {SOCIAL.map((item) => (
               <li key={item.name}>
