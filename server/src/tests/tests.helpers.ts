@@ -59,12 +59,17 @@ export function gradeTestAnswers(
         questionType: 'choice' | 'text';
         correctTextAnswer: string | null;
         options: { id: string; optionText: string; isCorrect: boolean }[];
+        isActive?: boolean;
       };
     }[];
   },
   answers: GradeAnswers,
 ) {
-  const questionItems = test.testQuestions.map((item) => item.question);
+  // QA H1-6: grade only what the student was shown — inactive questions are left out of the
+  // exam (getFinalTest), so they must not count toward the total or the score either.
+  const questionItems = test.testQuestions
+    .map((item) => item.question)
+    .filter((question) => question.isActive !== false);
   const answerMap = new Map(answers.map((a) => [a.questionId, a]));
 
   // Only the totals are kept: per-question results or the answer key must never

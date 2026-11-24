@@ -8,12 +8,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { Course, Lesson } from '../database/entities';
 import { parseYoutubeVideoId } from '../lib/youtube-parse';
+import { assertPublishable, parseDurationField } from './lesson-duration';
 
+// `durationSeconds` is checked by the service (lesson-duration.ts), not here: zod errors on
+// this controller collapse into one generic message, and `undefined` (not sent) must stay
+// distinct from `null` (cleared).
 export const createLessonSchema = z.object({
   title: z.string().trim().min(1).max(255),
   description: z.string().trim().optional(),
   youtubeUrl: z.string().trim().min(1).max(500),
-  durationSeconds: z.number().int().positive().optional(),
+  durationSeconds: z.unknown().optional(),
   lessonOrder: z.number().int().positive(),
   isPublished: z.boolean().optional().default(true),
 });
@@ -22,7 +26,7 @@ export const updateLessonSchema = z.object({
   title: z.string().trim().min(1).max(255).optional(),
   description: z.string().trim().nullable().optional(),
   youtubeUrl: z.string().trim().min(1).max(500).optional(),
-  durationSeconds: z.number().int().positive().nullable().optional(),
+  durationSeconds: z.unknown().optional(),
   lessonOrder: z.number().int().positive().optional(),
   isPublished: z.boolean().optional(),
 });
@@ -102,6 +106,11 @@ export class LessonsService {
     const courseId = await this.courses.resolveId(ref);
     if (!courseId) throw new AppError(404, 'Курс табылган жок');
 
+    // A new lesson has nothing to clear, so `null` is as invalid as any other non-duration.
+    const durationSeconds = parseDurationField(data.durationSeconds, { allowNull: false }) ?? null;
+    const isPublished = data.isPublished ?? false;
+    assertPublishable(null, { isPublished, durationSeconds });
+
     const videoId = parseYoutubeVideoId(data.youtubeUrl);
     if (!videoId) throw new AppError(400, BAD_YOUTUBE);
 
@@ -118,9 +127,9 @@ export class LessonsService {
         description: data.description ?? null,
         youtubeUrl: data.youtubeUrl,
         youtubeVideoId: videoId,
-        durationSeconds: data.durationSeconds ?? null,
+        durationSeconds,
         lessonOrder: data.lessonOrder,
-        isPublished: data.isPublished ?? false,
+        isPublished,
       }),
     );
 
@@ -131,6 +140,13 @@ export class LessonsService {
   async update(id: string, data: z.infer<typeof updateLessonSchema>) {
     const existing = await this.lessonRepo.findOneBy({ id });
     if (!existing) throw new AppError(404, 'Сабак табылган жок');
+
+    // Every check runs before `existing` is touched or saved.
+    const durationSeconds = parseDurationField(data.durationSeconds, { allowNull: true });
+    const warnings = assertPublishable(
+      { isPublished: existing.isPublished, durationSeconds: existing.durationSeconds },
+      { isPublished: data.isPublished, durationSeconds },
+    );
 
     const updateData: {
       title?: string;
@@ -144,7 +160,7 @@ export class LessonsService {
 
     if (data.title !== undefined) updateData.title = data.title;
     if (data.description !== undefined) updateData.description = data.description;
-    if (data.durationSeconds !== undefined) updateData.durationSeconds = data.durationSeconds;
+    if (durationSeconds !== undefined) updateData.durationSeconds = durationSeconds;
     if (data.isPublished !== undefined) updateData.isPublished = data.isPublished;
 
     if (data.youtubeUrl !== undefined) {
@@ -165,7 +181,8 @@ export class LessonsService {
 
     const lesson = await this.lessonRepo.save(Object.assign(existing, updateData));
     await this.courses.invalidate();
-    return toDto(lesson);
+    // Admin-only response: `warnings` is never added to toDto(), which students also receive.
+    return warnings.length > 0 ? { ...toDto(lesson), warnings } : toDto(lesson);
   }
 
   async remove(id: string) {

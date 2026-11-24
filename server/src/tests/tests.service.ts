@@ -375,6 +375,11 @@ export class TestsService {
 
     const test = await this.findFinalTestForCourse(course.id, true);
     if (!test) throw new AppError(404, TEST_NOT_FOUND);
+    // QA H1-6: an exam with no active questions shows the student nothing (getFinalTest), so it
+    // cannot be taken either — refused before grading, so no empty attempt counts as a failure.
+    if (!test.testQuestions.some((item) => item.question?.isActive)) {
+      throw new AppError(404, TEST_NOT_FOUND);
+    }
 
     const lock = await this.getFinalTestLockState(user.id, test.id);
     if (lock.locked) {

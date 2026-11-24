@@ -15,7 +15,7 @@ import {
 } from '../../lib/admin-courses-api';
 import { deleteLesson, updateLesson } from '../../lib/lesson-api';
 import { AdminSelect } from '../../components/admin/AdminSelect';
-import { getErrorMessage, toastError, toastSuccess } from '../../lib/toast';
+import { getErrorMessage, toastError, toastInfo, toastSuccess } from '../../lib/toast';
 
 type LessonFormState = {
   title: string;
@@ -37,14 +37,22 @@ function emptyLessonForm(nextOrder: number): LessonFormState {
   };
 }
 
+const DURATION_FORMAT_ERROR =
+  'Узактыкты мм:сс же с:мм:сс форматында жазыңыз (мисалы, 10:15 же 1:05:00), 6 саатка чейин';
+
+/** Empty → undefined (not sent). Anything else must be a valid mm:ss or h:mm:ss, or it throws. */
 function parseDurationInput(value: string): number | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
+  if (!/^\d+(:\d{1,2}){1,2}$/.test(trimmed)) throw new Error(DURATION_FORMAT_ERROR);
   const parts = trimmed.split(':').map(Number);
-  if (parts.some((n) => Number.isNaN(n))) return undefined;
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  return undefined;
+  // Seconds, and minutes in h:mm:ss, are 0–59.
+  if (parts.slice(1).some((n) => n > 59)) throw new Error(DURATION_FORMAT_ERROR);
+  const seconds =
+    parts.length === 2 ? parts[0] * 60 + parts[1] : parts[0] * 3600 + parts[1] * 60 + parts[2];
+  // Same range as the server (1 second – 6 hours).
+  if (seconds < 1 || seconds > 21_600) throw new Error(DURATION_FORMAT_ERROR);
+  return seconds;
 }
 
 function formatDurationInput(seconds: number | null | undefined): string {
@@ -180,7 +188,10 @@ export function AdminCourseDetailPage() {
       };
 
       if (editingLessonId) {
-        await updateLesson(token, editingLessonId, payload);
+        const updated = await updateLesson(token, editingLessonId, payload);
+        if (updated.warnings?.includes('DURATION_MISSING')) {
+          toastInfo('Сабак сакталды, бирок ал жарыяланган жана видеонун узактыгы жок. Узактыгын киргизиңиз.');
+        }
       } else {
         await createAdminLesson(token, courseRef, payload);
       }
@@ -223,6 +234,11 @@ export function AdminCourseDetailPage() {
           ? `${result.imported} сабак кошулду, ${result.skipped} кайталанды.`
           : `${result.imported} сабак плейлисттен кошулду.`,
       );
+      if (result.unpublished) {
+        toastInfo(
+          `${result.unpublished} сабактын узактыгы YouTube'дан алынган жок, ошондуктан алар жарыяланбай кошулду. Узактыгын киргизип, жарыялаңыз.`,
+        );
+      }
     } catch (err) {
       toastError(getErrorMessage(err, 'Плейлист импорттолгон жок'));
     } finally {

@@ -131,7 +131,13 @@ export async function importAdminLessonsFromPlaylist(
     },
   );
   if (!res.ok) throw await parseApiError(res, 'Плейлист импорттолгон жок');
-  return res.json() as Promise<{ imported: number; skipped: number; total: number }>;
+  return res.json() as Promise<{
+    imported: number;
+    skipped: number;
+    total: number;
+    /** Imported without a duration from YouTube, so left unpublished. */
+    unpublished?: number;
+  }>;
 }
 
 export async function createAdminLesson(
