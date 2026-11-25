@@ -923,16 +923,6 @@ export function CourseLearnPage() {
               </div>
             </article>
           </div>
-
-          {courseId ? (
-            <CourseReviewsSection
-              courseRef={courseId}
-              courseTitle={course.title}
-              courseSlug={course.slug}
-              compact
-              canWrite={false}
-            />
-          ) : null}
         </div>
       </section>
     );
