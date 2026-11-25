@@ -61,7 +61,7 @@ export const SOCIAL = [
   { name: "WhatsApp", href: `https://wa.me/${SITE.whatsappDigits}` },
   { name: "YouTube", href: SITE.youtubeFree },
   { name: "Instagram", href: SITE.instagram },
-  { name: "Telegram", href: SITE.paidTelegramInvite },
+  { name: "Telegram", href: `https://t.me/+${SITE.telegramDigits}` },
 ] as const;
 
 export const NAV_PRIMARY = [
@@ -302,7 +302,7 @@ export const TEACHER = {
   name: "Мухаммадалим Исаков",
   shortName: "Мухаммадалим",
   birthYear: 1991,
-  family: "3 баланың атасы",
+  family: "4 баланың атасы",
   institute: "Кара-Балта ш., «Хазрети Осмон» ислам институту",
   role: "Директордун орун басары",
   quote: "БИЛИМ МЕНЕН КУРАЛДАН, АДЕП МЕНЕН ЖОЛ ТАП, ЭМГЕК МЕНЕН БИЙИКТЕ.",
