@@ -513,6 +513,22 @@ button.header-dropdown-link {
     @apply grid-cols-2 gap-x-3;
   }
 }
+/* User login/register modal only (admin modals share .auth-modal-overlay and stay as they are).
+   A form taller than the screen scrolls inside the overlay instead of being clipped at the top
+   and bottom; margin: auto still centres a short form. */
+.auth-modal-overlay:has(> [aria-labelledby="user-auth-modal-title"]) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.auth-modal[aria-labelledby="user-auth-modal-title"] {
+  margin: auto;
+}
+/* iOS Safari zooms the page when a focused input's font is below 16px. */
+@media (max-width: 768px) {
+  .auth-modal[aria-labelledby="user-auth-modal-title"] .auth-modal-input {
+    font-size: 16px;
+  }
+}
 .auth-modal-form {
   @apply flex flex-col gap-4;
 }
