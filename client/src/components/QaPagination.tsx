@@ -28,7 +28,17 @@ export function QaPagination({
 
   useEffect(() => {
     if (currentPage === lastPage) return;
-    activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    const nums = numsRef.current;
+    const active = activeRef.current;
+    if (!nums || !active) return;
+    // Center the active number inside the horizontal strip only. scrollIntoView() would also
+    // scroll the window down to the pagination every time the list loads.
+    const numsBox = nums.getBoundingClientRect();
+    const activeBox = active.getBoundingClientRect();
+    nums.scrollTo({
+      left: nums.scrollLeft + activeBox.left - numsBox.left - (numsBox.width - activeBox.width) / 2,
+      behavior: 'smooth',
+    });
   }, [currentPage, lastPage]);
 
   if (totalPages <= 1) return null;
