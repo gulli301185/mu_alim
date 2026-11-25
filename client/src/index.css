@@ -1077,7 +1077,9 @@ button.header-dropdown-link {
   width: 847px;
   height: 100%;
   max-width: min(100%, 847px);
-  object-fit: contain;
+  /* Fill the banner's full height at every size; the image keeps its proportions and is
+     cropped at the sides (object-position below picks the part that stays visible). */
+  object-fit: cover;
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 42%);
   mask-image: linear-gradient(90deg, transparent 0%, black 42%);
 }
@@ -1094,7 +1096,7 @@ button.header-dropdown-link {
   .hero-mosque-photo {
     width: min(68%, 620px);
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     object-position: right center;
   }
   .hero-sky-text {
@@ -3210,7 +3212,6 @@ button.footer-link {
 .ustaz-page-banner-img {
   display: block;
   width: 100%;
-  max-width: 1400px;
   margin: 0 auto;
   height: auto;
   aspect-ratio: 1410 / 752;
