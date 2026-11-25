@@ -119,7 +119,7 @@ export function AdminCoursesPage() {
         </div>
       ) : (
         <div className="admin-users-table-wrap ui-card">
-          <table className="admin-users-table">
+          <table className="admin-users-table admin-users-table-cards">
             <thead>
               <tr>
                 <th>Аталышы</th>
@@ -133,8 +133,8 @@ export function AdminCoursesPage() {
             <tbody>
               {items.map((course) => (
                 <tr key={course.recordId}>
-                  <td>{course.title}</td>
-                  <td>
+                  <td className="admin-users-cell-name">{course.title}</td>
+                  <td data-label="Түрү">
                     <span
                       className={`admin-users-status ${
                         course.courseType === 'free'
@@ -145,10 +145,10 @@ export function AdminCoursesPage() {
                       {courseTypeLabel(course.courseType)}
                     </span>
                   </td>
-                  <td>{course.priceLabel}</td>
-                  <td>{course.lessonsCount}</td>
-                  <td>{course.isPublished ? 'Жарыяланган' : 'Ж чертөө'}</td>
-                  <td>
+                  <td data-label="Баасы">{course.priceLabel}</td>
+                  <td data-label="Сабактар">{course.lessonsCount}</td>
+                  <td data-label="Статус">{course.isPublished ? 'Жарыяланган' : 'Ж чертөө'}</td>
+                  <td className="admin-users-cell-actions">
                     <Link
                       to={`/admin/courses/${course.slug}`}
                       className="qa-admin-btn qa-admin-btn-muted"

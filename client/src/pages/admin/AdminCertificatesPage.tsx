@@ -109,7 +109,7 @@ export function AdminCertificatesPage() {
         </div>
       ) : (
         <div className="admin-users-table-wrap ui-card">
-          <table className="admin-users-table">
+          <table className="admin-users-table admin-users-table-cards">
             <thead>
               <tr>
                 <th>Колдонуучу</th>
@@ -123,7 +123,7 @@ export function AdminCertificatesPage() {
             <tbody>
               {items.map((cert) => (
                 <tr key={cert.id}>
-                  <td>
+                  <td className="admin-users-cell-name">
                     <div className="admin-users-name-cell">
                       <span className="admin-users-avatar">
                         {(cert.recipientName || cert.user.firstName).charAt(0).toUpperCase()}
@@ -135,11 +135,11 @@ export function AdminCertificatesPage() {
                       </span>
                     </div>
                   </td>
-                  <td>{cert.user.email}</td>
-                  <td>{cert.course.title}</td>
-                  <td>{cert.certificateNumber}</td>
-                  <td>{formatAdminDate(cert.issuedAt)}</td>
-                  <td>
+                  <td data-label="Электрондук почта">{cert.user.email}</td>
+                  <td data-label="Курс">{cert.course.title}</td>
+                  <td data-label="Сертификат №">{cert.certificateNumber}</td>
+                  <td data-label="Алынган күнү">{formatAdminDate(cert.issuedAt)}</td>
+                  <td className="admin-users-cell-actions">
                     <Link to={`/admin/users/${cert.user.id}`} className="qa-admin-btn qa-admin-btn-muted">
                       Колдонуучуну көрүү
                     </Link>

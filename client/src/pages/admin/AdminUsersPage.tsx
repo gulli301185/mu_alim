@@ -128,7 +128,7 @@ export function AdminUsersPage() {
         </div>
       ) : (
         <div className="admin-users-table-wrap ui-card">
-          <table className="admin-users-table">
+          <table className="admin-users-table admin-users-table-cards">
             <thead>
               <tr>
                 <th>Колдонуучу</th>
@@ -144,25 +144,25 @@ export function AdminUsersPage() {
             <tbody>
               {items.map((user) => (
                 <tr key={user.id}>
-                  <td>
+                  <td className="admin-users-cell-name">
                     <div className="admin-users-name-cell">
                       <span className="admin-users-avatar">{user.firstName.charAt(0).toUpperCase()}</span>
                       <span>{getAdminUserDisplayName(user)}</span>
                     </div>
                   </td>
-                  <td>{user.email}</td>
-                  <td>{user.phone || '—'}</td>
-                  <td>{user.enrollmentsCount}</td>
-                  <td>{user.certificatesCount}</td>
-                  <td>{formatAdminDate(user.lastLoginAt)}</td>
-                  <td>
+                  <td data-label="Электрондук почта">{user.email}</td>
+                  <td data-label="Телефон">{user.phone || '—'}</td>
+                  <td data-label="Курстар">{user.enrollmentsCount}</td>
+                  <td data-label="Сертификат">{user.certificatesCount}</td>
+                  <td data-label="Акыркы кирүү">{formatAdminDate(user.lastLoginAt)}</td>
+                  <td data-label="Статус">
                     <span
                       className={`admin-users-status${user.isActive ? ' admin-users-status-active' : ' admin-users-status-blocked'}`}
                     >
                       {user.isActive ? 'Активдүү' : 'Блоктоолгон'}
                     </span>
                   </td>
-                  <td>
+                  <td className="admin-users-cell-actions">
                     <div className="admin-users-row-actions">
                       <Link to={`/admin/users/${user.id}`} className="qa-admin-btn qa-admin-btn-muted">
                         Көрүү
