@@ -61,7 +61,7 @@ export const SOCIAL = [
   { name: "WhatsApp", href: `https://wa.me/${SITE.whatsappDigits}` },
   { name: "YouTube", href: SITE.youtubeFree },
   { name: "Instagram", href: SITE.instagram },
-  { name: "Telegram", href: SITE.paidTelegramInvite },
+  { name: "Telegram", href: `https://t.me/+${SITE.telegramDigits}` },
 ] as const;
 
 export const NAV_PRIMARY = [
