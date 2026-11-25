@@ -24,6 +24,7 @@ const COURSE = {
   slug: 'aqida',
   title: 'Акыйда',
   isPublished: true,
+  courseType: 'paid' as 'free' | 'paid',
 };
 const STUDENT: AuthUser = { id: 'u0000000-0000-4000-8000-0000000000r1', role: 'user' } as AuthUser;
 
@@ -162,6 +163,23 @@ describe('student reviews are published immediately', () => {
     const hidden = setup({ ...COURSE, isPublished: false });
     await assert.rejects(hidden.service.create('aqida', STUDENT, { rating: 5 }), { status: 404 });
     assert.equal(hidden.rows.length, 0);
+  });
+
+  it('refuses a review for a free course and saves nothing', async () => {
+    const free = setup({ ...COURSE, courseType: 'free' });
+    await assert.rejects(
+      free.service.create('aqida', STUDENT, { rating: 5, comment: 'Жакшы' }),
+      (err: AppError) => {
+        assert.equal(err.getStatus(), 403);
+        assert.deepEqual(err.getResponse(), { error: 'Бекер курстарга пикир калтырууга болбойт' });
+        return true;
+      },
+    );
+    assert.equal(free.rows.length, 0);
+    assert.equal(
+      translateMessage('Бекер курстарга пикир калтырууга болбойт', 'ru'),
+      'Для бесплатных курсов отзывы не принимаются',
+    );
   });
 
   it('translates the success message for ru', () => {
