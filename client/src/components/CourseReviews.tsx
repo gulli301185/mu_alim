@@ -55,12 +55,15 @@ export function CourseReviewsSection({
   courseSlug,
   hideCards = false,
   compact = false,
+  canWrite = true,
 }: {
   courseRef: string;
   courseTitle?: string;
   courseSlug?: string;
   hideCards?: boolean;
   compact?: boolean;
+  /** False hides the review form (free courses: the API refuses their reviews too). */
+  canWrite?: boolean;
 }) {
   const { t } = useTranslation();
   const { token, user } = useAuth();
@@ -143,52 +146,54 @@ export function CourseReviewsSection({
         </p>
       </div>
 
-      <div className={compact ? 'course-reviews-compact-row' : undefined}>
-        <div className={compact ? 'course-reviews-compact-form' : undefined}>
-          {user ? (
-            <form className="course-review-form" onSubmit={(event) => void onSubmit(event)}>
-              <p className="course-review-form-label">{t('reviews.yourRating')}</p>
-              <Stars
-                value={rating}
-                onChange={(value) => {
-                  setRating(value);
-                  if (ratingError) setRatingError('');
-                }}
-              />
-              {ratingError ? <p className="course-review-field-error">{ratingError}</p> : null}
-              <label className="course-review-form-label" htmlFor="course-review-name">
-                {t('reviews.author')}
-              </label>
-              <input
-                id="course-review-name"
-                className="course-review-input"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder={t('reviews.namePlaceholder')}
-                maxLength={150}
-                required
-              />
-              <label className="course-review-form-label" htmlFor="course-review-text">
-                {t('reviews.text')}
-              </label>
-              <textarea
-                id="course-review-text"
-                className="course-review-textarea"
-                rows={compact ? 3 : 8}
-                maxLength={8000}
-                placeholder={t('reviews.textPlaceholder')}
-                value={comment}
-                onChange={(event) => setComment(event.target.value)}
-                required
-              />
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? t('reviews.sending') : t('reviews.submit')}
-              </button>
-            </form>
-          ) : (
-            <p className="course-review-note">{t('reviews.loginToReview')}</p>
-          )}
-        </div>
+      <div className={compact && canWrite ? 'course-reviews-compact-row' : undefined}>
+        {canWrite ? (
+          <div className={compact ? 'course-reviews-compact-form' : undefined}>
+            {user ? (
+              <form className="course-review-form" onSubmit={(event) => void onSubmit(event)}>
+                <p className="course-review-form-label">{t('reviews.yourRating')}</p>
+                <Stars
+                  value={rating}
+                  onChange={(value) => {
+                    setRating(value);
+                    if (ratingError) setRatingError('');
+                  }}
+                />
+                {ratingError ? <p className="course-review-field-error">{ratingError}</p> : null}
+                <label className="course-review-form-label" htmlFor="course-review-name">
+                  {t('reviews.author')}
+                </label>
+                <input
+                  id="course-review-name"
+                  className="course-review-input"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder={t('reviews.namePlaceholder')}
+                  maxLength={150}
+                  required
+                />
+                <label className="course-review-form-label" htmlFor="course-review-text">
+                  {t('reviews.text')}
+                </label>
+                <textarea
+                  id="course-review-text"
+                  className="course-review-textarea"
+                  rows={compact ? 3 : 8}
+                  maxLength={8000}
+                  placeholder={t('reviews.textPlaceholder')}
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  required
+                />
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? t('reviews.sending') : t('reviews.submit')}
+                </button>
+              </form>
+            ) : (
+              <p className="course-review-note">{t('reviews.loginToReview')}</p>
+            )}
+          </div>
+        ) : null}
 
         {hideCards ? null : loading ? (
           <div className="course-reviews-compact-carousel course-review-note-wrap">

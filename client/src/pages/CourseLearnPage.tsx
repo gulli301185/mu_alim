@@ -930,6 +930,7 @@ export function CourseLearnPage() {
               courseTitle={course.title}
               courseSlug={course.slug}
               compact
+              canWrite={false}
             />
           ) : null}
         </div>

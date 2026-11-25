@@ -12,6 +12,7 @@ import { Review } from '../database/entities';
 const CACHE_TTL = 120;
 const COURSE_NOT_FOUND = 'Курс табылган жок';
 const REVIEW_NOT_FOUND = 'Пикир табылган жок';
+const FREE_COURSE_REVIEWS_CLOSED = 'Бекер курстарга пикир калтырууга болбойт';
 
 const reviewStatus = z.enum(['pending', 'approved', 'rejected']);
 
@@ -183,6 +184,8 @@ export class ReviewsService {
   async create(ref: string, user: AuthUser, data: z.infer<typeof createReviewSchema>) {
     const course = await this.courses.resolveRef(ref);
     if (!course || !course.isPublished) throw new AppError(404, COURSE_NOT_FOUND);
+    // Students review paid courses only (same free/paid rule as final tests).
+    if (course.courseType !== 'paid') throw new AppError(403, FREE_COURSE_REVIEWS_CLOSED);
 
     const saved = await this.reviewRepo.save(
       this.reviewRepo.create({
