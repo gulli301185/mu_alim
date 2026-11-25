@@ -473,6 +473,36 @@ export function CourseLearnPage() {
     return () => window.clearTimeout(timer);
   }, [completeBlockedUntil]);
 
+  // Free course on phones/tablets: the lesson list sits below the video, so after picking a
+  // lesson bring its title and video into view (below the sticky header). Desktop shows both
+  // columns side by side and is left as is.
+  const freeLessonMainRef = useRef<HTMLElement>(null);
+  const scrollToFreeLessonRef = useRef(false);
+  const scrollToFreeLesson = useCallback(() => {
+    if (!window.matchMedia("(max-width: 1023px)").matches) return;
+    const main = freeLessonMainRef.current;
+    if (!main) return;
+    const header = document.querySelector(".header-wave");
+    const offset = (header?.getBoundingClientRect().bottom ?? 0) + 12;
+    const top = main.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    if (!scrollToFreeLessonRef.current) return;
+    scrollToFreeLessonRef.current = false;
+    scrollToFreeLesson();
+  }, [activeLessonId, scrollToFreeLesson]);
+
+  const selectFreeLesson = (lessonId: string) => {
+    if (lessonId === activeLessonId) {
+      scrollToFreeLesson();
+      return;
+    }
+    scrollToFreeLessonRef.current = true;
+    setActiveLessonId(lessonId);
+  };
+
   const activeLesson = lessons.find((l) => l.id === activeLessonId);
   const completedCount = progress.completedLessonIds.length;
   const isActiveLessonCompleted = activeLesson
@@ -861,7 +891,7 @@ export function CourseLearnPage() {
                         className={`course-learn-lesson-btn${
                           active ? " course-learn-lesson-active" : ""
                         }`}
-                        onClick={() => setActiveLessonId(lesson.id)}
+                        onClick={() => selectFreeLesson(lesson.id)}
                       >
                         <span className="course-learn-lesson-icon" aria-hidden>
                           <PlayCircle className="h-4 w-4" />
@@ -884,7 +914,10 @@ export function CourseLearnPage() {
               </Link>
             </aside>
 
-            <article className="course-learn-main ui-card">
+            <article
+              ref={freeLessonMainRef}
+              className="course-learn-main ui-card"
+            >
               <div className="course-learn-main-head">
                 <div className="course-learn-main-heading">
                   <h2 className="course-learn-main-title">
