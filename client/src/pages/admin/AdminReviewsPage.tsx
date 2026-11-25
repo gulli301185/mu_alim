@@ -332,7 +332,7 @@ export function AdminReviewsPage() {
         ) : items.length === 0 ? (
           <p className="admin-placeholder-subtitle px-4 py-6">Пикир жок.</p>
         ) : (
-          <table className="admin-users-table">
+          <table className="admin-users-table admin-users-table-cards">
             <thead>
               <tr>
                 <th>Автор</th>
@@ -346,14 +346,14 @@ export function AdminReviewsPage() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id} className={editingId === item.id ? 'admin-review-row-editing' : undefined}>
-                  <td>
+                  <td className="admin-users-cell-name">
                     <strong>{item.authorName}</strong>
                     {item.authorEmail ? (
                       <p className="admin-section-subtitle m-0">{item.authorEmail}</p>
                     ) : null}
                   </td>
-                  <td>{item.courseTitle}</td>
-                  <td>
+                  <td data-label="Курс">{item.courseTitle}</td>
+                  <td data-label="Баа">
                     <span className="admin-review-stars">
                       {Array.from({ length: 5 }, (_, i) => (
                         <Star
@@ -364,14 +364,14 @@ export function AdminReviewsPage() {
                       ))}
                     </span>
                   </td>
-                  <td className="admin-review-comment">
+                  <td className="admin-review-comment" data-label="Пикир">
                     {item.videoUrl ? (
                       <span>Видео отзыв{item.comment ? ` · ${item.comment}` : ''}</span>
                     ) : (
                       item.comment || '—'
                     )}
                   </td>
-                  <td>
+                  <td data-label="Статус">
                     <span
                       className={`admin-users-status ${
                         item.status === 'approved'
@@ -384,7 +384,7 @@ export function AdminReviewsPage() {
                       {statusLabel(item.status)}
                     </span>
                   </td>
-                  <td>
+                  <td className="admin-users-cell-actions">
                     <div className="admin-review-actions">
                       <button
                         type="button"

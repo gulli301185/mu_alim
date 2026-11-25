@@ -445,7 +445,7 @@ export function AdminTestsPage() {
         </div>
       ) : (
         <div className="admin-users-table-wrap ui-card">
-          <table className="admin-users-table">
+          <table className="admin-users-table admin-users-table-cards">
             <thead>
               <tr>
                 <th>Тест</th>
@@ -459,7 +459,7 @@ export function AdminTestsPage() {
             <tbody>
               {items.map((test) => (
                 <tr key={test.id}>
-                  <td>
+                  <td className="admin-users-cell-name">
                     {test.title}
                     {test.lesson ? (
                       <span
@@ -471,10 +471,10 @@ export function AdminTestsPage() {
                       </span>
                     ) : null}
                   </td>
-                  <td>{test.course.title}</td>
-                  <td>{test.questionsCount}</td>
-                  <td>{test.passingScore}%</td>
-                  <td>
+                  <td data-label="Курс">{test.course.title}</td>
+                  <td data-label="Суроолор">{test.questionsCount}</td>
+                  <td data-label="Өтүү">{test.passingScore}%</td>
+                  <td data-label="Абалы">
                     <span
                       className={`admin-users-status ${
                         test.isActive ? 'admin-users-status-active' : 'admin-users-status-blocked'
@@ -483,7 +483,7 @@ export function AdminTestsPage() {
                       {test.isActive ? 'Активдүү' : 'Өчүк'}
                     </span>
                   </td>
-                  <td>
+                  <td className="admin-users-cell-actions">
                     <div className="admin-lesson-actions">
                       <button
                         type="button"
@@ -522,7 +522,7 @@ export function AdminTestsPage() {
       {!loading && !error && coursesWithoutTest.length > 0 ? (
         <div className="admin-users-table-wrap ui-card">
           <h3 className="admin-section-title">Тести жок акылуу курстар · {coursesWithoutTest.length}</h3>
-          <table className="admin-users-table">
+          <table className="admin-users-table admin-users-table-cards">
             <thead>
               <tr>
                 <th>Курс</th>
@@ -533,9 +533,9 @@ export function AdminTestsPage() {
             <tbody>
               {coursesWithoutTest.map((course) => (
                 <tr key={course.slug}>
-                  <td>{course.title}</td>
-                  <td>{course.isPublished ? 'Жарыяланган' : 'Жарыяланбаган'}</td>
-                  <td>
+                  <td className="admin-users-cell-name">{course.title}</td>
+                  <td data-label="Абалы">{course.isPublished ? 'Жарыяланган' : 'Жарыяланбаган'}</td>
+                  <td className="admin-users-cell-actions">
                     <div className="admin-lesson-actions">
                       <button
                         type="button"

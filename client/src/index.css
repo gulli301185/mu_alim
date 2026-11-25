@@ -7758,7 +7758,7 @@ a.course-learn-review-tab {
   min-width: 42px;
   height: 42px;
   background: rgba(241, 158, 31, 0.16);
-  color: var(--color-navy);
+  color: var(--admin-text, var(--color-navy));
 }
 
 .qa-admin-row-text {
@@ -7917,10 +7917,22 @@ a.course-learn-review-tab {
 /* Admin dashboard */
 .admin-dashboard {
   --admin-sidebar-width: 17.5rem;
+  /* Admin text tokens: black text in light mode, white in dark mode (.admin-dashboard.dark).
+     The navy/muted colour tokens are text colours in the admin, so they follow too. */
+  --color-navy: #000;
+  --color-navy-light: #000;
+  --color-muted: #000;
+  --admin-text: #000;
+  --admin-text-muted: #000;
+  --admin-success-text: #166534;
+  --admin-danger-text: #b91c1c;
+  --admin-warning-text: #92400e;
+  --admin-accent-text: #92400e;
+  --admin-placeholder: #64748b;
   min-height: 100vh;
   display: flex;
   background: var(--color-page);
-  color: var(--color-navy);
+  color: var(--admin-text);
 }
 
 @media (min-width: 1024px) {
@@ -7931,8 +7943,57 @@ a.course-learn-review-tab {
 }
 
 .admin-dashboard.dark {
+  --color-navy: #fff;
+  --color-navy-light: #fff;
+  --color-muted: #fff;
+  --dm-text: #fff;
+  --admin-text: #fff;
+  --admin-text-muted: #fff;
+  --admin-success-text: #86efac;
+  --admin-danger-text: #fca5a5;
+  --admin-warning-text: #fcd34d;
+  --admin-accent-text: var(--color-gold);
+  --admin-placeholder: #94a3b8;
+  /* Used by the existing `.dark .admin-*` rules but never defined before. */
+  --dm-muted: var(--admin-text-muted);
   background: var(--dm-bg);
-  color: var(--dm-text);
+  color: var(--admin-text);
+}
+
+/* These shared components use navy as a background, so they keep the site palette
+   (same values as :root / .dark) instead of the admin's black/white text tokens. */
+.admin-dashboard :is(.auth-modal-overlay, .qa-pagination, .qa-sort-btn) {
+  --color-navy: #1a367e;
+  --color-navy-light: #2a4a9e;
+  --color-muted: #64748b;
+  --dm-text: #e2e8f0;
+}
+
+.admin-dashboard.dark :is(.auth-modal-overlay, .qa-pagination, .qa-sort-btn) {
+  --color-muted: #94a3b8;
+}
+
+.admin-dashboard .qa-admin-pending-badge {
+  /* Dark text stays on the gold badge in both themes. */
+  color: var(--color-navy-dark);
+}
+
+.admin-dashboard.dark .admin-stat-card {
+  background: var(--dm-card);
+  border-color: var(--dm-card-border);
+}
+
+.admin-dashboard.dark .admin-user-progress-bar {
+  background: var(--dm-card-border);
+}
+
+.admin-dashboard.dark .admin-review-btn-edit {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.admin-dashboard ::placeholder,
+.admin-dashboard .admin-select-placeholder {
+  color: var(--admin-placeholder);
 }
 
 .admin-sidebar-backdrop {
@@ -8172,7 +8233,7 @@ a.course-learn-review-tab {
 
 .admin-stat-card-green .admin-stat-icon {
   background: rgba(34, 197, 94, 0.15);
-  color: #15803d;
+  color: var(--admin-success-text, #15803d);
 }
 
 .admin-stat-label {
@@ -8310,7 +8371,7 @@ a.course-learn-review-tab {
 
 .admin-users-table th {
   @apply text-xs font-bold uppercase tracking-wide;
-  color: var(--color-navy-light);
+  color: var(--admin-text-muted, var(--color-navy-light));
   background: rgba(241, 158, 31, 0.06);
 }
 
@@ -8323,7 +8384,7 @@ a.course-learn-review-tab {
   width: 34px;
   height: 34px;
   background: rgba(241, 158, 31, 0.18);
-  color: var(--color-gold);
+  color: var(--admin-accent-text, var(--color-gold));
 }
 
 .admin-users-status {
@@ -8332,12 +8393,143 @@ a.course-learn-review-tab {
 
 .admin-users-status-active {
   background: rgba(34, 197, 94, 0.14);
-  color: #15803d;
+  color: var(--admin-success-text, #15803d);
 }
 
 .admin-users-status-blocked {
   background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  color: var(--admin-danger-text, #b91c1c);
+}
+
+/* Admin on phones: users table as cards, full-width search, compact topbar. */
+@media (max-width: 768px) {
+  .admin-dashboard-main {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .admin-topbar {
+    @apply gap-2 px-3 py-3;
+  }
+
+  .admin-topbar-left {
+    @apply gap-2;
+  }
+
+  .admin-topbar-left > div {
+    min-width: 0;
+  }
+
+  .admin-topbar-actions {
+    @apply gap-1.5;
+  }
+
+  .admin-topbar-icon-btn,
+  .admin-topbar-logout {
+    @apply px-2.5;
+  }
+
+  .admin-dashboard-content .qa-admin-search {
+    width: 100%;
+  }
+
+  .admin-dashboard-content .qa-admin-search > svg {
+    @apply absolute left-4 pointer-events-none;
+    z-index: 1;
+  }
+
+  .admin-dashboard-content .qa-admin-search-input {
+    @apply py-3 pl-11 text-base;
+    min-width: 0;
+  }
+
+  .admin-users-table-cards thead {
+    @apply sr-only;
+  }
+
+  .admin-users-table-cards,
+  .admin-users-table-cards tbody,
+  .admin-users-table-cards tr,
+  .admin-users-table-cards td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-users-table-cards tr {
+    @apply py-3 border-b;
+    border-color: #e5eaf3;
+  }
+
+  .dark .admin-users-table-cards tr {
+    border-color: var(--dm-card-border);
+  }
+
+  .admin-users-table-cards tr:last-child {
+    border-bottom: 0;
+  }
+
+  .admin-users-table-cards td {
+    @apply flex items-center justify-between gap-3 px-4 py-1.5 border-0 text-right;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-users-table-cards td[data-label]::before {
+    content: attr(data-label);
+    @apply shrink-0 text-xs font-bold uppercase tracking-wide text-left;
+    color: var(--admin-text-muted);
+  }
+
+  .admin-users-table-cards .admin-users-cell-name {
+    @apply block pb-2 text-left font-semibold;
+  }
+
+  .admin-users-table-cards .admin-users-name-cell {
+    min-width: 0;
+  }
+
+  .admin-users-table-cards .admin-users-cell-actions {
+    @apply pt-2;
+  }
+
+  /* Action buttons share the card's full width and wrap instead of overflowing. */
+  .admin-users-table-cards .admin-users-cell-actions > * {
+    @apply flex-1 justify-center;
+  }
+
+  .admin-users-table-cards .admin-users-cell-actions > div {
+    @apply flex-wrap;
+    min-width: 0;
+  }
+
+  .admin-users-table-cards .admin-users-cell-actions > div > * {
+    @apply flex-auto justify-center;
+  }
+
+  .admin-users-table-cards .admin-users-cell-actions .qa-admin-btn {
+    @apply px-3 py-2.5 text-sm;
+  }
+
+  /* Icon-only buttons (edit, delete) keep their own size. */
+  .admin-users-table-cards .admin-users-cell-actions > div > [aria-label],
+  .admin-users-table-cards .admin-users-cell-actions > div > .admin-review-btn-danger {
+    flex: 0 0 auto;
+    min-width: 2.75rem;
+  }
+
+  .admin-users-table-cards .admin-test-hint,
+  .admin-users-table-cards .admin-users-cell-name .admin-section-subtitle {
+    font-weight: 400;
+  }
+
+  .admin-users-table-wrap > .admin-section-title {
+    @apply px-4 pt-4 text-xl;
+  }
+
+  /* Long free text (review comment) reads left-aligned under its label. */
+  .admin-users-table-cards .admin-review-comment {
+    @apply flex-col items-start gap-1 text-left;
+    max-width: none;
+  }
 }
 
 .admin-user-detail-grid {
@@ -8401,7 +8593,7 @@ a.course-learn-review-tab {
 }
 
 .admin-user-dates dt {
-  color: var(--color-navy-light);
+  color: var(--admin-text-muted, var(--color-navy-light));
 }
 
 .admin-user-dates dd {
@@ -8543,7 +8735,7 @@ a.course-learn-review-tab {
 
 .admin-course-type-paid {
   background: rgba(241, 158, 31, 0.14);
-  color: var(--color-gold);
+  color: var(--admin-accent-text, var(--color-gold));
 }
 
 .admin-course-form,
@@ -8587,12 +8779,12 @@ a.course-learn-review-tab {
 
 .admin-test-edit-meta {
   @apply text-sm m-0;
-  color: var(--color-navy-light);
+  color: var(--admin-text-muted, var(--color-navy-light));
 }
 
 .admin-test-hint {
   @apply text-xs mt-1 block;
-  color: var(--color-navy-light);
+  color: var(--admin-text-muted, var(--color-navy-light));
 }
 
 .admin-test-questions {
@@ -8657,7 +8849,7 @@ a.course-learn-review-tab {
 
 .admin-select-chevron {
   @apply h-5 w-5 shrink-0 transition-transform;
-  color: var(--color-navy-light);
+  color: var(--admin-text-muted, var(--color-navy-light));
 }
 
 .admin-select-open .admin-select-chevron {
@@ -8674,7 +8866,7 @@ a.course-learn-review-tab {
 
 .admin-select-option {
   @apply w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left text-base border-0 bg-transparent cursor-pointer transition-colors;
-  color: var(--color-navy);
+  color: var(--admin-text, var(--color-navy));
 }
 
 .admin-select-option:hover:not(:disabled) {
@@ -9320,23 +9512,23 @@ a.course-learn-review-tab {
 .admin-review-btn {
   @apply inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold border-0 cursor-pointer;
   background: rgba(34, 197, 94, 0.14);
-  color: #15803d;
+  color: var(--admin-success-text, #15803d);
 }
 .admin-review-btn-edit {
   background: rgba(26, 54, 126, 0.12);
-  color: var(--color-navy);
+  color: var(--admin-text, var(--color-navy));
 }
 .admin-review-btn-warn {
   background: rgba(245, 158, 11, 0.16);
-  color: #b45309;
+  color: var(--admin-warning-text, #b45309);
 }
 .admin-review-btn-danger {
   background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  color: var(--admin-danger-text, #b91c1c);
 }
 .admin-review-status-pending {
   background: rgba(245, 158, 11, 0.16);
-  color: #b45309;
+  color: var(--admin-warning-text, #b45309);
 }
 .admin-review-row-editing td {
   background: rgba(243, 195, 74, 0.12);
