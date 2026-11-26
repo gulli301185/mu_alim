@@ -1036,6 +1036,10 @@ button.header-dropdown-link {
   max-width: min(46%, 460px);
   pointer-events: none;
 }
+/* Line break used on phones only (see withMobileBreak in LandingPage). */
+.hero-mobile-br {
+  display: none;
+}
 .hero-sky-title {
   margin: 0;
   font-family: var(--font-display);
@@ -1119,6 +1123,9 @@ button.header-dropdown-link {
   .hero-sky-text {
     left: 4%;
     max-width: 58%;
+  }
+  .hero-mobile-br {
+    display: inline;
   }
   .hero-sky-title {
     font-size: 1.35rem;

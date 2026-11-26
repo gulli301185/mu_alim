@@ -397,6 +397,20 @@ function VideoPanel({
   );
 }
 
+/** Phones only (`.hero-mobile-br`): moves the last `tailWords` words of the hero text to a new line,
+ * e.g. "Стремись к / вершинам!" and "Знание открывает / путь к свободе,". */
+function withMobileBreak(text: string, tailWords: number) {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= tailWords) return text;
+  return (
+    <>
+      {words.slice(0, -tailWords).join(" ")}{" "}
+      <br className="hero-mobile-br" />
+      {words.slice(-tailWords).join(" ")}
+    </>
+  );
+}
+
 export function LandingPage() {
   const { t, i18n: i18next } = useTranslation();
   const { data: hero } = useQuery({
@@ -442,14 +456,16 @@ export function LandingPage() {
       <section id="hero" className="hero-mosque">
         <img src={banner.skyImageUrl} alt="" className="hero-sky-photo" />
         <div className="hero-sky-text">
-          <p className="hero-sky-title">{banner.title}</p>
+          <p className="hero-sky-title">
+            {withMobileBreak(banner.title, 1)}
+          </p>
           <p className="hero-sky-sub">
             {(() => {
               const comma = banner.subtitle.indexOf(",");
               if (comma === -1) return banner.subtitle;
               return (
                 <>
-                  {banner.subtitle.slice(0, comma + 1)}
+                  {withMobileBreak(banner.subtitle.slice(0, comma + 1), 3)}
                   <br />
                   {banner.subtitle.slice(comma + 1).trim()}
                 </>
